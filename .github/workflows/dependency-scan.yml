@@ -1,0 +1,204 @@
+name: Dependency Vulnerability Scan
+
+# Audit findings DEP-06 (pins drifting apart between the 9 modules) and DEP-07.
+# Companion to the weekly image scan: that one scans built images for OS-level
+# CVEs, this one scans the dependency manifests in the repo.
+#
+#   drift  — every requirements*.txt agrees with constraints.txt   (hard gate)
+#   scan   — OSV-Scanner SARIF into the Security tab               (informational)
+#   gate   — fails the build on HIGH/CRITICAL advisories           (hard gate)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Every Monday at 06:00 UTC — an hour before the weekly image scan.
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+    inputs:
+      severity-threshold:
+        description: 'Minimum CVSS base score that fails the build'
+        default: '7.0'
+        type: string
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+  issues: write
+
+env:
+  # CVSS v3/v4 base score at which the build fails. 7.0 = HIGH.
+  SEVERITY_THRESHOLD: ${{ inputs.severity-threshold || '7.0' }}
+
+  # Advisories that are HIGH but cannot currently be fixed from this repo.
+  # Every entry must carry a reason and be re-checked at each dependency wave —
+  # see reports/fix-deps-2.md §4. Keep this list SHORT; it is the only thing
+  # standing between a real HIGH and a red build.
+  #
+  #   PYSEC-2026-3481 / -3482 / -3483  (mcp 1.23.3, via semgrep)
+  #     semgrep hard-pins `mcp==1.23.3` in every release to date, so the version
+  #     cannot be raised without dropping semgrep. Not reachable: appsec only
+  #     shells out to `semgrep scan`, never imports mcp, and exposes no MCP
+  #     server — all three advisories are server-side. Re-check whenever
+  #     semgrep relaxes the pin.
+  #
+  #   RUSTSEC-2026-0194 / -0195  (quick-xml, smb_scan_rs)
+  #     Only fixed in quick-xml 0.41, which removes BytesText::unescape() and
+  #     therefore needs a one-line source change in smb_scan_rs/rust/src/main.rs.
+  #     Tracked as a follow-up.
+  ALLOWLIST: >-
+    PYSEC-2026-3481 PYSEC-2026-3482 PYSEC-2026-3483
+    GHSA-hvrp-rf83-w775 GHSA-jpw9-pfvf-9f58 GHSA-vj7q-gjh5-988w
+    RUSTSEC-2026-0194 RUSTSEC-2026-0195
+
+jobs:
+  # ── Dependency drift: the 9 modules must stay on one set of versions ───────
+  drift:
+    name: Pin drift vs constraints.txt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check dependency drift
+        run: bash tests/check-deps-drift.sh
+
+  # ── OSV-Scanner, official reusable workflow: SARIF into the Security tab ───
+  # Informational: the pass/fail decision is the `gate` job below, which knows
+  # about severity and about the advisories we cannot act on yet.
+  scan:
+    name: OSV-Scanner (SARIF)
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@v2.3.8
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    with:
+      scan-args: |-
+        --recursive
+        ./
+      fail-on-vuln: false
+      upload-sarif: true
+
+  # ── Severity gate: fail on HIGH and above ─────────────────────────────────
+  gate:
+    name: Fail on HIGH+ advisories
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run OSV-Scanner (JSON)
+        id: osv
+        continue-on-error: true          # exit 1 just means "found something"
+        uses: google/osv-scanner-action/osv-scanner-action@v2.3.8
+        with:
+          scan-args: |-
+            --recursive
+            --format=json
+            --output-file=osv-results.json
+            ./
+
+      - name: Evaluate severities
+        run: |
+          python3 - <<'PY'
+          import json, os, sys, pathlib
+
+          threshold = float(os.environ["SEVERITY_THRESHOLD"])
+          allowed = set(os.environ["ALLOWLIST"].split())
+
+          results = pathlib.Path("osv-results.json")
+          if not results.exists():
+              print("::error::osv-results.json missing — the scan step did not produce output")
+              sys.exit(1)
+
+          data = json.loads(results.read_text())
+
+          blocking, ignored, unscored = [], [], []
+          for result in data.get("results", []):
+              source = result.get("source", {}).get("path", "?")
+              for package in result.get("packages", []):
+                  pkg = package.get("package", {})
+                  name = f"{pkg.get('name')}@{pkg.get('version')}"
+                  for group in package.get("groups", []):
+                      ids = group.get("ids", [])
+                      aliases = group.get("aliases", ids)
+                      label = ",".join(ids)
+                      raw = group.get("max_severity", "")
+                      # An allowlisted id or alias clears the whole group.
+                      if allowed.intersection(set(ids) | set(aliases)):
+                          ignored.append(f"{source}: {name} {label}")
+                          continue
+                      try:
+                          score = float(raw)
+                      except (TypeError, ValueError):
+                          unscored.append(f"{source}: {name} {label} (no CVSS score)")
+                          continue
+                      if score >= threshold:
+                          blocking.append(f"{source}: {name} {label} CVSS {score}")
+
+          summary = pathlib.Path(os.environ.get("GITHUB_STEP_SUMMARY", os.devnull))
+          with summary.open("a") as fh:
+              fh.write(f"## OSV-Scanner severity gate (threshold {threshold})\n\n")
+              fh.write(f"- blocking: **{len(blocking)}**\n")
+              fh.write(f"- allowlisted: {len(ignored)}\n")
+              fh.write(f"- unscored (reported, not blocking): {len(unscored)}\n\n")
+              for item in blocking:
+                  fh.write(f"- :x: {item}\n")
+              for item in ignored:
+                  fh.write(f"- :grey_exclamation: allowlisted — {item}\n")
+
+          for item in ignored:
+              print(f"allowlisted  {item}")
+          for item in unscored:
+              print(f"::warning::unscored advisory {item}")
+          for item in blocking:
+              print(f"::error::{item}")
+
+          if blocking:
+              print(f"\nFAIL: {len(blocking)} advisory group(s) at or above CVSS {threshold}.")
+              sys.exit(1)
+          print(f"\nOK: no advisory at or above CVSS {threshold} outside the allowlist.")
+          PY
+
+  # ── Open an issue when the scheduled run goes red ──────────────────────────
+  notify:
+    runs-on: ubuntu-latest
+    needs: [drift, scan, gate]
+    if: failure() && github.event_name == 'schedule'
+    steps:
+      - name: Create issue for dependency vulnerabilities
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = `🔒 Dependency vulnerabilities detected — ${new Date().toISOString().split('T')[0]}`;
+            const body = `## Dependency Scan Results
+
+            The weekly dependency scan failed on the manifests in this repository.
+
+            ### Action Required
+            1. Review the [Security tab](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/security/code-scanning) and the failed run's job summary
+            2. Raise the affected pins in \`constraints.txt\` **and** in every \`requirements.txt\` that carries them
+            3. Verify alignment: \`bash tests/check-deps-drift.sh\`
+            4. Re-scan: \`osv-scanner --recursive .\`
+            5. Rebuild the affected images
+
+            _Automated by GitHub Actions weekly dependency scan_`;
+
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'security,dependency-scan'
+            });
+
+            if (issues.data.length === 0) {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: title,
+                body: body,
+                labels: ['security', 'dependency-scan']
+              });
+            }

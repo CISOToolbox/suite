@@ -1,0 +1,84 @@
+/* ── Asset Management — App-specific styles ──────────────── */
+
+/* ── Dashboard cards — migrated to shared .ct-kpi / .ct-kpigrid ─ */
+
+/* ── Forms ─────────────────────────────────────────────────── */
+
+/* ── Tabs (reuse vendor-tabs pattern) ─────────────────────── */
+.vendor-tabs { display: flex; gap: 4px; margin-bottom: 12px; }
+.vendor-tab { flex: 1; padding: 8px; border: none; background: var(--ct-canvas); cursor: pointer; border-radius: 6px; font-weight: 600; font-size: 0.82em; color: var(--ct-ink-2); transition: all 0.15s; }
+.vendor-tab.active { background: var(--ct-surface); color: var(--ct-ink); box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+
+/* ── Dashboard sections ───────────────────────────────────── */
+.dash-section { background: var(--ct-surface); border: 1px solid var(--ct-line); border-radius: 8px; padding: 14px; margin-bottom: 12px; }
+
+/* ── Type breakdown bar ───────────────────────────────────── */
+.type-breakdown { display: flex; flex-direction: column; gap: 6px; }
+.type-bar-row { display: flex; align-items: center; gap: 8px; font-size: 0.85em; }
+.type-bar-label { min-width: 140px; font-weight: 600; }
+.type-bar-track { flex: 1; height: 8px; background: var(--ct-canvas); border-radius: 4px; overflow: hidden; }
+.type-bar-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }
+.type-bar-count { min-width: 24px; text-align: right; font-weight: 700; color: var(--ct-ink-2); }
+
+/* ── Type badge ───────────────────────────────────────────── */
+
+/* ── Groupe card ──────────────────────────────────────────── */
+
+/* ── RACI table ───────────────────────────────────────────── */
+.raci-table { width: 100%; border-collapse: collapse; }
+.raci-table th { font-size: 0.78em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--ct-ink-2); padding: 8px; text-align: center; }
+.raci-table td { padding: 6px 8px; border-top: 1px solid var(--ct-line); }
+.raci-table input { text-align: center; }
+
+/* ── Forms (reuse tprm-form from shared patterns) ─────────── */
+.form-section { font-size: 0.75em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--ct-ink-2); margin: 16px 0 8px; padding-top: 12px; border-top: 1px solid var(--ct-line); }
+
+/* ── AI suggest button ─────────────────────────────────────── */
+
+/* ── Empty state ──────────────────────────────────────────── */
+/* ── Responsive ───────────────────────────────────────────── */
+@media (max-width: 768px) {
+    .type-bar-label { min-width: 100px; font-size: 0.8em; }
+    .tprm-form { padding: 12px; }
+    .form-grid { grid-template-columns: 1fr; }
+    .vendor-tabs { flex-direction: column; }
+    .vendor-tab { padding: 10px; font-size: 0.85em; }
+    table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    thead { white-space: nowrap; }
+    td, th { padding: 6px 8px; font-size: 0.82em; }
+}
+
+/* ── Dark theme fixes (light rendering unchanged) ─────────── */
+/* Saturated green .btn-add: dark ink on filled button (convention). */
+/* Accent (violet) filled variants keep light text — they are correct as-is. */
+
+/* Neutral secondary buttons (light: gray via inline background:var(--ct-ink-2)). */
+:root[data-theme="dark"] .btn-add.btn-neutral {
+    background: var(--ct-surface) !important;
+    border: 1px solid var(--ct-line-strong);
+    color: var(--ct-ink) !important;
+}
+:root[data-theme="dark"] .btn-add.btn-neutral:hover { background: var(--ct-surface-2) !important; opacity: 1; }
+
+/* Destructive: tinted at rest, solid red on hover (spec bouton Supprimer). */
+
+/* Small edit pill on connector cards — accent family (action, not status). */
+
+/* "auto" origin badge on the measures table (light: solid #0ea5e9 inline). */
+
+/* Asset type badges: tint background + ink text, keeping the per-type hue.
+   Light keeps the inline hex + alpha styling; custom types keep their own color. */
+
+/* Manual-lock banner: hardcoded #fcd34d border reads too bright in dark. */
+
+/* ── Backend suite additions ──────────────────────────────── */
+.nav-badge { display: inline-block; margin-left: 6px; min-width: 16px; padding: 0 5px; border-radius: 9px; background: var(--ct-high); color: var(--ct-onsolid); font-size: 0.72em; font-weight: 700; line-height: 16px; text-align: center; vertical-align: middle; }
+
+
+/* Extrait des styles inline : la classe portait deja le nom, la mise en
+   forme vivait a cote dans un attribut style. Rendu identique. */
+.manual-lock-banner { background:var(--ct-medium-tint); border:1px solid var(--ct-medium); border-radius:6px; padding:8px 12px; margin-bottom:var(--ct-s3); font-size:var(--ct-text-meta); display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+
+/* Pastille de conformite : Asset l'emet depuis toujours sans la definir,
+   les trois occurrences etaient rendues sans style. Meme regle qu'Access
+   et Compliance. */

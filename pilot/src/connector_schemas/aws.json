@@ -1,0 +1,43 @@
+{
+  "id": "aws",
+  "name": { "fr": "AWS — Posture sécurité", "en": "AWS — Security posture" },
+  "description": {
+    "fr": "Connecteur AWS (IAM read-only) alimentant les indicateurs sécurité : Security Hub, GuardDuty, rotation des clés IAM, buckets S3 publics. Mode démo si aucune credential.",
+    "en": "AWS connector (read-only IAM) feeding security indicators: Security Hub, GuardDuty, IAM key rotation, public S3 buckets. Demo mode when no credentials are set."
+  },
+  "icon": "shield",
+  "vendor": "Amazon Web Services",
+  "cardinality": "one",
+  "fields": [
+    {
+      "id": "access_key_id",
+      "label": { "fr": "Access Key ID", "en": "Access Key ID" },
+      "help": { "fr": "Clé d'accès de l'utilisateur IAM read-only.", "en": "Access key of the read-only IAM user." },
+      "secret": false,
+      "required": false,
+      "placeholder": "AKIA..."
+    },
+    {
+      "id": "secret_access_key",
+      "label": { "fr": "Secret Access Key", "en": "Secret Access Key" },
+      "help": { "fr": "Secret associé à l'Access Key (jamais réaffiché).", "en": "Secret paired with the Access Key (never shown again)." },
+      "secret": true,
+      "required": false
+    },
+    {
+      "id": "region",
+      "label": { "fr": "Région", "en": "Region" },
+      "help": { "fr": "Région AWS par défaut pour les appels.", "en": "Default AWS region for the API calls." },
+      "secret": false,
+      "required": false,
+      "placeholder": "us-east-1"
+    }
+  ],
+  "capabilities": ["test", "run"],
+  "prereqs": {
+    "setup_guide": {
+      "fr": "Laissez les champs vides pour le MODE DÉMO (indicateurs simulés, aucun appel AWS).\n\nPour un compte réel (lecture seule) :\n1. AWS Console → IAM → Utilisateurs → créer « ciso-pilot-reader » (accès programmatique).\n2. Attacher la politique gérée AWS « SecurityAudit » (arn:aws:iam::aws:policy/SecurityAudit) — elle couvre Security Hub, GuardDuty, IAM et S3 en lecture.\n3. (Optionnel, minimal) politique personnalisée avec : securityhub:GetFindings, guardduty:ListDetectors, guardduty:GetFindingsStatistics, iam:ListUsers, iam:ListAccessKeys, s3:ListAllMyBuckets, s3:GetBucketPolicyStatus, s3:GetAccountPublicAccessBlock, sts:GetCallerIdentity. Aucune permission d'écriture.\n4. Créer une clé d'accès, renseigner Access Key ID + Secret ci-dessus, puis Tester.\n5. Active GuardDuty et Security Hub dans la région ciblée pour des findings non vides.",
+      "en": "Leave the fields empty for DEMO MODE (simulated indicators, no AWS call).\n\nFor a real (read-only) account:\n1. AWS Console → IAM → Users → create \"ciso-pilot-reader\" (programmatic access).\n2. Attach the AWS managed policy \"SecurityAudit\" (arn:aws:iam::aws:policy/SecurityAudit) — it covers read access to Security Hub, GuardDuty, IAM and S3.\n3. (Optional, minimal) custom policy with: securityhub:GetFindings, guardduty:ListDetectors, guardduty:GetFindingsStatistics, iam:ListUsers, iam:ListAccessKeys, s3:ListAllMyBuckets, s3:GetBucketPolicyStatus, s3:GetAccountPublicAccessBlock, sts:GetCallerIdentity. No write permissions.\n4. Create an access key, fill Access Key ID + Secret above, then Test.\n5. Enable GuardDuty and Security Hub in the target region for non-empty findings."
+    }
+  }
+}

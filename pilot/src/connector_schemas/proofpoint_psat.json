@@ -1,0 +1,94 @@
+{
+  "id": "proofpoint_psat",
+  "name": {
+    "fr": "Proofpoint Security Awareness (PSAT)",
+    "en": "Proofpoint Security Awareness (PSAT)"
+  },
+  "description": {
+    "fr": "Connecteur API Reporting Proofpoint (ex-Wombat). Suit la complétion des campagnes de formation : alimente la preuve « sensibilisation » des utilisateurs Access et le reporting Pilot.",
+    "en": "Proofpoint Reporting API connector (ex-Wombat). Tracks training campaign completion: feeds the Access users' awareness proof and the Pilot reporting."
+  },
+  "icon": "graduation-cap",
+  "auth_kind": "api_key",
+  "vendor": "Proofpoint",
+  "cardinality": "one",
+  "fields": [
+    {
+      "id": "region",
+      "label": { "fr": "Région", "en": "Region" },
+      "help": {
+        "fr": "Région de l'instance PSAT : us, eu ou ap (eu recommandé pour le RGPD).",
+        "en": "PSAT instance region: us, eu or ap (eu recommended for GDPR)."
+      },
+      "secret": false,
+      "required": true,
+      "pattern": "^(us|eu|ap)$",
+      "placeholder": "eu"
+    },
+    {
+      "id": "api_key",
+      "label": { "fr": "Clé API (token)", "en": "API key (token)" },
+      "help": {
+        "fr": "Token d'API Results PSAT (en-tête x-apikey-token). Laisser vide active le mode démo.",
+        "en": "PSAT Results API token (x-apikey-token header). Leave empty to enable demo mode."
+      },
+      "secret": true,
+      "required": false
+    },
+    {
+      "id": "campaign_filter",
+      "label": { "fr": "Filtre par nom (contient)", "en": "Name filter (contains)" },
+      "help": {
+        "fr": "Récupère dynamiquement les formations démarrées et non archivées dont le nom contient ce texte (insensible à la casse). Une échéance dépassée n'exclut pas la formation (l'indicateur passe au rouge) ; les formations échues depuis plus de 12 mois ne sont plus affichées. Un indicateur de complétion est créé par formation trouvée.",
+        "en": "Dynamically pulls started, non-archived trainings whose name contains this text (case-insensitive). A past due date does not exclude a training (its indicator turns red); trainings whose deadline is over 12 months old are dropped. One completion indicator is created per matching training."
+      },
+      "secret": false,
+      "required": false,
+      "placeholder": "Parcours Nouveaux arrivants"
+    },
+    {
+      "id": "email_domains",
+      "label": { "fr": "Domaines email (Access)", "en": "Email domains (Access)" },
+      "help": {
+        "fr": "Domaines (séparés par des virgules) dont les utilisateurs reçoivent la preuve de conformité dans Access. N'affecte PAS le reporting Pilot (tout le tenant).",
+        "en": "Domains (comma-separated) whose users get the Access compliance proof. Does NOT affect Pilot reporting (whole tenant)."
+      },
+      "secret": false,
+      "required": true,
+      "placeholder": "acme.com, acme.fr"
+    },
+    {
+      "id": "retention_months",
+      "label": { "fr": "Rétention (mois)", "en": "Retention (months)" },
+      "help": {
+        "fr": "Durée pendant laquelle une formation échue reste affichée en KPI après sa date de fin (défaut 12). 0 = sans limite.",
+        "en": "How long a past-due training stays shown as a KPI after its deadline (default 12). 0 = unlimited."
+      },
+      "secret": false,
+      "required": false,
+      "pattern": "^[0-9]{1,3}$",
+      "placeholder": "12"
+    },
+    {
+      "id": "lookback_days",
+      "label": { "fr": "Fenêtre (jours)", "en": "Lookback (days)" },
+      "help": {
+        "fr": "Profondeur d'historique à interroger (défaut 365).",
+        "en": "History depth to query (default 365)."
+      },
+      "secret": false,
+      "required": false,
+      "pattern": "^[0-9]{1,4}$",
+      "placeholder": "365"
+    }
+  ],
+  "capabilities": ["test", "run"],
+  "prereqs": {
+    "api_endpoint": "https://results.{region}.securityeducation.com/api/reporting/v0.3.0",
+    "auth_header": "x-apikey-token",
+    "setup_guide": {
+      "fr": "1. Console PSAT > Reporting > API.\n2. Générer une clé API (token).\n3. Renseigner la région (us/eu/ap), la clé, vos domaines email, un filtre par nom (les formations en cours correspondantes sont récupérées automatiquement) et la/les campagne(s) obligatoire(s).\n4. Sans clé API : le connecteur tourne en mode démo (données simulées sur l'annuaire Access).",
+      "en": "1. PSAT console > Reporting > API.\n2. Generate an API key (token).\n3. Fill region (us/eu/ap), key, your email domains, a name filter (matching running trainings are pulled automatically) and mandatory campaign(s).\n4. Without an API key the connector runs in demo mode (simulated data over the Access directory)."
+    }
+  }
+}

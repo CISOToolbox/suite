@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pilot - CISO Toolbox</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="stylesheet" href="css/cisotoolbox.css">
+<link rel="stylesheet" href="css/Pilot.css">
+</head>
+<body class="ct-app-shell">
+
+<div class="ct-app">
+<header class="ct-appbar">
+    <button class="btn-hamburger" data-click="_toggleSidebarMobile">&#9776;</button>
+    <span class="ct-modulepicker" role="img" aria-label="Pilot"><span data-i18n="module.pilot">Pilot</span></span>
+    <span class="ct-appbar-sep"></span>
+    <nav class="ct-appbar-context" aria-label="Contexte"><span class="ct-muted" id="header-subtitle"></span></nav>
+    <span class="ct-spacer"></span>
+    <span class="ct-appbar-saved" id="status-msg"></span>
+    <div class="ct-appbar-actions">
+        <button class="ct-iconaction" data-click="ct_toggleLang" data-icon="globe" aria-label="Langue" title="Langue FR / EN"></button>
+        <button class="ct-iconaction" data-click="ct_toggleTheme" data-icon="moon" aria-label="Thème" title="Thème clair / sombre"></button>
+        <span class="toolbar-right" id="toolbar-right"></span>
+    </div>
+</header>
+
+<div class="ct-body">
+
+<nav class="ct-rail" id="sidebar" aria-label="Navigation du module">
+  <div class="ct-rail-scroll">
+    <div class="ct-rail-section">
+      <button class="ct-rail-group" aria-expanded="true" data-click="ct_toggleRailGroup" data-pass-el>
+        <span class="ct-icon-btn-slot" data-icon="chevron-right"></span><span>Pilot</span>
+      </button>
+      <button class="ct-rail-item" aria-current="page" data-click="selectPanel" data-args='["dashboard"]'><span class="ct-rail-item-label" data-i18n="pilot.nav.dashboard">Tableau de bord</span></button>
+      <button class="ct-rail-item" data-click="selectPanel" data-args='["projets"]'><span class="ct-rail-item-label" data-i18n="pilot.nav.projets">Projets</span></button>
+      <button class="ct-rail-item" data-click="selectPanel" data-args='["measures"]'><span class="ct-rail-item-label" data-i18n="pilot.nav.measures">Mesures</span></button>
+      <button class="ct-rail-item" data-click="selectPanel" data-args='["evidences"]'><span class="ct-rail-item-label" data-i18n="pilot.nav.evidences">Registre des preuves</span></button>
+      <button class="ct-rail-item" data-click="selectPanel" data-args='["kpis"]'><span class="ct-rail-item-label" data-i18n="pilot.nav.kpis">Indicateurs</span></button>
+      <button class="ct-rail-item" data-click="selectPanel" data-args='["directory"]'><span class="ct-rail-item-label" data-i18n="pilot.nav.directory">Utilisateurs</span></button>
+      <button class="ct-rail-item" data-click="selectPanel" data-args='["users"]'><span class="ct-rail-item-label" data-i18n="pilot.nav.users">Habilitations</span></button>
+      <button class="ct-rail-item" data-click="selectPanel" data-args='["backups"]'><span class="ct-rail-item-label" data-i18n="pilot.nav.backups">Sauvegardes</span></button>
+      <button class="ct-rail-item" data-click="selectPanel" data-args='["connectors"]'><span class="ct-rail-item-label" data-i18n="pilot.nav.connectors">Connecteurs</span></button>
+      <button class="ct-rail-item" data-click="selectPanel" data-args='["settings"]'><span class="ct-rail-item-label" data-i18n="pilot.nav.settings">Parametres</span></button>
+    </div>
+
+    <div class="ct-rail-section">
+      <button class="ct-rail-group" aria-expanded="true" data-click="ct_toggleRailGroup" data-pass-el>
+        <span class="ct-icon-btn-slot" data-icon="chevron-right"></span><span data-i18n="pilot.sidebar.section_aide">Aide</span>
+      </button>
+      <button class="ct-rail-item" data-click="toggleHelp" data-args='["methodo"]'><span class="ct-rail-item-label" data-i18n="pilot.sidebar.methodo">Méthodologie</span></button>
+      <button class="ct-rail-item" data-click="toggleHelp" data-args='["usage"]'><span class="ct-rail-item-label" data-i18n="pilot.sidebar.usage">Utilisation</span></button>
+    </div>
+  </div>
+
+  <div class="ct-rail-foot">
+    <a href="https://www.cisotoolbox.org" target="_blank" rel="noopener noreferrer" class="sidebar-brand">cisotoolbox.org</a>
+  </div>
+</nav>
+
+<main class="ct-content" id="content"></main>
+</div><!-- ct-body -->
+</div><!-- ct-app -->
+
+<input type="file" id="csv-import-input" accept=".csv,.txt" class="ct-hidden">
+
+<!-- Panel d'aide -->
+<div class="help-overlay" id="help-overlay" data-click-self="toggleHelp">
+<div class="help-panel">
+<button class="close-help" data-click="toggleHelp">&times;</button>
+
+<div class="help-tabs">
+    <div class="help-tab active" id="help-tab-methodo" data-click="switchHelpTab" data-args='["methodo"]' data-i18n="pilot.help.tab_methodo">Méthodologie Pilot</div>
+    <div class="help-tab" id="help-tab-usage" data-click="switchHelpTab" data-args='["usage"]' data-i18n="pilot.help.tab_usage">Utilisation de l'application</div>
+</div>
+
+<!-- Onglet Méthodologie -->
+<div class="help-content" id="help-content-methodo" data-i18n-html="pilot.help.methodo"></div>
+
+<!-- Onglet Utilisation -->
+<div class="help-content ct-hidden" id="help-content-usage" data-i18n-html="pilot.help.usage"></div>
+
+</div>
+</div>
+
+<script src="js/cisotoolbox.js"></script>
+<script src="js/ct_modules.js"></script>
+<script src="js/cisotoolbox_backend.js"></script>
+<script src="js/i18n.js"></script>
+<script src="js/i18n_core_en.js"></script>
+<script src="js/i18n_core_fr.js"></script>
+<script src="js/Pilot_i18n_fr.js"></script>
+<script src="js/Pilot_i18n_en.js"></script>
+<script src="js/ct_modal.js"></script>
+<script src="js/ct_userpicker.js"></script>
+<script src="js/ct_notifprefs.js"></script>
+<script src="js/ct_measure_modal.js"></script>
+<script src="js/ct_table.js"></script>
+<script src="js/ct_bulkbar.js"></script>
+<script src="js/pilot_ai_panel.js"></script>
+<script src="js/ct_settings.js"></script>
+<script src="js/connectors_common.js"></script>
+<script src="js/Pilot_kpis.js"></script>
+<script src="js/Pilot_connectors.js"></script>
+<script src="js/Pilot_app.js"></script>
+
+</body>
+</html>

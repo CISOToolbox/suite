@@ -1,0 +1,102 @@
+{
+  "id": "m365",
+  "name": {
+    "fr": "Microsoft 365 / Entra ID",
+    "en": "Microsoft 365 / Entra ID"
+  },
+  "description": {
+    "fr": "Connecteur Microsoft Graph (client_credentials OAuth2) pour Entra ID, Intune, Defender et Identity Protection.",
+    "en": "Microsoft Graph connector (client_credentials OAuth2) for Entra ID, Intune, Defender and Identity Protection."
+  },
+  "icon": "shield",
+  "auth_kind": "client_credentials_oauth2",
+  "vendor": "Microsoft",
+  "cardinality": "one",
+  "fields": [
+    {
+      "id": "tenant_id",
+      "label": { "fr": "Tenant ID", "en": "Tenant ID" },
+      "help": {
+        "fr": "GUID du tenant Entra (Annuaire (locataire) dans le portail Azure).",
+        "en": "Entra tenant GUID (Directory (tenant) ID in Azure portal)."
+      },
+      "secret": false,
+      "required": true,
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+      "placeholder": "00000000-0000-0000-0000-000000000000"
+    },
+    {
+      "id": "client_id",
+      "label": { "fr": "Client ID", "en": "Client ID" },
+      "help": {
+        "fr": "Application (client) ID de l'app registration.",
+        "en": "Application (client) ID of the app registration."
+      },
+      "secret": false,
+      "required": true,
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+      "placeholder": "00000000-0000-0000-0000-000000000000"
+    },
+    {
+      "id": "client_secret",
+      "label": { "fr": "Client Secret", "en": "Client Secret" },
+      "help": {
+        "fr": "Valeur du secret généré dans Certificates & secrets (pas l'ID).",
+        "en": "Value of the secret generated in Certificates & secrets (not the ID)."
+      },
+      "secret": true,
+      "required": true
+    }
+  ],
+  "capabilities": ["test", "run"],
+  "prereqs": {
+    "consent_required": true,
+    "consent_url_template": "https://login.microsoftonline.com/{tenant_id}/adminconsent?client_id={client_id}",
+    "graph_permissions": [
+      {
+        "id": "SecurityEvents.Read.All",
+        "purpose": {
+          "fr": "Score de sécurité M365 (sonde du bouton Tester)",
+          "en": "M365 Secure Score (Test button probe)"
+        }
+      },
+      {
+        "id": "ThreatHunting.Read.All",
+        "purpose": {
+          "fr": "Score d'exposition Defender (optionnel, requiert MSEM)",
+          "en": "Defender exposure score (optional, requires MSEM)"
+        }
+      },
+      {
+        "id": "DeviceManagementManagedDevices.Read.All",
+        "purpose": {
+          "fr": "Conformité des terminaux Intune",
+          "en": "Intune device compliance"
+        }
+      },
+      {
+        "id": "UserAuthenticationMethod.Read.All",
+        "purpose": {
+          "fr": "Couverture MFA Entra (méthodes enregistrées)",
+          "en": "Entra MFA coverage (registered methods)"
+        }
+      },
+      {
+        "id": "AuditLog.Read.All",
+        "purpose": {
+          "fr": "Couverture MFA Entra (logs auth)",
+          "en": "Entra MFA coverage (auth logs)"
+        }
+      },
+      {
+        "id": "IdentityRiskyUser.Read.All",
+        "purpose": {
+          "fr": "Utilisateurs Entra à risque",
+          "en": "Entra risky users"
+        }
+      }
+    ],
+    "auth_endpoint": "https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token",
+    "api_endpoint": "https://graph.microsoft.com/v1.0"
+  }
+}

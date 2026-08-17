@@ -1,0 +1,4 @@
+boto3==1.43.57
+# --- transitive pins (security, wave 2) ---
+# urllib3: transitive of boto3/botocore — 6 HIGH fixed in 2.x (>=2.7.0)
+urllib3==2.7.0

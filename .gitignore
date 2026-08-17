@@ -1,0 +1,74 @@
+# Secrets — never commit
+.env
+.env.bak
+.env.backup
+.env.*
+!.env.example
+.env.local
+*.env.local
+.env.*.local
+
+# TLS private keys / local certs
+certs/*.pem
+certs/*.key
+certs/*.crt
+!certs/cert.pem.example
+
+# Database volumes (in case someone mounts locally)
+pgdata/
+*-pgdata/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node / frontend build artefacts
+node_modules/
+dist/
+.next/
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+
+# Docker
+*.pid
+
+# Alembic local overrides
+alembic/versions/*.pyc
+
+# Local dev override — points surface-app at a locally built image
+docker-compose.override.yml
+
+# Ad-hoc local files (RoI test inputs, vendor scratch scripts, etc.)
+roi.xlsx
+vendor/scripts/
+
+# Real-data connector import samples (personal data — never commit)
+access/*.xlsx
+
+# Claude Code skill artefacts (built locally, not part of the suite)
+*.skill
+
+# ruvector vector-store artefact (local tool, accidentally committed)
+ruvector.db
+
+# Claude Code session dir
+.claude/
+
+# Client add-on build staging (shared/build-client-image.sh)
+access/.client-addons/
+surface/.client-addons/
+*/.client-addons/

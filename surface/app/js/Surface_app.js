@@ -1,0 +1,4530 @@
+/**
+ * CISO Toolbox — Surface App
+ */
+// AI_APP_CONFIG must be set BEFORE ai_common.js runs (ai_common.js reads it
+// at IIFE init time). Surface_app.js is loaded before ai_common.js in
+// index.html, so this global assignment runs first.
+window.AI_APP_CONFIG = {
+    storagePrefix: "surface",
+    settingsExtraHTML: function () {
+        // Surface settings are rendered as a list of <details> accordions
+        // so the panel stays scannable as the number of sections grows.
+        // Each section is a self-contained block the user expands only
+        // when they need it. `ai_common.js` builds the AI + language
+        // blocks ABOVE this extra HTML — we cannot wrap those.
+        var tt = typeof t === "function" ? t : function (k) { return k; };
+        // ── Timezone picker ──────────────────────────────────
+        var currentTz = "";
+        try {
+            currentTz = localStorage.getItem("surface_timezone") || "";
+        }
+        catch (e) { }
+        var browserTz = "";
+        try {
+            browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+        }
+        catch (e) { }
+        var zones = (window._TZ_OPTIONS_GLOBAL || [""]);
+        var tzBrowser = tt("tz.browser") || "Auto (browser)";
+        var tzHtml = '<select id="surface-tz-select" class="surface-settings-input" data-change="_onTimezoneChange" data-pass-value>';
+        zones.forEach(function (z) {
+            var lbl = z === "" ? (tzBrowser + (browserTz ? " — " + browserTz : "")) : z;
+            var sel = (z === currentTz) ? " selected" : "";
+            tzHtml += '<option value="' + z + '"' + sel + '>' + lbl + '</option>';
+        });
+        tzHtml += '</select>';
+        tzHtml += '<div class="surface-settings-help">' + (tt("tz.hint") || "") + '</div>';
+        var loading = tt("common.loading") || "Loading...";
+        var tzTitle = tt("tz.section") || "Time zone";
+        var nucleiTitle = tt("nuclei.section") || "Nuclei (DAST scanner)";
+        var shodanTitle = tt("shodan.section") || "Shodan API";
+        var smtpTitle = tt("smtp.section") || "Email digest (SMTP)";
+        // Small helper: accordion wrapper. `name="surface-settings"` on
+        // every <details> gives us the native exclusive-accordion behaviour
+        // — opening one auto-closes any other one in the same group.
+        function section(title, body, open) {
+            return ('<details class="surface-settings-accordion" name="surface-settings"' + (open ? " open" : "") + '>' +
+                '<summary class="surface-settings-summary">' +
+                '<span class="surface-settings-chevron">▸</span>' +
+                '<span>' + title + '</span>' +
+                '</summary>' +
+                '<div class="surface-settings-body">' + body + '</div>' +
+                '</details>');
+        }
+        // Nuclei / Shodan / GitHub / SMTP all render via async JS in
+        // their own container div. `_surfaceWireSettings()` is called
+        // after the panel is inserted so each accordion hydrates lazily
+        // when the user expands it.
+        var nucleiBody = '<div id="surface-nuclei-section" class="surface-settings-inner"><div class="surface-settings-muted">' + loading + '</div></div>';
+        var shodanBody = '<div id="surface-shodan-section" class="surface-settings-inner"><div class="surface-settings-muted">' + loading + '</div></div>';
+        var smtpBody = '<div id="surface-smtp-section"   class="surface-settings-inner"><div class="surface-settings-muted">' + loading + '</div></div>';
+        return ('<div class="surface-settings-wrap">' +
+            section(tzTitle, tzHtml) +
+            section(nucleiTitle, nucleiBody) +
+            section(shodanTitle, shodanBody) +
+            section(smtpTitle, smtpBody) +
+            '</div>');
+    },
+    onSettingsSaved: function () {
+        // Nuclei & Shodan have their own save buttons; nothing on the shared path.
+    }
+};
+// _ASSET_BASE is defined in Surface_config.js, loaded before i18n.js.
+(function () {
+    "use strict";
+    window.CT_CONFIG = {
+        edition: "suite",
+        module: "surface",
+        deployed: ["risk", "compliance", "audit", "vendor", "asset", "pilot", "appsec", "surface", "access", "watch"],
+    };
+    // ═══════════════════════════════════════════════════════════════
+    // SVG icon set (Feather-style stroke icons, 24×24 viewBox)
+    // ═══════════════════════════════════════════════════════════════
+    // Each entry is the inner <path>/<polyline>/... markup for the icon.
+    // _icon(name, size) wraps it in a <svg> with `currentColor` stroke so
+    // the icon inherits the parent's text color (no hardcoded colors).
+    var _ICON_PATHS = {
+        // Actions
+        check: '<polyline points="20 6 9 17 4 12"/>',
+        x: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
+        plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
+        edit: '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>',
+        trash: '<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>',
+        refresh: '<polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>',
+        // Navigation
+        arrow_left: '<line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>',
+        arrow_right: '<line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>',
+        menu: '<line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>',
+        // Concepts
+        search: '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
+        clock: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+        pin: '<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>',
+        target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+        shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+        server: '<rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>',
+        alert: '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+        list: '<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>',
+        // Panels
+        grid: '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>',
+        globe: '<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>',
+        check_circle: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>',
+        // Findings
+        zap: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
+        activity: '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>',
+    };
+    // Badges Surface — un état métier se mappe sur un TON, pas sur une classe par
+    // valeur (spec §2). La palette de tons est fermée : critical · high · medium ·
+    // low · info · neutral · accent. Ajouter un statut ne demande plus de CSS.
+    var _SURFACE_TONES = {
+        // sévérités
+        critical: "critical", high: "high", medium: "medium", low: "low", info: "info",
+        // statuts de constat
+        new: "info", to_fix: "medium", fixed: "low", accepted: "neutral",
+        ignored: "neutral", false_positive: "neutral",
+        // origine et état d'un hôte
+        auto: "accent", manual: "info", off: "neutral", share: "medium", scanner: "low",
+    };
+    // État d'un job de scan. « running » porte en plus data-live : la pulsation est
+    // un état générique du socle, pas une animation propre à Surface.
+    var _JOB_TONES = {
+        pending: "neutral", running: "info", completed: "low",
+        partial: "medium", failed: "critical",
+    };
+    function _jobTone(s) {
+        return _JOB_TONES[(s || "").toString()] || "neutral";
+    }
+    function _surfaceTone(v) {
+        return _SURFACE_TONES[(v || "").toString()] || "neutral";
+    }
+    function _icon(name, size, extraClass) {
+        var path = _ICON_PATHS[name];
+        if (!path) {
+            var _sh = window.CT_ICONS;
+            if (_sh)
+                path = _sh[name];
+        } // fall back to shared CT_ICONS (moon, sun, settings…)
+        if (!path)
+            return "";
+        var sz = size || 16;
+        var cls = extraClass ? ' class="' + extraClass + '"' : '';
+        return '<svg' + cls + ' width="' + sz + '" height="' + sz + '" viewBox="0 0 24 24"'
+            + ' fill="none" stroke="currentColor" stroke-width="2"'
+            + ' stroke-linecap="round" stroke-linejoin="round"'
+            + ' class="ct-va-middle ct-no-shrink">'
+            + path
+            + '</svg>';
+    }
+    // ═══════════════════════════════════════════════════════════════
+    // Timezone-aware date formatting
+    // ═══════════════════════════════════════════════════════════════
+    // Backend timestamps are stored as UTC (datetime.now(tz=UTC)) and
+    // serialized as ISO-8601 with explicit offset (e.g.
+    // 2026-04-15T14:32:10+00:00). We parse them into a Date object and
+    // format in the user's preferred timezone — either the browser's own
+    // (default) or an IANA name chosen in Settings and stored in
+    // localStorage under `surface_timezone`.
+    //
+    // The helper accepts both "short" (YYYY-MM-DD HH:MM) and "long"
+    // (YYYY-MM-DD HH:MM:SS) modes to match the two granularities currently
+    // used across the app.
+    window._onTimezoneChange = function (value) {
+        try {
+            if (value)
+                localStorage.setItem("surface_timezone", value);
+            else
+                localStorage.removeItem("surface_timezone");
+        }
+        catch (e) { }
+        // Re-render the current panel so every _fmtDate call picks up the
+        // new timezone immediately. No reload required.
+        if (typeof renderPanel === "function")
+            renderPanel();
+        if (typeof showStatus === "function") {
+            showStatus(t("tz.saved") || "Timezone updated");
+        }
+    };
+    function _getTimezone() {
+        try {
+            return localStorage.getItem("surface_timezone") || "";
+        }
+        catch (e) {
+            return "";
+        }
+    }
+    function _fmtDate(iso, mode) {
+        if (!iso)
+            return "";
+        var d = new Date(iso);
+        if (isNaN(d.getTime()))
+            return "";
+        var tz = _getTimezone();
+        var opts = {
+            year: "numeric", month: "2-digit", day: "2-digit",
+            hour: "2-digit", minute: "2-digit",
+        };
+        if (mode === "long")
+            opts.second = "2-digit";
+        if (tz)
+            opts.timeZone = tz;
+        // Use sv-SE locale — it produces "YYYY-MM-DD HH:MM" which is the
+        // format the rest of the app was using before. Keeps alignment and
+        // is culture-neutral.
+        try {
+            return d.toLocaleString("sv-SE", opts);
+        }
+        catch (e) {
+            // Invalid TZ → fall back to browser TZ
+            delete opts.timeZone;
+            return d.toLocaleString("sv-SE", opts);
+        }
+    }
+    // Default IANA zones offered in the Settings picker. "" = browser auto.
+    // Exposed on window so AI_APP_CONFIG.settingsExtraHTML (declared outside
+    // the IIFE) can build the select.
+    window._TZ_OPTIONS_GLOBAL = [
+        "", // auto-detect (browser)
+        "UTC",
+        "Europe/Paris",
+        "Europe/London",
+        "Europe/Berlin",
+        "Europe/Madrid",
+        "Europe/Rome",
+        "Europe/Amsterdam",
+        "Europe/Brussels",
+        "Europe/Lisbon",
+        "Europe/Athens",
+        "Europe/Warsaw",
+        "Europe/Dublin",
+        "Europe/Zurich",
+        "America/New_York",
+        "America/Chicago",
+        "America/Denver",
+        "America/Los_Angeles",
+        "America/Sao_Paulo",
+        "America/Toronto",
+        "Africa/Casablanca",
+        "Africa/Tunis",
+        "Africa/Algiers",
+        "Asia/Dubai",
+        "Asia/Kolkata",
+        "Asia/Singapore",
+        "Asia/Tokyo",
+        "Asia/Shanghai",
+        "Australia/Sydney",
+        "Pacific/Auckland",
+    ];
+    var _panel = "dashboard";
+    var _findings = [];
+    var _monitored = [];
+    var _exclusions = []; // scan blocklist (host/IP/CIDR/domain)
+    var _jobs = [];
+    var _jobsPollTimer = null;
+    var _jobsFilterScanner = "";
+    var _jobsFilterStatus = "";
+    var _scannersCatalog = null;
+    var _measures = [];
+    var _filterStatus = "open"; // default: show new + to_fix findings
+    var _filterSeverities = []; // multi-select; empty = all
+    var _filterScanners = []; // multi-select; empty = all
+    var _monitoredFilterScanners = []; // multi-select scanner filter on Surveillance page
+    var _selectedFinding = null;
+    var _selectedHost = null; // MonitoredAsset object, set when user clicks a host card
+    var _selectedHostReturnPanel = null; // panel to return to on "back" (set when opened from Surveillance)
+    var _hostSelectedFinding = null; // Finding shown inline in host detail view
+    var _hostHideFP = true; // Host detail: hide false-positive findings by default
+    var _hostSearch = ""; // free-text filter for the Hosts panel
+    var _bulkSelection = {}; // { [finding_id]: true } — checked rows in findings table
+    var _monitoredBulkSelection = {}; // { [asset_id]: true } — checked rows in surveillance table
+    var _monitoredSearch = ""; // free-text search for the Surveillance panel
+    var _findingsSearch = ""; // free-text search for the Findings panel
+    // tiny helper: t() with {n} substitution — fallback to the raw string if
+    // the i18n registry returns the key as-is (when the key isn't registered).
+    function _tn(key, n) {
+        var s = typeof t === "function" ? t(key) : key;
+        if (!s)
+            s = key;
+        return String(s).replace("{n}", String(n));
+    }
+    window.selectPanel = function (id) {
+        _panel = id;
+        _selectedFinding = null;
+        _selectedHost = null;
+        if (window.ct_bulkbar) {
+            ct_bulkbar.clear("surface-findings");
+            ct_bulkbar.clear("surface-measures");
+        }
+        document.querySelectorAll(".ct-rail-item").forEach(function (el) {
+            var args = el.getAttribute("data-args");
+            if (args)
+                try {
+                    if (JSON.parse(args)[0] === id)
+                        el.setAttribute("aria-current", "page");
+                    else
+                        el.removeAttribute("aria-current");
+                }
+                catch (e) { }
+        });
+        document.querySelector(".ct-rail, .sidebar")?.classList.remove("open");
+        _loadAndRender();
+    };
+    function _loadAndRender() {
+        var p1 = SurfaceAPI.listFindings({ limit: "10000" }).then(function (d) { _findings = d || []; }).catch(function () { _findings = []; });
+        var p2 = SurfaceAPI.listMeasures().then(function (d) { _measures = d || []; }).catch(function () { _measures = []; });
+        var p3 = SurfaceAPI.listMonitored().then(function (d) { _monitored = d || []; }).catch(function () { _monitored = []; });
+        var p4 = SurfaceAPI.listJobs().then(function (d) { _jobs = d || []; }).catch(function () { _jobs = []; });
+        var p6 = SurfaceAPI.listExclusions().then(function (d) { _exclusions = d || []; }).catch(function () { _exclusions = []; });
+        var p5 = _scannersCatalog
+            ? Promise.resolve()
+            : SurfaceAPI.scannersCatalog().then(function (d) { _scannersCatalog = d || {}; }).catch(function () { _scannersCatalog = {}; });
+        Promise.all([p1, p2, p3, p4, p5, p6]).then(function () { renderPanel(); });
+    }
+    function renderPanel() {
+        var c = document.getElementById("content");
+        if (!c)
+            return;
+        if (_jobsPollTimer) {
+            clearInterval(_jobsPollTimer);
+            _jobsPollTimer = null;
+        }
+        switch (_panel) {
+            case "dashboard":
+                _renderDashboard(c);
+                break;
+            case "monitored":
+                _renderMonitored(c);
+                break;
+            case "hosts":
+                _renderHosts(c);
+                break;
+            case "jobs":
+                _renderJobs(c);
+                break;
+            case "findings":
+                _renderFindings(c);
+                break;
+            case "measures":
+                _renderMeasures(c);
+                break;
+            case "audit":
+                _renderAuditLog(c);
+                break;
+            default: _renderDashboard(c);
+        }
+        var tr = document.getElementById("toolbar-right");
+        if (tr && typeof _getSettingsButtonHTML === "function" && !tr.querySelector(".toolbar-settings")) {
+            var _sh = _getSettingsButtonHTML();
+            if (_sh)
+                tr.insertAdjacentHTML("afterbegin", '<span class="toolbar-settings">' + _sh + '</span>');
+        }
+        if (tr && window.ct_notifprefs && !tr.querySelector(".toolbar-notif")) {
+            tr.insertAdjacentHTML("afterbegin", '<span class="toolbar-notif"><button class="ct-text-label ct-muted ct-bg-none ct-no-border ct-clickable ct-py-1 ct-px-2" data-click="_openNotifPrefs" title="' + t("notif.title") + '">' + _icon("bell", 15) + '</button></span>');
+        }
+        _loadAddonHelpDocs();
+    }
+    window.renderPanel = renderPanel;
+    // In-app help for add-ons is NOT in the core i18n bundle: it is fetched from
+    // the backend (GET /api/monitored-assets/addon-docs), which returns doc only
+    // for add-ons actually loaded in this image. So an image built without an
+    // add-on never even ships its help text. The HTML is injected into the
+    // Méthodologie / Utilisation tabs. Fetched once, then re-injected on every
+    // renderPanel — which covers boot, navigation and switchLang (the latter
+    // resets the tabs' data-i18n-html, wiping our injected nodes; we re-add them
+    // in the current language).
+    var _addonHelpDocs = null;
+    var _addonHelpDocsLoading = false;
+    function _loadAddonHelpDocs() {
+        if (_addonHelpDocs !== null) {
+            _renderAddonHelpDocs();
+            return;
+        }
+        if (_addonHelpDocsLoading)
+            return;
+        _addonHelpDocsLoading = true;
+        SurfaceAPI.get("/api/monitored-assets/addon-docs").then(function (d) {
+            _addonHelpDocs = (d && d.addons) || [];
+        }).catch(function () {
+            _addonHelpDocs = [];
+        }).then(function () {
+            _addonHelpDocsLoading = false;
+            _renderAddonHelpDocs();
+        });
+    }
+    function _renderAddonHelpDocs() {
+        if (!_addonHelpDocs || !_addonHelpDocs.length)
+            return;
+        var lang = document.documentElement.lang === "en" ? "en" : "fr";
+        ["methodo", "usage"].forEach(function (tab) {
+            var parent = document.getElementById("help-content-" + tab);
+            if (!parent)
+                return;
+            var parentEl = parent;
+            parentEl.querySelectorAll("[data-addon-injected]").forEach(function (n) {
+                if (n.parentNode)
+                    n.parentNode.removeChild(n);
+            });
+            _addonHelpDocs.forEach(function (ad) {
+                var byLang = ad.doc && ad.doc[lang];
+                var html = byLang && byLang[tab];
+                if (!html)
+                    return;
+                var div = document.createElement("div");
+                div.setAttribute("data-addon-injected", ad.scanner || "");
+                // Developer-authored add-on doc served by our own backend (not user
+                // input) — same trust level as the data-i18n-html help content.
+                div.innerHTML = html;
+                parentEl.appendChild(div);
+            });
+        });
+    }
+    // ═══════════════════════════════════════════════════════════════
+    // AUDIT LOG (admin-only)
+    // ═══════════════════════════════════════════════════════════════
+    var _auditFilter = { q: "" };
+    async function _renderAuditLog(c) {
+        var h = '<div class="ct-row ct-row-wrap ct-mb-3">';
+        h += '<h2 class="ct-m-0">' + t("audit.title") + '</h2><span class="ct-flex-1"></span>';
+        h += '<input type="search" class="appsec-filter" placeholder="' + t("audit.search") + '" value="' + esc(_auditFilter.q || "") + '" data-input="_setAuditSearch" data-pass-value>';
+        h += '</div>';
+        h += '<div id="audit-body"><p class="text-muted">Chargement...</p></div>';
+        c.innerHTML = h;
+        _refreshAuditBody();
+    }
+    async function _refreshAuditBody() {
+        var el = document.getElementById("audit-body");
+        if (!el)
+            return;
+        try {
+            var qs = _auditFilter.q ? "?q=" + encodeURIComponent(_auditFilter.q) : "";
+            var resp = await fetch("api/audit-log" + qs, { credentials: "same-origin" });
+            if (!resp.ok)
+                throw new Error("HTTP " + resp.status);
+            var data = await resp.json();
+            var items = data.items || [];
+            var h = '';
+            if (items.length === 0) {
+                h = '<p class="text-muted">' + t("audit.empty") + '</p>';
+            }
+            else {
+                h = '<table class="ct-table ct-text-meta"><thead><tr>';
+                h += '<th>' + t("audit.col_date") + '</th>';
+                h += '<th>' + t("audit.col_user") + '</th>';
+                h += '<th>' + t("audit.col_action") + '</th>';
+                h += '<th>' + t("audit.col_target") + '</th>';
+                h += '<th>' + t("audit.col_details") + '</th>';
+                h += '<th>IP</th></tr></thead><tbody>';
+                for (var i = 0; i < items.length; i++) {
+                    var e = items[i];
+                    var d = new Date(e.logged_at);
+                    var dateStr = isNaN(d.getTime()) ? e.logged_at : d.toLocaleString();
+                    var actionLabel = t("audit.action." + e.action);
+                    if (actionLabel === "audit.action." + e.action)
+                        actionLabel = e.action;
+                    h += '<tr>';
+                    h += '<td class="ct-nowrap ct-muted">' + esc(dateStr) + '</td>';
+                    h += '<td>' + esc(e.user_email || "—") + '</td>';
+                    h += '<td><code class="ct-text-meta">' + esc(actionLabel) + '</code></td>';
+                    h += '<td class="ct-maxw-250 ct-overflow-hidden ct-ellipsis">' + esc(e.target || "—") + '</td>';
+                    h += '<td class="ct-maxw-200 ct-overflow-hidden ct-ellipsis ct-journal-sep" title="' + esc(e.details || "") + '">' + esc(e.details || "—") + '</td>';
+                    h += '<td class="ct-muted">' + esc(e.ip_address || "") + '</td>';
+                    h += '</tr>';
+                }
+                h += '</tbody></table>';
+                h += '<p class="ct-text-label ct-muted">' + data.total + ' ' + t("audit.entries") + '</p>';
+            }
+            el.innerHTML = h;
+        }
+        catch (e) {
+            el.innerHTML = '<p class="ct-text-critical">' + esc(e.message || String(e)) + '</p>';
+        }
+    }
+    window._setAuditSearch = function (v) { _auditFilter.q = v; _refreshAuditBody(); };
+    window.renderAll = renderPanel;
+    window._initDataAndRender = function () { _panel = "dashboard"; _loadAndRender(); };
+    // ═══════════════════════════════════════════════════════════════
+    // SCAN JOBS (real nmap scans, async background tasks)
+    // ═══════════════════════════════════════════════════════════════
+    function _scannerLabel(s) {
+        if (!s)
+            return "";
+        var key = {
+            "nmap": "scanner.nmap",
+            "scheduled-host": "scanner.scheduled_host",
+            "scheduled-domain": "scanner.scheduled_domain",
+            "scheduled-discovery": "scanner.scheduled_discovery",
+            "manual-host": "scanner.manual_host",
+            "manual-domain": "scanner.manual_domain",
+            "manual-discovery": "scanner.manual_discovery",
+        }[s];
+        if (key)
+            return t(key);
+        // Fall back to the friendly label declared in SCANNER_REGISTRY
+        // (returned via /api/monitored-assets/scanners-catalog) so the UI
+        // never shows raw scanner IDs like "ct_logs" / "dns_brute".
+        if (_scannersCatalog) {
+            for (var kind in _scannersCatalog) {
+                var entry = _scannersCatalog[kind];
+                var list = entry && entry.scanners ? entry.scanners : [];
+                for (var i = 0; i < list.length; i++) {
+                    if (list[i].name === s && list[i].label) {
+                        // Libellé localisé si "scanner.<name>.label" est déclaré,
+                        // sinon le label backend (langue pivot, anglais).
+                        var _lk = "scanner." + list[i].name + ".label";
+                        var _lv = t(_lk);
+                        return _lv === _lk ? list[i].label : _lv;
+                    }
+                }
+            }
+        }
+        return s;
+    }
+    // Badge class for a scanner type. Only a few types have a dedicated
+    // .scanner-<type> style in Surface.css; anything else (e.g. "manual",
+    // "scheduled") falls back to the neutral .scanner-unknown pill so TYPE
+    // columns render a pill on every row instead of mixing pills and raw text.
+    // Le scanner est une identité, pas une gravité : chacun avait sa classe et sa
+    // couleur, ce qui faisait lire nmap comme un incident (teinte critical). Il
+    // devient un ton, choisi pour distinguer sans alarmer.
+    var _SCANNER_TONES = {
+        nmap: "accent", "scheduled-host": "accent",
+        "scheduled-domain": "info", "scheduled-discovery": "medium",
+    };
+    function _scannerTone(s) {
+        var key = (s || "").replace(/[^a-z0-9]/g, "-");
+        return _SCANNER_TONES[key] || "neutral";
+    }
+    function _renderJobs(c) {
+        // Always tear down any existing poll timer first. This function re-renders
+        // itself from the poll callback below; without this clear, each 3 s tick
+        // (while a job is running) would leak a NEW interval without cancelling the
+        // old one — the timers double every tick and flood /api/scans/jobs, pegging
+        // the backend. Clearing here guarantees at most one live poll timer.
+        if (_jobsPollTimer) {
+            clearInterval(_jobsPollTimer);
+            _jobsPollTimer = null;
+        }
+        var h = '<div class="ct-row ct-row-wrap ct-mb-3">';
+        h += '<h2 class="ct-m-0">' + esc(t("jobs.title")) + '</h2>';
+        h += '<span class="ct-flex-1"></span>';
+        h += '</div>';
+        h += '<div class="ct-text-meta ct-muted ct-mb-3">' + esc(t("jobs.help")) + '</div>';
+        if (!_jobs.length) {
+            h += '<div class="empty-state">' + esc(t("jobs.empty")) + '</div>';
+            c.innerHTML = h;
+            return;
+        }
+        // Build set of distinct scanner types from current data
+        var scannerSet = {};
+        _jobs.forEach(function (j) { if (j.scanner)
+            scannerSet[j.scanner] = true; });
+        var scannerTypes = Object.keys(scannerSet).sort();
+        // Filters bar
+        h += '<div class="surface-filters">';
+        h += '<select class="surface-filter" data-change="_setJobsScannerFilter" data-pass-value>';
+        h += '<option value=""' + (_jobsFilterScanner === "" ? " selected" : "") + '>' + esc(t("jobs.filter.all")) + ' (' + _jobs.length + ')</option>';
+        scannerTypes.forEach(function (s) {
+            var count = _jobs.filter(function (j) { return j.scanner === s; }).length;
+            h += '<option value="' + esc(s) + '"' + (_jobsFilterScanner === s ? " selected" : "") + '>' + esc(_scannerLabel(s)) + ' (' + count + ')</option>';
+        });
+        h += '</select>';
+        h += '<select class="surface-filter" data-change="_setJobsStatusFilter" data-pass-value>';
+        h += '<option value=""' + (_jobsFilterStatus === "" ? " selected" : "") + '>' + esc(t("jobs.filter.all")) + '</option>';
+        ["pending", "running", "completed", "partial", "failed"].forEach(function (s) {
+            var count = _jobs.filter(function (j) { return j.status === s; }).length;
+            if (!count)
+                return;
+            h += '<option value="' + s + '"' + (_jobsFilterStatus === s ? " selected" : "") + '>' + esc(_jobStatusLabel(s)) + ' (' + count + ')</option>';
+        });
+        h += '</select>';
+        h += '</div>';
+        var filtered = _jobs.filter(function (j) {
+            if (_jobsFilterScanner && j.scanner !== _jobsFilterScanner)
+                return false;
+            if (_jobsFilterStatus && j.status !== _jobsFilterStatus)
+                return false;
+            return true;
+        });
+        if (!filtered.length) {
+            h += '<div class="empty-state">' + esc(t("jobs.no_match")) + '</div>';
+            c.innerHTML = h;
+            return;
+        }
+        var hasRunning = filtered.some(function (j) { return j.status === "pending" || j.status === "running"; });
+        h += '<div class="ct-text-label ct-muted ct-mb-2">' + filtered.length + ' / ' + _jobs.length + ' ' + esc(t("jobs.title").toLowerCase()) + '</div>';
+        h += '<table class="ct-table"><thead><tr>'
+            + '<th>' + esc(t("jobs.col.target")) + '</th>'
+            + '<th>' + esc(t("jobs.col.scanner")) + '</th>'
+            + '<th>' + esc(t("jobs.col.source")) + '</th>'
+            + '<th>' + esc(t("jobs.col.status")) + '</th>'
+            + '<th>' + esc(t("jobs.col.findings")) + '</th>'
+            + '<th>' + esc(t("jobs.col.started")) + '</th>'
+            + '<th>' + esc(t("jobs.col.duration")) + '</th>'
+            + '<th></th></tr></thead><tbody>';
+        filtered.forEach(function (j) {
+            var dur = "";
+            if (j.started_at) {
+                var start = new Date(j.started_at);
+                var end = j.completed_at ? new Date(j.completed_at) : new Date();
+                var s = Math.round((end.getTime() - start.getTime()) / 1000);
+                dur = s < 60 ? s + "s" : Math.floor(s / 60) + "m" + (s % 60) + "s";
+            }
+            var isScheduled = j.triggered_by === "scheduler" || j.profile === "scheduled";
+            var sourceBadge = isScheduled
+                ? '<span class="ct-badge" data-size="sm" data-tone="accent">' + _icon("clock", 12) + ' ' + esc(t("jobs.source.auto").toUpperCase()) + '</span>'
+                : '<span class="ct-badge" data-size="sm" data-tone="info">' + _icon("pin", 12) + ' ' + esc(t("jobs.source.manual").toUpperCase()) + '</span>';
+            var scannerCls = _scannerTone(j.scanner);
+            h += '<tr>';
+            h += '<td class="ct-mono ct-text-meta ct-strong">' + esc(j.target) + '</td>';
+            h += '<td><span class="ct-badge" data-size="sm" data-tone="' + scannerCls + '" title="' + esc(j.scanner || "") + '">' + esc(_scannerLabel(j.scanner)) + '</span>';
+            if (j.profile && j.profile !== "scheduled")
+                h += '<div class="ct-text-label ct-muted ct-mt-1">profil: ' + esc(j.profile) + '</div>';
+            h += '</td>';
+            h += '<td>' + sourceBadge + '</td>';
+            h += '<td><span class="ct-badge" data-size="sm" data-tone="' + _jobTone(j.status) + '"' + (j.status === "running" ? " data-live" : "") + '>' + esc(_jobStatusLabel(j.status)) + '</span>';
+            if (j.error)
+                h += '<div style="font-size:var(--ct-text-label);color:var(--ct-critical);margin-top:var(--ct-s1);max-width:240px;word-break:break-word">' + esc(_jobErrorText(j.error).substring(0, 120)) + '</div>';
+            if (j.status === "partial" && j.diff && j.diff.partial) {
+                var pp = j.diff.partial;
+                var msgs = [];
+                if (pp.limit === "files")
+                    msgs.push(t("jobs.partial.stopped").replace("{n}", String(pp.scanned != null ? pp.scanned : "?")) + " " + t("jobs.partial.files"));
+                else if (pp.limit === "time")
+                    msgs.push(t("jobs.partial.stopped").replace("{n}", String(pp.scanned != null ? pp.scanned : "?")) + " " + t("jobs.partial.time"));
+                if (pp.inaccessible_dirs)
+                    msgs.push(t("jobs.partial.inaccessible").replace("{n}", String(pp.inaccessible_dirs)));
+                if (msgs.length)
+                    h += '<div class="ct-text-label ct-text-medium ct-mt-1">' + esc(msgs.join(" · ")) + '</div>';
+            }
+            h += '</td>';
+            h += '<td class="ct-ta-c ct-strong">' + j.findings_count;
+            if (j.diff && (j.diff.added || j.diff.reopened)) {
+                var diffParts = [];
+                if (j.diff.added)
+                    diffParts.push('<span class="job-diff-added">+' + j.diff.added + '</span>');
+                if (j.diff.reopened)
+                    diffParts.push('<span class="job-diff-reopened">↻' + j.diff.reopened + '</span>');
+                h += '<div class="job-diff">' + diffParts.join(" ") + '</div>';
+            }
+            h += '</td>';
+            h += '<td class="ct-text-label ct-muted">' + esc(_fmtDate(j.created_at || "")) + '<br><span class="ct-text-data">' + esc(j.triggered_by || "") + '</span></td>';
+            h += '<td class="ct-text-label ct-muted">' + esc(dur);
+            if (j.diff && j.diff.scanned != null)
+                h += '<div class="ct-text-data">' + esc(t("jobs.scanned_files").replace("{n}", String(j.diff.scanned))) + '</div>';
+            h += '</td>';
+            h += '<td class="ct-nowrap">';
+            // Rerun is offered on every completed/failed job. The handler picks
+            // the right path: manual nmap → POST /scans/jobs, scheduled jobs →
+            // POST /monitored-assets/{id}/scan based on target match.
+            if (j.status !== "pending" && j.status !== "running") {
+                h += '<button class="ct-btn" data-size="xs" data-click="_rerunJob" data-args=\'' + _da(j.id) + '\' data-pass-el title="' + esc(t("jobs.rerun")) + '" data-icon>' + _icon("refresh", 14) + '</button> ';
+            }
+            h += '<button class="ct-btn" data-variant="danger" data-size="xs" data-click="_deleteJob" data-args=\'' + _da(j.id) + '\' title="' + esc(t("action.delete")) + '" data-icon>' + _icon("trash", 14) + '</button>';
+            h += '</td>';
+            h += '</tr>';
+        });
+        h += '</tbody></table>';
+        c.innerHTML = h;
+        // Auto-refresh while at least one job is running
+        if (hasRunning) {
+            _jobsPollTimer = setInterval(function () {
+                if (_panel !== "jobs") {
+                    clearInterval(_jobsPollTimer);
+                    _jobsPollTimer = null;
+                    return;
+                }
+                SurfaceAPI.listJobs().then(function (d) {
+                    if (_panel !== "jobs")
+                        return;
+                    _jobs = d || [];
+                    _renderJobs(document.getElementById("content"));
+                });
+            }, 3000);
+        }
+    }
+    function _jobStatusLabel(s) {
+        return t("jobs.status." + s) || s;
+    }
+    // Job errors from scanners are free-text (English pivot language) and shown
+    // verbatim. A few backend-emitted errors are instead stored as translation
+    // KEYS (prefix "job.error.") so they follow the UI language — translate those,
+    // pass everything else through unchanged. Unknown keys fall back to raw text.
+    function _jobErrorText(err) {
+        if (!err)
+            return "";
+        if (err.indexOf("job.error.") === 0) {
+            var tr = t(err);
+            return tr === err ? err : tr;
+        }
+        return err;
+    }
+    window._setJobsScannerFilter = function (v) { _jobsFilterScanner = v || ""; renderPanel(); };
+    window._setJobsStatusFilter = function (v) { _jobsFilterStatus = v || ""; renderPanel(); };
+    window._deleteJob = function (id) {
+        if (!confirm(t("prompt.job_delete_confirm")))
+            return;
+        SurfaceAPI.deleteJob(id).then(function () {
+            showStatus(t("action.delete"));
+            _loadAndRender();
+        }).catch(function (e) { showStatus(e.message || t("common.error"), true); });
+    };
+    window._rerunJob = function (id, el) {
+        var job = _jobs.find(function (j) { return j.id === id; });
+        if (!job)
+            return;
+        // Disable the button to prevent double-clicks while the scan runs.
+        var btn = (el && el.tagName === "BUTTON" ? el : (el ? el.closest("button") : null));
+        if (btn) {
+            btn.disabled = true;
+            btn.style.opacity = "0.5";
+        }
+        // Immediate feedback — the scheduled-* endpoint is synchronous and can
+        // take 30s+ to return, so the user needs to see something happen NOW.
+        showStatus(t("jobs.rerun_in_progress").replace("{target}", job.target));
+        // any localisé : trois endpoints de relance aux réponses hétérogènes
+        // (createJob / scanMonitored / quickScan), seuls findings_created /
+        // findings_count sont lus avec garde null.
+        var ok = function (r) {
+            var n = (r && (r.findings_created != null ? r.findings_created : r.findings_count)) || 0;
+            showStatus(t("jobs.rerun_done")
+                .replace("{target}", job.target)
+                .replace("{n}", String(n)));
+            _loadAndRender();
+        };
+        var fail = function (e) {
+            if (btn) {
+                btn.disabled = false;
+                btn.style.opacity = "1";
+            }
+            showStatus(e.message || t("common.error"), true);
+        };
+        // Manual nmap jobs replay through the create-job endpoint (async,
+        // returns immediately with a pending job).
+        if (job.scanner === "nmap") {
+            SurfaceAPI.createJob({ target: job.target, profile: job.profile || "quick" }).then(ok).catch(fail);
+            return;
+        }
+        // Scheduled AND manual jobs (scheduled-*/manual-*) are bound to a
+        // MonitoredAsset — find it by value and trigger its /scan endpoint,
+        // which kicks off the full scanner chain asynchronously.
+        var asset = (_monitored || []).find(function (a) { return a.value === job.target; });
+        if (asset) {
+            SurfaceAPI.scanMonitored(asset.id).then(ok).catch(fail);
+            return;
+        }
+        // Fallback: try a quick port scan
+        SurfaceAPI.quickScan(job.target).then(ok).catch(fail);
+    };
+    // ═══════════════════════════════════════════════════════════════
+    // MONITORED ASSETS
+    // ═══════════════════════════════════════════════════════════════
+    function _renderMonitored(c) {
+        var h = '<div class="ct-row ct-row-wrap ct-mb-3">';
+        h += '<h2 class="ct-m-0">' + esc(t("monitored.title")) + '</h2>';
+        h += '<span class="ct-flex-1"></span>';
+        if (_monitored.length)
+            h += '<button class="ct-btn mt-8" data-write data-click="_scanAllMonitored">' + _icon("search", 14) + ' ' + esc(t("monitored.scan_all")) + '</button>';
+        h += '<button class="ct-btn mt-8" data-write data-variant="primary" data-click="_newMonitoredDialog">' + _icon("plus", 14) + ' ' + esc(t("monitored.add")) + '</button>';
+        h += '</div>';
+        h += '<div class="ct-text-meta ct-muted ct-mb-3">' + esc(t("monitored.help")) + '</div>';
+        if (!_monitored.length) {
+            h += '<div class="empty-state">' + esc(t("monitored.empty")) + '</div>';
+            c.innerHTML = h;
+            return;
+        }
+        // Search bar (rendered once — the table below lives in a wrapper the
+        // search handler refreshes in place so the input keeps focus).
+        h += '<div class="surface-filters ct-mb-3">';
+        h += '<input type="text" class="surface-filter ct-minw-320 ct-flex-1" placeholder="' + esc(t("monitored.search.placeholder")) + '"';
+        h += ' id="monitored-search" value="' + esc(_monitoredSearch) + '" data-input="_setMonitoredSearch" data-pass-value autocomplete="off">';
+        h += '<button class="ct-btn mt-8 ct-hidden" data-write data-variant="primary" id="monitored-search-clear" data-click="_clearMonitoredSearch"' + (_monitoredSearch ? '' : '') + '>x</button>';
+        h += '</div>';
+        // Scanner-type filter pills — the union of every scanner declared on
+        // any monitored asset, sorted alphabetically. Multi-select.
+        var scannerSet = {};
+        _monitored.forEach(function (a) { (a.enabled_scanners || []).forEach(function (s) { if (s)
+            scannerSet[s] = true; }); });
+        var scannerList = Object.keys(scannerSet).sort();
+        if (scannerList.length) {
+            h += '<div class="filter-pills-row ct-mb-3">';
+            h += '<span class="filter-pills-lbl">' + esc(t("monitored.filter.scanner")) + '</span>';
+            scannerList.forEach(function (s) {
+                var on = _monitoredFilterScanners.indexOf(s) >= 0;
+                h += '<button type="button" class="filter-pill' + (on ? " active" : "") + '" data-click="_toggleMonitoredScanner" data-args=\'' + _da(s) + '\'>' + esc(_scannerLabel(s)) + '</button>';
+            });
+            if (_monitoredFilterScanners.length) {
+                h += '<button type="button" class="filter-pill filter-pill-clear" data-click="_clearMonitoredScannerFilter">' + esc(t("findings.filter.reset")) + '</button>';
+            }
+            else {
+                h += '<span class="filter-pills-hint">' + esc(t("findings.filter.hint_m")) + '</span>';
+            }
+            h += '</div>';
+        }
+        h += '<div id="monitored-table-wrap"></div>';
+        c.innerHTML = h;
+        _refreshMonitoredTable();
+    }
+    function _refreshMonitoredTable() {
+        var wrap = document.getElementById("monitored-table-wrap");
+        if (!wrap)
+            return;
+        var q = _monitoredSearch.trim().toLowerCase();
+        var filtered = _monitored.filter(function (a) {
+            // Scanner filter pills (ANY-match — show the asset if at least one
+            // of its scanners matches at least one selected pill).
+            if (_monitoredFilterScanners.length) {
+                var scs = a.enabled_scanners || [];
+                var matched = false;
+                for (var i = 0; i < scs.length; i++) {
+                    if (_monitoredFilterScanners.indexOf(scs[i]) >= 0) {
+                        matched = true;
+                        break;
+                    }
+                }
+                if (!matched)
+                    return false;
+            }
+            if (!q)
+                return true;
+            if ((a.value || "").toLowerCase().indexOf(q) >= 0)
+                return true;
+            if ((a.label || "").toLowerCase().indexOf(q) >= 0)
+                return true;
+            if ((a.notes || "").toLowerCase().indexOf(q) >= 0)
+                return true;
+            if ((a.kind || "").toLowerCase().indexOf(q) >= 0)
+                return true;
+            if ((a.enabled_scanners || []).some(function (s) { return (s || "").toLowerCase().indexOf(q) >= 0; }))
+                return true;
+            return false;
+        });
+        var h = '<div class="ct-text-label ct-muted ct-mb-2">' + filtered.length + ' / ' + _monitored.length + ' ' + esc(t("monitored.count")) + '</div>';
+        if (!filtered.length) {
+            h += '<div class="empty-state">' + esc(t("monitored.no_match")) + '</div>';
+            wrap.innerHTML = h;
+            return;
+        }
+        // Drop selections for assets that are no longer in the filtered list
+        var filteredIds = {};
+        filtered.forEach(function (a) { filteredIds[a.id] = true; });
+        Object.keys(_monitoredBulkSelection).forEach(function (id) {
+            if (!filteredIds[id])
+                delete _monitoredBulkSelection[id];
+        });
+        var allChecked = filtered.length > 0 && filtered.every(function (a) { return _monitoredBulkSelection[a.id]; });
+        h += '<table class="ct-table"><thead><tr>'
+            + '<th style="width:28px"><input type="checkbox" id="mon-bulk-all"' + (allChecked ? " checked" : "") + ' data-change="_toggleMonBulkAll" data-pass-value></th>'
+            + '<th>' + esc(t("monitored.col.type")) + '</th>'
+            + '<th>' + esc(t("monitored.col.value")) + '</th>'
+            + '<th>' + esc(t("monitored.col.label")) + '</th>'
+            + '<th>' + esc(t("monitored.col.scanners")) + '</th>'
+            + '<th>' + esc(t("monitored.col.frequency")) + '</th>'
+            + '<th>' + esc(t("monitored.col.enabled")) + '</th>'
+            + '<th>' + esc(t("monitored.col.last_scan")) + '</th>'
+            + '<th>' + esc(t("monitored.col.next_scan")) + '</th>'
+            + '<th></th></tr></thead><tbody>';
+        var now = Date.now();
+        filtered.forEach(function (a) {
+            var disabled = !a.enabled;
+            var freq = a.scan_frequency_hours || 0;
+            var nextStr = "—";
+            if (freq > 0) {
+                if (!a.last_scan_at) {
+                    nextStr = '<span class="ct-text-low">' + esc(t("monitored.next.imminent")) + '</span>';
+                }
+                else {
+                    var nextMs = new Date(a.last_scan_at).getTime() + freq * 3600 * 1000;
+                    if (nextMs <= now)
+                        nextStr = '<span class="ct-text-low">' + esc(t("monitored.next.imminent")) + '</span>';
+                    else {
+                        var inH = Math.round((nextMs - now) / 3600000);
+                        nextStr = inH < 1 ? "< 1 h" : inH + " h";
+                    }
+                }
+            }
+            else {
+                nextStr = '<span class="ct-muted">' + esc(t("monitored.next.disabled")) + '</span>';
+            }
+            var checkedM = _monitoredBulkSelection[a.id] ? " checked" : "";
+            h += '<tr style="' + (disabled ? "opacity:0.5;" : "") + '">';
+            h += '<td data-stop><input type="checkbox" class="bulk-check"' + checkedM + ' data-click="_toggleMonBulkOne" data-args=\'' + _da(a.id) + '\' data-stop></td>';
+            h += '<td><span class="ct-ref" data-size="sm">' + esc(_kindLabel(a.kind)) + '</span></td>';
+            h += '<td class="ct-mono ct-text-meta ct-strong">' + esc(a.value) + '</td>';
+            h += '<td class="ct-text-meta">' + esc(a.label || "-") + '</td>';
+            var scs = a.enabled_scanners || [];
+            if (scs.length) {
+                var badges = scs.map(function (s) { return '<span class="scanner-mini" title="' + esc(s) + '">' + esc(_scannerLabel(s)) + '</span>'; }).join("");
+                h += '<td class="ct-maxw-240">' + badges + '</td>';
+            }
+            else {
+                h += '<td><span class="scanner-mini scanner-mini-none">aucun</span></td>';
+            }
+            h += '<td class="ct-text-label ct-muted">' + (freq > 0 ? String(t("monitored.frequency_hours")).replace("{n}", String(freq)) : "—") + '</td>';
+            h += '<td><label class="ct-clickable"><input type="checkbox"' + (a.enabled ? " checked" : "") + ' data-change="_toggleMonitored" data-args=\'' + _da(a.id) + '\' data-pass-el></label></td>';
+            h += '<td class="ct-text-label ct-muted">' + esc(a.last_scan_at ? _fmtDate(a.last_scan_at || "") : t("monitored.last.never")) + '</td>';
+            h += '<td class="ct-text-label">' + nextStr + '</td>';
+            h += '<td class="ct-nowrap">';
+            h += '<button class="ct-btn" data-size="xs" data-click="_openMonitoredDetail" data-args=\'' + _da(a.id) + '\' title="' + esc(t("monitored.open_detail")) + '" data-icon>' + _icon("arrow_right", 14) + '</button> ';
+            h += '<button class="ct-btn" data-size="xs" data-click="_scanMonitored" data-args=\'' + _da(a.id) + '\' title="' + esc(t("host.scan_now")) + '" data-icon>' + _icon("search", 14) + '</button> ';
+            h += '<button class="ct-btn" data-size="xs" data-click="_editMonitoredDialog" data-args=\'' + _da(a.id) + '\' title="' + esc(t("action.edit")) + '" data-icon>' + _icon("edit", 14) + '</button> ';
+            h += '<button class="ct-btn" data-variant="danger" data-size="xs" data-click="_deleteMonitored" data-args=\'' + _da(a.id) + '\' title="' + esc(t("action.delete")) + '" data-icon>' + _icon("trash", 14) + '</button>';
+            h += '</td>';
+            h += '</tr>';
+        });
+        h += '</tbody></table>';
+        var selCount = Object.keys(_monitoredBulkSelection).length;
+        if (selCount > 0) {
+            h += '<div class="bulk-action-bar">';
+            h += '<span class="bulk-count">' + esc(t("bulk.selected", { n: selCount })) + '</span>';
+            h += '<button class="ct-btn mt-8" data-write data-variant="primary" data-click="_bulkScanMonitored">' + _icon("search", 14) + ' ' + esc(t("monitored.bulk_scan")) + '</button>';
+            h += '<button class="ct-btn mt-8" data-write data-variant="primary" data-click="_bulkConfigureScanners">' + _icon("edit", 14) + ' ' + esc(t("hosts.bulk_configure_scans")) + '</button>';
+            h += '<button class="ct-btn mt-8" data-write data-variant="danger" data-click="_bulkDeleteMonitored">' + _icon("trash", 14) + ' ' + esc(t("monitored.bulk_delete")) + '</button>';
+            h += '<span class="ct-flex-1"></span>';
+            h += '<button class="ct-btn mt-8" data-write data-variant="primary" data-click="_clearMonitoredBulk">' + esc(t("bulk.clear")) + '</button>';
+            h += '</div>';
+        }
+        h += _exclusionsPanelHTML();
+        wrap.innerHTML = h;
+    }
+    // Scan blocklist manager, shown under the Surveillance table. Values here are
+    // never scanned nor auto-enrolled (enforced server-side).
+    function _exclusionsPanelHTML() {
+        var h = '<div class="surface-card ct-mt-5">';
+        h += '<h3 class="ct-m-0">' + _icon("shield", 15) + ' ' + esc(t("exclude.panel_title")) + '</h3>';
+        h += '<div class="ct-text-label ct-muted ct-mb-2">' + esc(t("exclude.panel_hint")) + '</div>';
+        h += '<div class="ct-row ct-row-wrap ct-mb-3">';
+        h += '<input id="excl-value" class="ct-input ct-maxw-300" placeholder="' + esc(t("exclude.placeholder_value")) + '">';
+        h += '<input id="excl-note" class="ct-input ct-flex-1" placeholder="' + esc(t("exclude.placeholder_note")) + '">';
+        h += '<button class="ct-btn" data-write data-variant="primary" data-click="_addExclusionManual">' + _icon("plus", 14) + ' ' + esc(t("exclude.add_btn")) + '</button>';
+        h += '</div>';
+        if (!_exclusions.length) {
+            h += '<div class="ct-text-label ct-muted">' + esc(t("exclude.empty")) + '</div>';
+        }
+        else {
+            h += '<table class="ct-table"><tbody>';
+            _exclusions.forEach(function (e) {
+                h += '<tr>';
+                h += '<td class="ct-mono ct-strong">' + esc(e.value) + '</td>';
+                h += '<td class="ct-text-meta ct-muted">' + esc(e.note || "") + '</td>';
+                h += '<td class="ct-text-label ct-muted ct-nowrap">' + esc(e.created_at ? _fmtDate(e.created_at) : "") + '</td>';
+                h += '<td class="ct-nowrap"><button class="ct-btn" data-variant="danger" data-size="xs" data-click="_removeExclusion" data-args=\'' + _da(e.id) + '\' title="' + esc(t("exclude.remove")) + '" data-icon>' + _icon("trash", 14) + '</button></td>';
+                h += '</tr>';
+            });
+            h += '</tbody></table>';
+        }
+        h += '</div>';
+        return h;
+    }
+    window._addExclusionManual = function () {
+        var vEl = document.getElementById("excl-value");
+        var nEl = document.getElementById("excl-note");
+        var value = (vEl && vEl.value || "").trim();
+        if (!value) {
+            showStatus(t("exclude.value_required"), true);
+            return;
+        }
+        SurfaceAPI.addExclusion({ value: value, note: (nEl && nEl.value || "").trim() }).then(function () {
+            showStatus(t("exclude.added", { value: value }));
+            _loadAndRender();
+        }).catch(function (e) { showStatus(e.message || t("common.error"), true); });
+    };
+    window._removeExclusion = function (id) {
+        SurfaceAPI.deleteExclusion(id).then(function () {
+            showStatus(t("exclude.removed"));
+            _loadAndRender();
+        }).catch(function (e) { showStatus(e.message || t("common.error"), true); });
+    };
+    window._toggleMonBulkAll = function () {
+        var el = document.getElementById("mon-bulk-all");
+        var checked = el && el.checked;
+        var q = _monitoredSearch.trim().toLowerCase();
+        var filtered = _monitored.filter(function (a) {
+            if (_monitoredFilterScanners.length) {
+                var scs = a.enabled_scanners || [];
+                var matched = false;
+                for (var i = 0; i < scs.length; i++) {
+                    if (_monitoredFilterScanners.indexOf(scs[i]) >= 0) {
+                        matched = true;
+                        break;
+                    }
+                }
+                if (!matched)
+                    return false;
+            }
+            if (!q)
+                return true;
+            return ((a.value || "") + (a.label || "") + (a.notes || "") + (a.kind || "")).toLowerCase().indexOf(q) >= 0;
+        });
+        if (checked)
+            filtered.forEach(function (a) { _monitoredBulkSelection[a.id] = true; });
+        else
+            _monitoredBulkSelection = {};
+        _refreshMonitoredTable();
+    };
+    window._toggleMonBulkOne = function (id) {
+        if (_monitoredBulkSelection[id])
+            delete _monitoredBulkSelection[id];
+        else
+            _monitoredBulkSelection[id] = true;
+        _refreshMonitoredTable();
+    };
+    window._clearMonitoredBulk = function () {
+        _monitoredBulkSelection = {};
+        _refreshMonitoredTable();
+    };
+    window._bulkDeleteMonitored = function () {
+        var ids = Object.keys(_monitoredBulkSelection);
+        if (!ids.length)
+            return;
+        if (!confirm(t("monitored.bulk_delete_confirm", { count: ids.length })))
+            return;
+        var done = 0, errors = 0;
+        ids.forEach(function (id) {
+            SurfaceAPI.deleteMonitored(id)
+                .then(function () { done++; _checkBulkDeleteDone(done, errors, ids.length); })
+                .catch(function () { errors++; _checkBulkDeleteDone(done, errors, ids.length); });
+        });
+    };
+    function _checkBulkDeleteDone(done, errors, total) {
+        if (done + errors < total)
+            return;
+        _monitoredBulkSelection = {};
+        _loadAndRender();
+        if (errors)
+            showStatus(t("monitored.bulk_delete_partial", { done: done, errors: errors }), true);
+        else
+            showStatus(t("monitored.bulk_delete_done", { count: done }));
+    }
+    window._bulkConfigureScanners = function () {
+        var ids = Object.keys(_monitoredBulkSelection);
+        if (!ids.length)
+            return;
+        _editScannersDialog(ids);
+    };
+    window._bulkScanMonitored = function () {
+        var ids = Object.keys(_monitoredBulkSelection);
+        if (!ids.length)
+            return;
+        showStatus(t("monitored.bulk_scan_started", { n: ids.length }));
+        var done = 0, errors = 0;
+        ids.forEach(function (id) {
+            SurfaceAPI.scanMonitored(id)
+                .then(function () { done++; _checkBulkScanDone(done, errors, ids.length); })
+                .catch(function () { errors++; _checkBulkScanDone(done, errors, ids.length); });
+        });
+    };
+    function _checkBulkScanDone(done, errors, total) {
+        if (done + errors < total)
+            return;
+        _monitoredBulkSelection = {};
+        _loadAndRender();
+        if (errors)
+            showStatus(t("monitored.bulk_scan_partial", { done: done, errors: errors }), true);
+        else
+            showStatus(t("monitored.bulk_scan_done", { n: done }));
+    }
+    window._setMonitoredSearch = function (v) {
+        _monitoredSearch = v || "";
+        _refreshMonitoredTable();
+        var clearBtn = document.getElementById("monitored-search-clear");
+        if (clearBtn)
+            clearBtn.style.display = _monitoredSearch ? "" : "none";
+    };
+    window._clearMonitoredSearch = function () {
+        _monitoredSearch = "";
+        var inp = document.getElementById("monitored-search");
+        if (inp)
+            inp.value = "";
+        _refreshMonitoredTable();
+        var clearBtn = document.getElementById("monitored-search-clear");
+        if (clearBtn)
+            clearBtn.style.display = "none";
+        if (inp)
+            inp.focus();
+    };
+    function _kindLabel(k) { return t("kind." + k) || k; }
+    function _kindHelp(k) {
+        return t("kind.help." + k) || "";
+    }
+    function _ensureMonitoredModal() {
+        var ov = document.getElementById("monitored-overlay");
+        if (!ov) {
+            ov = document.createElement("div");
+            ov.id = "monitored-overlay";
+            ov.className = "ct-modal-overlay";
+            ov.hidden = true;
+            document.body.appendChild(ov);
+            var _md = null;
+            ov.addEventListener("mousedown", function (e) { _md = e.target; });
+            ov.addEventListener("click", function (e) { if (e.target === ov && _md === ov)
+                _closeMonitoredModal(); });
+        }
+        // Kind radios are derived from the scanners catalogue: the base kinds plus
+        // any extra kind a loaded scanner add-on contributes (e.g. file_share from
+        // the SMB add-on). A kind only appears if a scanner supports it.
+        var _kinds = Object.keys(_scannersCatalog || {});
+        if (!_kinds.length)
+            _kinds = ["domain", "host", "ip_range"];
+        var kindRadios = _kinds.map(function (k, i) {
+            return '<label class="surface-radio"><input type="radio" name="monitored-kind" value="' + esc(k) + '"' + (i === 0 ? " checked" : "") + '> <span>' + esc(t("kind." + k) || k) + '</span></label>';
+        }).join("");
+        // Rebuild innerHTML on every open so the locale is always current.
+        ov.innerHTML =
+            '<div class="ct-modal">' +
+                '<div class="ct-modal-header"><span id="monitored-modal-title">' + esc(t("mon_modal.title_add")) + '</span><button class="surface-modal-close" data-click="_closeMonitoredModal">' + _icon("x", 18) + '</button></div>' +
+                '<div class="ct-modal-body">' +
+                '<div class="ct-field"><label class="surface-field-lbl">' + esc(t("mon_modal.type")) + '</label>' +
+                '<div class="surface-radio-group">' + kindRadios + '</div>' +
+                '<div class="surface-field-help" id="monitored-kind-help"></div>' +
+                '</div>' +
+                '<div class="ct-field"><label class="surface-field-lbl">' + esc(t("mon_modal.value")) + '</label>' +
+                '<input type="text" class="ct-input" id="monitored-value" placeholder="example.com">' +
+                '</div>' +
+                '<div class="ct-field"><label class="surface-field-lbl">' + esc(t("mon_modal.label")) + '</label>' +
+                '<input type="text" class="ct-input" id="monitored-label" placeholder="' + esc(t("mon_modal.label_ph")) + '">' +
+                '</div>' +
+                '<div class="ct-field"><label class="surface-field-lbl">' + esc(t("mon_modal.notes")) + '</label>' +
+                '<textarea class="ct-input" id="monitored-notes" rows="3" placeholder="' + esc(t("mon_modal.notes_ph")) + '"></textarea>' +
+                '</div>' +
+                '<div class="ct-field"><label class="surface-field-lbl">' + esc(t("mon_modal.criticality")) + '</label>' +
+                '<select class="ct-input" id="monitored-criticality">' +
+                '<option value="low">' + esc(t("mon_modal.crit_low")) + '</option>' +
+                '<option value="medium" selected>' + esc(t("mon_modal.crit_medium")) + '</option>' +
+                '<option value="high">' + esc(t("mon_modal.crit_high")) + '</option>' +
+                '<option value="critical">' + esc(t("mon_modal.crit_critical")) + '</option>' +
+                '</select>' +
+                '<div class="surface-field-help">' + esc(t("mon_modal.criticality_help")) + '</div>' +
+                '</div>' +
+                '<div class="ct-field"><label class="surface-field-lbl">' + esc(t("mon_modal.tags")) + '</label>' +
+                '<input type="text" class="ct-input" id="monitored-tags" placeholder="' + esc(t("mon_modal.tags_ph")) + '">' +
+                '<div class="surface-field-help">' + esc(t("mon_modal.tags_help")) + '</div>' +
+                '</div>' +
+                '<div class="ct-field"><label class="surface-field-lbl">' + esc(t("mon_modal.frequency")) + '</label>' +
+                '<select class="ct-input" id="monitored-frequency">' +
+                '<option value="1">1 h</option>' +
+                '<option value="6">6 h</option>' +
+                '<option value="24" selected>24 h</option>' +
+                '<option value="168">168 h (7d)</option>' +
+                '<option value="720">720 h (30d)</option>' +
+                '<option value="0">0 (' + esc(t("monitored.next.disabled")) + ')</option>' +
+                '</select>' +
+                '<div class="surface-field-help">' + esc(t("mon_modal.frequency_help")) + '</div>' +
+                '</div>' +
+                '<div class="ct-field"><label class="surface-field-lbl">' + esc(t("mon_modal.scanners")) + '</label>' +
+                '<div id="monitored-scanners" class="scanner-checklist"></div>' +
+                '<div class="surface-field-help">' + esc(t("mon_modal.scanners_help")) + '</div>' +
+                '</div>' +
+                // File-share (SMB) options — shown only for kind=file_share.
+                '<div id="monitored-fileshare" class="ct-hidden">' +
+                '<div class="ct-field"><label class="surface-field-lbl">' + esc(t("mon_modal.fs_user")) + '</label>' +
+                '<input type="text" class="ct-input" id="monitored-fs-user" placeholder="svc-scan" autocomplete="off">' +
+                '</div>' +
+                '<div class="ct-field"><label class="surface-field-lbl">' + esc(t("mon_modal.fs_domain")) + '</label>' +
+                '<input type="text" class="ct-input" id="monitored-fs-domain" placeholder="' + esc(t("mon_modal.fs_domain_ph")) + '" autocomplete="off">' +
+                '</div>' +
+                '<div class="ct-field"><label class="surface-field-lbl">' + esc(t("mon_modal.fs_pwd")) + '</label>' +
+                '<input type="password" class="ct-input" id="monitored-fs-pwd" placeholder="' + esc(t("mon_modal.fs_pwd_ph")) + '" autocomplete="new-password">' +
+                '<div class="surface-field-help">' + esc(t("mon_modal.fs_creds_help")) + '</div>' +
+                '</div>' +
+                '<div class="ct-field"><label class="surface-field-lbl">' + esc(t("mon_modal.fs_regex")) + '</label>' +
+                '<textarea class="ct-input" id="monitored-fs-regex" rows="3" placeholder="' + esc(t("mon_modal.fs_regex_ph")) + '"></textarea>' +
+                '<div class="surface-field-help">' + esc(t("mon_modal.fs_regex_help")) + '</div>' +
+                '</div>' +
+                '<div class="ct-field"><label class="surface-field-lbl">' + esc(t("mon_modal.fs_ext")) + '</label>' +
+                '<input type="text" class="ct-input" id="monitored-fs-ext" placeholder="' + esc(t("mon_modal.fs_ext_ph")) + '">' +
+                '<div class="surface-field-help">' + esc(t("mon_modal.fs_ext_help")) + '</div>' +
+                '</div>' +
+                '<div class="ct-field"><label class="surface-field-lbl">' + esc(t("mon_modal.fs_maxsize")) + '</label>' +
+                '<input type="number" class="ct-input" id="monitored-fs-maxsize" min="1" placeholder="50">' +
+                '</div>' +
+                '<div class="ct-field"><label class="surface-field-lbl">' + esc(t("mon_modal.fs_maxfiles")) + '</label>' +
+                '<input type="number" class="ct-input" id="monitored-fs-maxfiles" min="1" placeholder="∞">' +
+                '<div class="surface-field-help">' + esc(t("mon_modal.fs_maxfiles_help")) + '</div>' +
+                '</div>' +
+                '<div class="ct-field"><label class="surface-field-lbl">' + esc(t("mon_modal.fs_timebudget")) + '</label>' +
+                '<input type="number" class="ct-input" id="monitored-fs-timebudget" min="1" placeholder="30">' +
+                '<div class="surface-field-help">' + esc(t("mon_modal.fs_timebudget_help")) + '</div>' +
+                '</div>' +
+                '</div>' +
+                '<div class="ct-field"><label class="surface-checkbox"><input type="checkbox" id="monitored-enabled" checked> <span>' + esc(t("mon_modal.enabled")) + '</span></label></div>' +
+                '<div class="ct-field" id="monitored-row-autoenroll"><label class="surface-checkbox"><input type="checkbox" id="monitored-auto-enroll"> <span>' + esc(t("mon_modal.auto_enroll")) + '</span></label>' +
+                '<div class="surface-field-help">' + esc(t("mon_modal.auto_enroll_help")) + '</div>' +
+                '</div>' +
+                '<div class="ct-field" id="monitored-row-stealth"><label class="surface-checkbox"><input type="checkbox" id="monitored-stealth"> <span>' + esc(t("mon_modal.stealth")) + '</span></label>' +
+                '<div class="surface-field-help">' + esc(t("mon_modal.stealth_help")) + '</div>' +
+                '</div>' +
+                '<div class="surface-error ct-hidden" id="monitored-error"></div>' +
+                '</div>' +
+                '<div class="ct-modal-footer">' +
+                '<button class="ct-modal-btn" data-click="_closeMonitoredModal">' + esc(t("action.cancel")) + '</button>' +
+                '<button class="ct-modal-btn ct-modal-btn--primary" data-click="_saveMonitored">' + esc(t("action.save")) + '</button>' +
+                '</div>' +
+                '</div>';
+        document.querySelectorAll('input[name="monitored-kind"]').forEach(function (r) {
+            r.addEventListener("change", function () {
+                _updateMonitoredKindHelp();
+                _renderScannerChecklist(null);
+                _toggleFileShareConfig();
+            });
+        });
+        return ov;
+    }
+    function _toggleFileShareConfig() {
+        var sel = document.querySelector('input[name="monitored-kind"]:checked');
+        var isFs = !!(sel && sel.value === "file_share");
+        var fs = document.getElementById("monitored-fileshare");
+        if (fs)
+            fs.style.display = isFs ? "" : "none";
+        // Auto-enroll and stealth are network-scan concepts — irrelevant for a share.
+        var ae = document.getElementById("monitored-row-autoenroll");
+        var st = document.getElementById("monitored-row-stealth");
+        if (ae)
+            ae.style.display = isFs ? "none" : "";
+        if (st)
+            st.style.display = isFs ? "none" : "";
+    }
+    function _renderScannerChecklist(currentSelection) {
+        var sel = document.querySelector('input[name="monitored-kind"]:checked');
+        var kind = sel ? sel.value : "domain";
+        var container = document.getElementById("monitored-scanners");
+        if (!container)
+            return;
+        var entry = (_scannersCatalog && _scannersCatalog[kind]) || { scanners: [], defaults: [] };
+        var enabled = currentSelection;
+        if (enabled == null)
+            enabled = entry.defaults || [];
+        var enabledSet = {};
+        (enabled || []).forEach(function (n) { enabledSet[n] = true; });
+        if (!entry.scanners || !entry.scanners.length) {
+            container.innerHTML = '<div class="surface-field-help">Aucun scanner disponible pour ce type.</div>';
+            return;
+        }
+        var h = "";
+        entry.scanners.forEach(function (s) {
+            var checked = enabledSet[s.name] ? " checked" : "";
+            h += '<label class="scanner-check">' +
+                '<input type="checkbox" value="' + esc(s.name) + '"' + checked + '> ' +
+                '<span>' + esc(_scannerLabel(s.name)) + '</span>' +
+                '</label>';
+        });
+        container.innerHTML = h;
+    }
+    function _updateMonitoredKindHelp() {
+        var sel = document.querySelector('input[name="monitored-kind"]:checked');
+        var k = sel ? sel.value : "domain";
+        var help = document.getElementById("monitored-kind-help");
+        if (help)
+            help.textContent = _kindHelp(k);
+        var input = document.getElementById("monitored-value");
+        if (input)
+            input.placeholder = { domain: "example.com", host: "1.2.3.4 ou api.example.com", ip_range: "192.168.1.0/24" }[k] || "";
+    }
+    var _editingMonitoredId = null;
+    window._newMonitoredDialog = function () {
+        _editingMonitoredId = null;
+        var ov = _ensureMonitoredModal();
+        document.getElementById("monitored-modal-title").textContent = t("mon_modal.title_add");
+        document.querySelector('input[name="monitored-kind"][value="domain"]').checked = true;
+        document.getElementById("monitored-value").value = "";
+        document.getElementById("monitored-label").value = "";
+        document.getElementById("monitored-notes").value = "";
+        document.getElementById("monitored-enabled").checked = true;
+        document.getElementById("monitored-auto-enroll").checked = false;
+        document.getElementById("monitored-stealth").checked = false;
+        document.getElementById("monitored-frequency").value = "24";
+        document.getElementById("monitored-criticality").value = "medium";
+        document.getElementById("monitored-tags").value = "";
+        document.getElementById("monitored-fs-regex").value = "";
+        document.getElementById("monitored-fs-ext").value = "";
+        document.getElementById("monitored-fs-maxsize").value = "";
+        document.getElementById("monitored-fs-maxfiles").value = "";
+        document.getElementById("monitored-fs-timebudget").value = "";
+        document.getElementById("monitored-fs-user").value = "";
+        document.getElementById("monitored-fs-domain").value = "";
+        var _pw0 = document.getElementById("monitored-fs-pwd");
+        _pw0.value = "";
+        _pw0.placeholder = t("mon_modal.fs_pwd_ph");
+        document.getElementById("monitored-error").style.display = "none";
+        _updateMonitoredKindHelp();
+        _renderScannerChecklist(null);
+        _toggleFileShareConfig();
+        ov.hidden = false;
+        setTimeout(function () {
+            var v = document.getElementById("monitored-value");
+            if (v)
+                v.focus();
+        }, 50);
+    };
+    // Lightweight scanner-only edit modal — opened from the host card or
+    // from the bulk-action bar on the Surveillance page. Patches just the
+    // `enabled_scanners` field so the user doesn't have to navigate the full
+    // monitored asset modal for the most common adjustment.
+    window._editScannersDialog = function (idOrIds) {
+        var ids = Array.isArray(idOrIds) ? idOrIds : [idOrIds];
+        var assets = _monitored.filter(function (a) { return ids.indexOf(a.id) >= 0; });
+        if (!assets.length)
+            return;
+        // Pick the first asset's scanners as the initial state. For bulk
+        // applies, the user explicitly accepts they overwrite every selected
+        // asset's scanners with the same set.
+        var first = assets[0];
+        var kind = first.kind || "host";
+        var entry = (_scannersCatalog && _scannersCatalog[kind]) || { scanners: [], defaults: [] };
+        var current = {};
+        (first.enabled_scanners || []).forEach(function (s) { current[s] = true; });
+        var ov = document.getElementById("scanners-overlay");
+        if (!ov) {
+            ov = document.createElement("div");
+            ov.id = "scanners-overlay";
+            ov.className = "ct-modal-overlay";
+            ov.hidden = true;
+            document.body.appendChild(ov);
+            ov.addEventListener("click", function (e) { if (e.target === ov)
+                ov.hidden = true; });
+        }
+        var listH = "";
+        if (entry.scanners && entry.scanners.length) {
+            entry.scanners.forEach(function (s) {
+                var checked = current[s.name] ? " checked" : "";
+                listH += '<label class="scanner-check"><input type="checkbox" value="' + esc(s.name) + '"' + checked + '> <span>' + esc(_scannerLabel(s.name)) + '</span></label>';
+            });
+        }
+        else {
+            listH = '<div class="surface-field-help">' + esc(t("mon_modal.no_scanners_for_kind")) + '</div>';
+        }
+        // FEAT-23: per-domain typosquatting tuning (single domain asset only).
+        // Reads/writes the typosquat_* keys of asset.config that the scanner honours.
+        var showTypo = ids.length === 1 && kind === "domain";
+        var typoH = "";
+        if (showTypo) {
+            var tc = first.config || {};
+            var mv = tc.typosquat_max_variants != null ? tc.typosquat_max_variants : 80;
+            var useCt = tc.typosquat_use_ct != null ? !!tc.typosquat_use_ct : true;
+            var maxCt = tc.typosquat_max_ct != null ? tc.typosquat_max_ct : 40;
+            typoH =
+                '<div class="surface-field-help ct-mt-3 ct-strong">' + esc(t("mon_typo.title")) + '</div>' +
+                    '<div id="typo-config" class="ct-flex ct-body ct-gap-2 ct-mt-1">' +
+                    '<label class="ct-flex ct-items-center ct-gap-2 ct-text-meta">' +
+                    '<span class="ct-flex-1">' + esc(t("mon_typo.max_variants")) + '</span>' +
+                    '<input type="number" id="typo-max-variants" min="1" max="500" value="' + esc(String(mv)) + '" class="ct-w-90">' +
+                    '</label>' +
+                    '<label class="ct-flex ct-items-center ct-gap-2 ct-text-meta">' +
+                    '<input type="checkbox" id="typo-use-ct"' + (useCt ? " checked" : "") + '>' +
+                    '<span>' + esc(t("mon_typo.use_ct")) + '</span>' +
+                    '</label>' +
+                    '<label class="ct-flex ct-items-center ct-gap-2 ct-text-meta">' +
+                    '<span class="ct-flex-1">' + esc(t("mon_typo.max_ct")) + '</span>' +
+                    '<input type="number" id="typo-max-ct" min="0" max="200" value="' + esc(String(maxCt)) + '" class="ct-w-90">' +
+                    '</label>' +
+                    '</div>';
+        }
+        var subtitle = ids.length > 1
+            ? t("hosts.bulk_scanners_subtitle").replace("{n}", String(ids.length))
+            : esc(first.value);
+        ov.innerHTML =
+            '<div class="ct-modal" style="width:520px">' +
+                '<div class="ct-modal-header"><span>' + esc(t("hosts.configure_scans")) + ' — ' + subtitle + '</span><button class="surface-modal-close" data-click="_closeScannersDialog">' + _icon("x", 18) + '</button></div>' +
+                '<div class="ct-modal-body">' +
+                '<div id="scanners-list" data-ids=\'' + _da.apply(null, ids) + '\'>' + listH + '</div>' +
+                typoH +
+                '</div>' +
+                '<div class="ct-modal-footer">' +
+                '<button class="ct-modal-btn" data-click="_closeScannersDialog">' + esc(t("action.cancel")) + '</button>' +
+                '<button class="ct-modal-btn ct-modal-btn--primary" data-click="_saveScannersDialog">' + esc(t("action.save")) + '</button>' +
+                '</div>' +
+                '</div>';
+        // Stash the ids on the modal so the save handler knows what to patch
+        ov.dataset.ids = JSON.stringify(ids);
+        ov.hidden = false;
+    };
+    window._closeScannersDialog = function () {
+        var ov = document.getElementById("scanners-overlay");
+        if (ov)
+            ov.hidden = true;
+    };
+    window._saveScannersDialog = function () {
+        var ov = document.getElementById("scanners-overlay");
+        if (!ov)
+            return;
+        var ids = JSON.parse(ov.dataset.ids || "[]");
+        var picked = [];
+        ov.querySelectorAll("#scanners-list input[type=checkbox]:checked").forEach(function (cb) {
+            picked.push(cb.value);
+        });
+        // FEAT-23: persist the per-domain typosquatting tuning (single domain only).
+        var typoVarEl = document.getElementById("typo-max-variants");
+        var typoConfig = null;
+        if (typoVarEl && ids.length === 1) {
+            var mv = parseInt(typoVarEl.value, 10);
+            var maxCt = parseInt(document.getElementById("typo-max-ct").value, 10);
+            var useCt = document.getElementById("typo-use-ct").checked;
+            var asset = _monitored.find(function (a) { return a.id === ids[0]; });
+            typoConfig = Object.assign({}, (asset && asset.config) || {}, {
+                typosquat_max_variants: isNaN(mv) ? 80 : Math.max(1, Math.min(mv, 500)),
+                typosquat_use_ct: useCt,
+                typosquat_max_ct: isNaN(maxCt) ? 40 : Math.max(0, Math.min(maxCt, 200)),
+            });
+        }
+        Promise.all(ids.map(function (id) {
+            var patch = { enabled_scanners: picked };
+            if (typoConfig)
+                patch.config = typoConfig;
+            return SurfaceAPI.updateMonitored(id, patch);
+        })).then(function () {
+            ov.hidden = true;
+            showStatus(t("hosts.scanners_updated").replace("{n}", String(ids.length)));
+            _bulkSelection = {};
+            _loadAndRender();
+        }).catch(function (e) { showStatus(e.message || t("common.error"), true); });
+    };
+    window._editMonitoredDialog = function (id) {
+        var a = _monitored.find(function (x) { return x.id === id; });
+        if (!a)
+            return;
+        _editingMonitoredId = id;
+        var ov = _ensureMonitoredModal();
+        document.getElementById("monitored-modal-title").textContent = t("mon_modal.title_edit");
+        var radio = document.querySelector('input[name="monitored-kind"][value="' + a.kind + '"]');
+        if (radio)
+            radio.checked = true;
+        document.getElementById("monitored-value").value = a.value;
+        document.getElementById("monitored-label").value = a.label || "";
+        document.getElementById("monitored-notes").value = a.notes || "";
+        document.getElementById("monitored-enabled").checked = !!a.enabled;
+        document.getElementById("monitored-auto-enroll").checked = !!a.auto_enroll_discoveries;
+        document.getElementById("monitored-stealth").checked = !!a.stealth_mode;
+        document.getElementById("monitored-frequency").value = String(a.scan_frequency_hours != null ? a.scan_frequency_hours : 24);
+        document.getElementById("monitored-criticality").value = a.criticality || "medium";
+        document.getElementById("monitored-tags").value = (a.tags || []).join(", ");
+        var cfg = (a.config || {});
+        document.getElementById("monitored-fs-regex").value = (cfg.custom_regex || []).join("\n");
+        document.getElementById("monitored-fs-ext").value = (cfg.extensions || []).join(", ");
+        document.getElementById("monitored-fs-maxsize").value = cfg.max_size_mb != null ? String(cfg.max_size_mb) : "";
+        document.getElementById("monitored-fs-maxfiles").value = cfg.max_files != null ? String(cfg.max_files) : "";
+        document.getElementById("monitored-fs-timebudget").value = cfg.time_budget_s != null ? String(Math.round(cfg.time_budget_s / 60)) : "";
+        document.getElementById("monitored-fs-user").value = cfg.smb_username || "";
+        document.getElementById("monitored-fs-domain").value = cfg.smb_domain || "";
+        var _pwE = document.getElementById("monitored-fs-pwd");
+        _pwE.value = "";
+        _pwE.placeholder = cfg.smb_password_set ? t("mon_modal.fs_pwd_keep") : t("mon_modal.fs_pwd_ph");
+        document.getElementById("monitored-error").style.display = "none";
+        _updateMonitoredKindHelp();
+        _renderScannerChecklist(a.enabled_scanners || null);
+        _toggleFileShareConfig();
+        ov.hidden = false;
+    };
+    window._closeMonitoredModal = function () {
+        var ov = document.getElementById("monitored-overlay");
+        if (ov)
+            ov.hidden = true;
+    };
+    window._saveMonitored = function () {
+        var sel = document.querySelector('input[name="monitored-kind"]:checked');
+        var enabledScanners = [];
+        document.querySelectorAll("#monitored-scanners input[type=checkbox]:checked").forEach(function (cb) {
+            enabledScanners.push(cb.value);
+        });
+        var rawTags = (document.getElementById("monitored-tags").value || "")
+            .split(",").map(function (s) { return s.trim(); }).filter(Boolean);
+        var data = {
+            kind: sel ? sel.value : "domain",
+            value: document.getElementById("monitored-value").value.trim(),
+            label: document.getElementById("monitored-label").value.trim(),
+            notes: document.getElementById("monitored-notes").value.trim(),
+            enabled: document.getElementById("monitored-enabled").checked,
+            scan_frequency_hours: parseInt(document.getElementById("monitored-frequency").value, 10),
+            enabled_scanners: enabledScanners,
+            criticality: document.getElementById("monitored-criticality").value || "medium",
+            tags: rawTags,
+            auto_enroll_discoveries: document.getElementById("monitored-auto-enroll").checked,
+            stealth_mode: document.getElementById("monitored-stealth").checked,
+            config: {},
+        };
+        // File-share options → config (only when relevant; harmless otherwise).
+        if (data.kind === "file_share") {
+            var rx = (document.getElementById("monitored-fs-regex").value || "")
+                .split("\n").map(function (s) { return s.trim(); }).filter(Boolean);
+            var exts = (document.getElementById("monitored-fs-ext").value || "")
+                .split(",").map(function (s) { return s.trim().replace(/^\./, "").toLowerCase(); }).filter(Boolean);
+            var maxsz = parseInt(document.getElementById("monitored-fs-maxsize").value, 10);
+            var maxf = parseInt(document.getElementById("monitored-fs-maxfiles").value, 10);
+            var tbMin = parseInt(document.getElementById("monitored-fs-timebudget").value, 10);
+            data.config = {
+                custom_regex: rx,
+                extensions: exts,
+                max_size_mb: isNaN(maxsz) ? undefined : maxsz,
+                max_files: isNaN(maxf) ? undefined : maxf,
+                time_budget_s: isNaN(tbMin) ? undefined : tbMin * 60,
+                smb_username: document.getElementById("monitored-fs-user").value.trim(),
+                smb_domain: document.getElementById("monitored-fs-domain").value.trim(),
+            };
+            // Only send the password when (re)entered; empty keeps the stored one.
+            var _pwVal = document.getElementById("monitored-fs-pwd").value;
+            if (_pwVal)
+                data.config.smb_password = _pwVal;
+        }
+        var err = document.getElementById("monitored-error");
+        err.style.display = "none";
+        if (!data.value) {
+            err.textContent = t("mon_modal.value_required");
+            err.style.display = "block";
+            return;
+        }
+        var promise = _editingMonitoredId
+            ? SurfaceAPI.updateMonitored(_editingMonitoredId, data)
+            : SurfaceAPI.createMonitored(data);
+        promise.then(function () {
+            _closeMonitoredModal();
+            showStatus(_editingMonitoredId ? t("mon_modal.updated") : t("mon_modal.added"));
+            _editingMonitoredId = null;
+            _loadAndRender();
+        }).catch(function (e) {
+            err.textContent = e.message || t("common.error");
+            err.style.display = "block";
+        });
+    };
+    window._toggleMonitored = function (id, el) {
+        SurfaceAPI.updateMonitored(id, { enabled: el.checked })
+            .then(function () { var a = _monitored.find(function (x) { return x.id === id; }); if (a)
+            a.enabled = el.checked; })
+            .catch(function (e) { showStatus(e.message || t("common.error"), true); });
+    };
+    window._deleteMonitored = function (id) {
+        if (!confirm(t("monitored.delete_confirm")))
+            return;
+        SurfaceAPI.deleteMonitored(id)
+            .then(function () { showStatus(t("mon_modal.deleted")); _loadAndRender(); })
+            .catch(function (e) { showStatus(e.message || t("common.error"), true); });
+    };
+    window._scanMonitored = function (id) {
+        showStatus(t("mon_modal.scan_in_progress"));
+        SurfaceAPI.scanMonitored(id).then(function (r) {
+            // The asset scan runs in the background (returns a job_id, no findings
+            // count yet) — announce the launch, the Scans list tracks completion.
+            showStatus(t("mon_modal.scan_launched").replace("{target}", String(r.target)));
+            _loadAndRender();
+        }).catch(function (e) { showStatus(e.message || t("common.error"), true); });
+    };
+    window._scanAllMonitored = function () {
+        if (!confirm(t("mon_modal.scan_all_confirm")))
+            return;
+        showStatus(t("mon_modal.scan_all_in_progress"));
+        SurfaceAPI.scanAllMonitored().then(function (r) {
+            var msg = t("mon_modal.scan_all_done").replace("{scanned}", String(r.scanned)).replace("{n}", String(r.findings_created));
+            if (r.errors && r.errors.length)
+                msg += ", " + t("mon_modal.scan_all_errors").replace("{n}", String(r.errors.length));
+            showStatus(msg);
+            _loadAndRender();
+        }).catch(function (e) { showStatus(e.message || t("common.error"), true); });
+    };
+    // ═══════════════════════════════════════════════════════════════
+    // DASHBOARD
+    // ═══════════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════
+    // DASHBOARD — stat helpers
+    // ═══════════════════════════════════════════════════════════════
+    var _DAY_MS = 86400000;
+    var _SEV_ORDER = ["critical", "high", "medium", "low", "info"];
+    var _SEV_RANK = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
+    function _dayKey(d) {
+        // YYYY-MM-DD in local time
+        var y = d.getFullYear(), m = d.getMonth() + 1, dd = d.getDate();
+        return y + "-" + (m < 10 ? "0" + m : m) + "-" + (dd < 10 ? "0" + dd : dd);
+    }
+    function _daysAgo(iso) {
+        if (!iso)
+            return Infinity;
+        var then = new Date(iso).getTime();
+        if (isNaN(then))
+            return Infinity;
+        return Math.floor((Date.now() - then) / _DAY_MS);
+    }
+    function _dashStats() {
+        // bySev   — severity breakdown of actionable findings (new/to_fix),
+        //           includes info for display
+        // active  — actionable findings EXCLUDING info (drives alert counts)
+        // byStatus— raw status counts (all severities)
+        var bySev = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
+        var byStatus = { new: 0, false_positive: 0, to_fix: 0, fixed: 0 };
+        var active = [];
+        _findings.forEach(function (f) {
+            if (byStatus[f.status] != null)
+                byStatus[f.status]++;
+            if (f.status === "new" || f.status === "to_fix") {
+                if (bySev[f.severity] != null)
+                    bySev[f.severity]++;
+                if (f.severity !== "info")
+                    active.push(f);
+            }
+        });
+        return { bySev: bySev, byStatus: byStatus, active: active };
+    }
+    function _topHostsByFindings(n) {
+        // Aggregate actionable findings per host.value (excluding info
+        // so audit-only findings don't push a host into the "at risk" list).
+        var map = {};
+        _findings.forEach(function (f) {
+            if (f.status !== "new" && f.status !== "to_fix")
+                return;
+            if (f.severity === "info")
+                return;
+            var tgt = (f.target || "").split(":")[0];
+            if (!tgt)
+                return;
+            if (!map[tgt])
+                map[tgt] = { host: tgt, total: 0, maxSev: 9 };
+            map[tgt].total++;
+            var r = _SEV_RANK[f.severity];
+            if (r != null && r < map[tgt].maxSev)
+                map[tgt].maxSev = r;
+        });
+        var list = Object.keys(map).map(function (k) { return map[k]; });
+        list.sort(function (a, b) {
+            if (a.maxSev !== b.maxSev)
+                return a.maxSev - b.maxSev;
+            return b.total - a.total;
+        });
+        // Resolve host id if the target matches a monitored host
+        list.forEach(function (row) {
+            var m = _monitored.find(function (a) { return a.value === row.host; });
+            if (m) {
+                row.id = m.id;
+                row.kind = m.kind;
+            }
+        });
+        return list.slice(0, n);
+    }
+    function _topFindingTypes(n) {
+        // Actionable types only — info findings (scan_clean, ct_discovery,
+        // tls_valid...) would otherwise dominate the list with noise.
+        var map = {};
+        _findings.forEach(function (f) {
+            if (f.status !== "new" && f.status !== "to_fix")
+                return;
+            if (f.severity === "info")
+                return;
+            var k = f.type || "other";
+            map[k] = (map[k] || 0) + 1;
+        });
+        return Object.keys(map).map(function (k) { return { type: k, count: map[k] }; })
+            .sort(function (a, b) { return b.count - a.count; })
+            .slice(0, n);
+    }
+    function _topScanners(n) {
+        var map = {};
+        _findings.forEach(function (f) {
+            var k = f.scanner || "manual";
+            map[k] = (map[k] || 0) + 1;
+        });
+        return Object.keys(map).map(function (k) { return { scanner: k, count: map[k] }; })
+            .sort(function (a, b) { return b.count - a.count; })
+            .slice(0, n);
+    }
+    function _timelineDaily(days) {
+        // Returns [{key, label, critical, high, medium, low, info, triaged}]
+        // for the last `days` days, inclusive of today. The severity columns are
+        // CUMULATIVE — each entry reflects the total number of findings of that
+        // severity that existed at the end of the day, not just the ones created
+        // that day. That way the curve never drops on a quiet day.
+        // `triaged` stays a daily count: the line overlay accumulates it
+        // separately to show triage velocity.
+        var out = [];
+        var now = new Date();
+        now.setHours(23, 59, 59, 999);
+        var msPerDay = _DAY_MS;
+        var dayLabels = [];
+        var dayEnds = [];
+        for (var i = days - 1; i >= 0; i--) {
+            var d = new Date(now.getTime() - i * msPerDay);
+            dayLabels.push({
+                key: _dayKey(d),
+                label: d.getDate() + "/" + (d.getMonth() + 1),
+                endTs: d.getTime(),
+            });
+            dayEnds.push(d.getTime());
+        }
+        // Pre-extract finding timestamps once so the loop stays O(N + days)
+        var prepped = _findings.map(function (f) {
+            return {
+                sev: f.severity,
+                created: f.created_at ? new Date(f.created_at).getTime() : 0,
+                triaged: f.triaged_at ? new Date(f.triaged_at).getTime() : 0,
+            };
+        });
+        dayLabels.forEach(function (slot, idx) {
+            var bucket = { key: slot.key, label: slot.label,
+                critical: 0, high: 0, medium: 0, low: 0, info: 0, triaged: 0 };
+            var end = slot.endTs;
+            prepped.forEach(function (f) {
+                if (f.created && f.created <= end && bucket[f.sev] != null) {
+                    bucket[f.sev]++;
+                }
+                // Daily triaged count: only triaged_at falling on this day
+                if (f.triaged) {
+                    var dayStart = end - msPerDay + 1;
+                    if (f.triaged >= dayStart && f.triaged <= end)
+                        bucket.triaged++;
+                }
+            });
+            out.push(bucket);
+        });
+        return out;
+    }
+    function _surfaceInventory() {
+        var byKind = { domain: 0, host: 0, ip_range: 0, file_share: 0 };
+        var hostsSource = { auto: 0, manual: 0 };
+        var discoveredThisWeek = 0;
+        var sevenDaysAgo = Date.now() - 7 * _DAY_MS;
+        _monitored.forEach(function (a) {
+            if (byKind[a.kind] != null)
+                byKind[a.kind]++;
+            if (a.kind === "host") {
+                var auto = (a.notes || "").indexOf("Auto-decouvert") === 0;
+                if (auto)
+                    hostsSource.auto++;
+                else
+                    hostsSource.manual++;
+                // Auto-discovered host creation date unknown in state; fall back to created_at field if present
+                if (auto && a.created_at && new Date(a.created_at).getTime() > sevenDaysAgo) {
+                    discoveredThisWeek++;
+                }
+            }
+        });
+        return {
+            byKind: byKind,
+            hostsSource: hostsSource,
+            discoveredThisWeek: discoveredThisWeek,
+            totalAssets: _monitored.length,
+        };
+    }
+    function _measuresStats() {
+        var byStatus = { a_faire: 0, en_cours: 0, termine: 0 };
+        var overdue = [];
+        var staleDays = 30;
+        var now = new Date();
+        var todayIso = now.toISOString().substring(0, 10);
+        var createdThisWeek = 0;
+        var doneThisWeek = 0;
+        var sevenDaysAgo = now.getTime() - 7 * _DAY_MS;
+        _measures.forEach(function (m) {
+            if (m.statut != null && byStatus[m.statut] != null)
+                byStatus[m.statut]++;
+            if (m.statut !== "termine" && m.echeance && m.echeance < todayIso) {
+                overdue.push(m);
+            }
+            if (m.created_at && new Date(m.created_at).getTime() > sevenDaysAgo)
+                createdThisWeek++;
+            if (m.statut === "termine" && m.updated_at && new Date(m.updated_at).getTime() > sevenDaysAgo)
+                doneThisWeek++;
+        });
+        return {
+            byStatus: byStatus,
+            total: _measures.length,
+            overdue: overdue,
+            createdThisWeek: createdThisWeek,
+            doneThisWeek: doneThisWeek,
+        };
+    }
+    function _schedulerHealth() {
+        var last24 = Date.now() - _DAY_MS;
+        var jobs24 = _jobs.filter(function (j) {
+            return j.created_at && new Date(j.created_at).getTime() > last24;
+        });
+        var ok = jobs24.filter(function (j) { return j.status === "completed" || j.status === "partial"; }).length;
+        var failed = jobs24.filter(function (j) { return j.status === "failed"; }).length;
+        var running = _jobs.filter(function (j) { return j.status === "running" || j.status === "pending"; }).length;
+        var lastJob = _jobs.length ? _jobs[0] : null;
+        // Next due asset
+        var now = Date.now();
+        var nextAsset = null, nextMs = Infinity;
+        _monitored.forEach(function (a) {
+            if (!a.enabled || !a.scan_frequency_hours)
+                return;
+            if (!a.last_scan_at) {
+                if (nextMs > 0) {
+                    nextMs = 0;
+                    nextAsset = a;
+                }
+                return;
+            }
+            var due = new Date(a.last_scan_at).getTime() + a.scan_frequency_hours * 3600000;
+            if (due < nextMs) {
+                nextMs = due;
+                nextAsset = a;
+            }
+        });
+        // Cast : les affectations dans le forEach ne sont pas vues par le CFA
+        // (TS garde le narrowing `null` de l'initialisation).
+        var nextInHours = nextAsset ? Math.max(0, Math.round((nextMs - now) / 3600000)) : null;
+        return {
+            ok: ok, failed: failed, running: running, total24: jobs24.length,
+            successRate: jobs24.length ? Math.round(ok / jobs24.length * 100) : null,
+            lastJob: lastJob,
+            nextAsset: nextAsset,
+            nextInHours: nextInHours,
+        };
+    }
+    function _coverageGaps() {
+        var staleHosts = [];
+        var sparseHosts = [];
+        var disabledLong = [];
+        var now = Date.now();
+        _monitored.forEach(function (a) {
+            if (a.kind === "host" && a.enabled) {
+                var age = _daysAgo(a.last_scan_at);
+                if (age > 7)
+                    staleHosts.push({ host: a.value, id: a.id, age: age });
+                if ((a.enabled_scanners || []).length < 2)
+                    sparseHosts.push(a);
+            }
+            if (!a.enabled && a.created_at) {
+                var days = Math.floor((now - new Date(a.created_at).getTime()) / _DAY_MS);
+                if (days > 30)
+                    disabledLong.push(a);
+            }
+        });
+        staleHosts.sort(function (a, b) { return (b.age === Infinity ? 9999 : b.age) - (a.age === Infinity ? 9999 : a.age); });
+        return { staleHosts: staleHosts, sparseHosts: sparseHosts, disabledLong: disabledLong };
+    }
+    // ═══════════════════════════════════════════════════════════════
+    // DASHBOARD — render
+    // ═══════════════════════════════════════════════════════════════
+    function _renderDashboard(c) {
+        var stats = _dashStats();
+        // "Nouveaux 24h" counter excludes info — it's meant to flag fresh
+        // actionable findings, not routine scan summaries.
+        var recent24 = _findings.filter(function (f) {
+            if (f.severity === "info")
+                return false;
+            return f.created_at && new Date(f.created_at).getTime() > Date.now() - _DAY_MS;
+        });
+        var h = '<div class="dash-header">';
+        h += '<h2 class="ct-m-0">' + esc(t("dash.title")) + '</h2>';
+        h += '<div class="dash-actions">';
+        h += '<button class="ct-btn mt-8" data-write data-click="_scanAllMonitored" title="' + esc(t("monitored.scan_all")) + '">' + _icon("search", 14) + ' ' + esc(t("monitored.scan_all")) + '</button>';
+        h += '<button class="ct-btn mt-8" data-write data-variant="primary" data-click="_newMonitoredDialog">' + _icon("plus", 14) + ' ' + esc(t("monitored.add")) + '</button>';
+        h += '<button class="ct-btn mt-8" data-write data-variant="primary" data-click="_bulkImportDialog">' + _icon("list", 14) + ' ' + esc(t("findings.bulk_import")) + '</button>';
+        h += '</div></div>';
+        // ── A. Critical banner ────────────────────────────────────
+        h += _dashBanner(stats, recent24);
+        // ── B. Timeline 30 days ───────────────────────────────────
+        h += _dashTimeline();
+        // ── Row 1 : Top hosts + Top types ────────────────────────
+        h += '<div class="dash-row">';
+        h += _dashTopHosts();
+        h += _dashTopTypes();
+        h += '</div>';
+        // ── Row 2 : Surface inventory + Measures burndown ────────
+        h += '<div class="dash-row">';
+        h += _dashSurface();
+        h += _dashMeasures();
+        h += '</div>';
+        // ── Row 3 : Scanner health + Top scanners ────────────────
+        h += '<div class="dash-row">';
+        h += _dashHealth();
+        h += _dashTopScanners();
+        h += '</div>';
+        c.innerHTML = h;
+    }
+    // v0.2 — per-asset risk score = severity-weighted active findings × business
+    // criticality. Returns 0–100. The weights mirror the Surface dashboard
+    // gradient: critical hurts 10×, high 5×, medium 2×, low/info 0. Multiplying
+    // by the criticality factor (1–4) lets a "critical" asset bubble up even
+    // with fewer findings than a "low" asset that has many medium findings.
+    var _CRIT_FACTOR = { low: 1, medium: 2, high: 3, critical: 4 };
+    function _riskScoreFor(asset, counts) {
+        if (!counts)
+            return 0;
+        var raw = (counts.critical || 0) * 10
+            + (counts.high || 0) * 5
+            + (counts.medium || 0) * 2
+            + (counts.low || 0) * 0.5;
+        var crit = _CRIT_FACTOR[(asset && asset.criticality) || "medium"] || 2;
+        var score = raw * crit;
+        return Math.min(100, Math.round(score));
+    }
+    function _riskTier(score) {
+        if (score >= 70)
+            return { lvl: "critical", lbl: t("risk.tier_critical") };
+        if (score >= 40)
+            return { lvl: "high", lbl: t("risk.tier_high") };
+        if (score >= 15)
+            return { lvl: "medium", lbl: t("risk.tier_medium") };
+        if (score > 0)
+            return { lvl: "low", lbl: t("risk.tier_low") };
+        return { lvl: "info", lbl: t("risk.tier_clean") };
+    }
+    function _statCard(value, label, cls) {
+        var _tone = { "stat-critical": "critical", "stat-high": "high", "stat-medium": "medium", "stat-low": "low", "stat-info": "info", "critical": "critical", "warning": "medium" };
+        var _t = _tone[cls] || "";
+        // A severity tone should light up only when the count is > 0 — a zero count
+        // stays neutral so a clean dashboard isn't a wall of coloured zeros.
+        if (_t && typeof value === "number" && value === 0)
+            _t = "";
+        var _dt = _t ? ' data-tone="' + _t + '"' : '';
+        return '<div class="ct-kpi" data-emphasis="value"' + _dt + '><div class="ct-kpi-tone"></div><div class="ct-kpi-body"><div class="ct-kpi-label">' + esc(label) + '</div><div class="ct-kpi-value">' + value + '</div></div></div>';
+    }
+    // ── A. Critical banner split into two dash-cards ──────────────
+    function _dashBanner(stats, recent24) {
+        var crit = stats.bySev.critical;
+        var high = stats.bySev.high;
+        var topHosts = _topHostsByFindings(3);
+        // Left card color reflects the severity of the situation.
+        var leftState = crit > 0 ? "critical" : high > 0 ? "high" : "ok";
+        var headline = crit > 0 ? esc(t("dash.headline_critical")).replace("{n}", String(crit))
+            : high > 0 ? esc(t("dash.headline_high")).replace("{n}", String(high))
+                : esc(t("dash.headline_ok"));
+        var icon = leftState === "ok" ? _icon("check_circle", 16) : _icon("alert", 16);
+        var h = '<div class="dash-row">';
+        // LEFT CARD — alert + 3 count tiles (orange/red/green by state)
+        h += '<div class="dash-card dash-card-alert dash-card-alert-' + leftState + '">';
+        h += '<div class="dash-card-head">' + icon + ' <span>' + headline + '</span></div>';
+        h += '<div class="dash-banner-counts">';
+        // Severity-count tiles carry their tone only when the count is > 0.
+        h += '<div class="ct-kpi ct-clickable" data-emphasis="value"' + (crit > 0 ? ' data-tone="critical"' : '') + ' data-click="_dashGotoSeverity" data-args=\'["critical"]\'><div class="ct-kpi-tone"></div><div class="ct-kpi-body"><div class="ct-kpi-label">' + esc(t("sev.critical")) + '</div><div class="ct-kpi-value">' + crit + '</div></div></div>';
+        h += '<div class="ct-kpi ct-clickable" data-emphasis="value"' + (high > 0 ? ' data-tone="high"' : '') + ' data-click="_dashGotoSeverity" data-args=\'["high"]\'><div class="ct-kpi-tone"></div><div class="ct-kpi-body"><div class="ct-kpi-label">' + esc(t("sev.high")) + '</div><div class="ct-kpi-value">' + high + '</div></div></div>';
+        h += '<div class="ct-kpi ct-clickable" data-emphasis="value" data-tone="info" data-click="_dashGotoRecent"><div class="ct-kpi-tone"></div><div class="ct-kpi-body"><div class="ct-kpi-label">' + esc(t("dash.new_24h")) + '</div><div class="ct-kpi-value">' + recent24.length + '</div></div></div>';
+        h += '</div>';
+        h += '</div>';
+        // RIGHT CARD — top 3 exposed hosts
+        h += '<div class="dash-card">';
+        h += '<div class="dash-card-head">' + _icon("server", 16) + ' ' + esc(t("dash.top_exposed_hosts")) + '</div>';
+        if (topHosts.length) {
+            h += '<div class="dash-list">';
+            topHosts.forEach(function (row) {
+                var sev = _SEV_ORDER[row.maxSev] || "info";
+                h += '<div class="dash-list-row" data-click="_dashGotoHost" data-args=\'' + _da(row.host) + '\'>';
+                h += '<span class="ct-badge" data-tone="' + _surfaceTone(sev) + '">' + esc(t("sev." + sev)) + '</span>';
+                h += '<span class="dash-list-main mono" title="' + esc(row.host) + '">' + esc(row.host) + '</span>';
+                h += '<span class="dash-list-count">' + row.total + '</span>';
+                h += '</div>';
+            });
+            h += '</div>';
+        }
+        else {
+            h += '<div class="dash-empty">' + esc(t("dash.no_hosts_at_risk")) + '</div>';
+        }
+        h += '</div>';
+        h += '</div>';
+        return h;
+    }
+    // ── B. Timeline 30 days ───────────────────────────────────────
+    function _dashTimeline() {
+        var days = _timelineDaily(30);
+        // Match the canonical severity badge palette (Surface.css .sev-*).
+        // Same hues used everywhere in the app — filter pills, badges, host
+        // counters — so the chart reads instantly.
+        // Shifted from the badge palette to give critical/high more chromatic
+        // distance — at 1.4px stroke var(--ct-critical) and var(--ct-high) looked nearly identical.
+        // Critical stays the deepest red, high jumps to a clearly brighter orange.
+        var colors = {
+            critical: "var(--ct-critical)",
+            high: "var(--ct-high)",
+            medium: "var(--ct-medium)",
+            low: "var(--ct-low)",
+            info: "var(--ct-info)",
+        };
+        // Per-severity max for the Y scale (lines, not stacked)
+        var maxVal = 1;
+        days.forEach(function (d) {
+            _SEV_ORDER.forEach(function (s) {
+                if ((d[s] || 0) > maxVal)
+                    maxVal = d[s];
+            });
+        });
+        // When one severity dwarfs the others (e.g. thousands of criticals vs a
+        // handful of lows) a linear scale flattens every small series onto the
+        // baseline and they become invisible. Switch to a log scale so every
+        // non-zero series stays readable; 0 still maps to the baseline.
+        var useLog = maxVal > 50;
+        var logMax = Math.log(maxVal + 1);
+        var W = 800, H = 260, ML = 40, MR = 12, MT = 14, MB = 44;
+        var cW = W - ML - MR, cH = H - MT - MB;
+        function xFor(i) { return ML + (i / Math.max(1, days.length - 1)) * cW; }
+        function yFor(v) {
+            if (useLog)
+                return MT + cH - (Math.log((v || 0) + 1) / logMax) * cH;
+            return MT + cH - (v / maxVal) * cH;
+        }
+        function smoothPath(pts) {
+            if (pts.length < 2)
+                return "";
+            var d = "M" + pts[0].x.toFixed(1) + "," + pts[0].y.toFixed(1);
+            for (var i = 0; i < pts.length - 1; i++) {
+                var p0 = pts[Math.max(i - 1, 0)];
+                var p1 = pts[i];
+                var p2 = pts[i + 1];
+                var p3 = pts[Math.min(i + 2, pts.length - 1)];
+                var cp1x = p1.x + (p2.x - p0.x) / 6;
+                var cp1y = Math.min(p1.y + (p2.y - p0.y) / 6, MT + cH);
+                var cp2x = p2.x - (p3.x - p1.x) / 6;
+                var cp2y = Math.min(p2.y - (p3.y - p1.y) / 6, MT + cH);
+                d += " C" + cp1x.toFixed(1) + "," + cp1y.toFixed(1)
+                    + " " + cp2x.toFixed(1) + "," + cp2y.toFixed(1)
+                    + " " + p2.x.toFixed(1) + "," + p2.y.toFixed(1);
+            }
+            return d;
+        }
+        // Cap the rendered height so the chart never dominates the dashboard,
+        // even on very wide cards. width:100% keeps it responsive horizontally.
+        var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMid meet" style="width:100%;max-height:280px;display:block">';
+        // Grid lines + Y labels (5 levels)
+        for (var g = 0; g <= 4; g++) {
+            var gy = MT + cH - (g / 4 * cH);
+            var gLabel = useLog ? Math.round(Math.exp((g / 4) * logMax) - 1) : Math.round(g / 4 * maxVal);
+            svg += '<line x1="' + ML + '" y1="' + gy + '" x2="' + (W - MR) + '" y2="' + gy + '" stroke="var(--ct-line)" stroke-width="0.6"/>';
+            svg += '<text x="' + (ML - 4) + '" y="' + (gy + 4) + '" text-anchor="end" font-size="10" fill="var(--ct-ink-2)">' + gLabel + '</text>';
+        }
+        // One smooth thin line per severity, painted from low → critical so
+        // critical is on top and never gets visually overwritten by lighter
+        // shades crossing through it.
+        _SEV_ORDER.slice().reverse().forEach(function (sev) {
+            var pts = days.map(function (d, i) {
+                return { x: xFor(i), y: yFor(d[sev] || 0) };
+            });
+            if (pts.length < 2)
+                return;
+            var sw = sev === "critical" ? 1.8 : 1.4;
+            svg += '<path d="' + smoothPath(pts) + '" fill="none" stroke="' + colors[sev] + '" stroke-width="' + sw + '" stroke-linecap="round" stroke-linejoin="round"/>';
+        });
+        // Triaged cumulative — distinct from severities (dashed gray-blue)
+        var tcum = 0, maxCum = 1;
+        var triagedPoints = days.map(function (d) { tcum += d.triaged; if (tcum > maxCum)
+            maxCum = tcum; return tcum; });
+        if (tcum > 0) {
+            var linePts = triagedPoints.map(function (y, i) {
+                return { x: xFor(i), y: MT + cH - (y / maxCum) * cH };
+            });
+            svg += '<path d="' + smoothPath(linePts) + '" fill="none" stroke="var(--ct-ink-2)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="4,3"/>';
+        }
+        // X axis labels (every ~5 days)
+        days.forEach(function (d, i) {
+            if (i % 5 !== 0 && i !== days.length - 1)
+                return;
+            svg += '<text x="' + xFor(i).toFixed(1) + '" y="' + (H - MB + 16) + '" text-anchor="middle" font-size="10" fill="var(--ct-ink-2)">' + esc(d.label) + '</text>';
+        });
+        svg += '</svg>';
+        var legend = '<div class="dash-timeline-legend ct-gap-2 ct-justify-center ct-mt-1 ct-row-wrap">';
+        _SEV_ORDER.forEach(function (sev) {
+            var h = sev === "critical" ? 3 : 2;
+            legend += '<span class="ct-flex ct-items-center ct-gap-1">' +
+                '<span style="width:16px;height:' + h + 'px;border-radius:1px;background:' + colors[sev] + '"></span>' +
+                esc(t("sev." + sev)) +
+                '</span>';
+        });
+        legend += '<span class="ct-flex ct-items-center ct-gap-1">' +
+            '<span style="width:14px;height:0;border-top:1px dashed var(--ct-ink-2)"></span>' +
+            esc(t("dash.timeline_triaged")) +
+            '</span>';
+        legend += '</div>';
+        return '<div class="dash-card dash-card-full">' +
+            '<div class="dash-card-head">' + _icon("activity", 16) + ' ' + esc(t("dash.timeline_title")) + '</div>' +
+            svg + legend +
+            '</div>';
+    }
+    // ── Top hosts ─────────────────────────────────────────────────
+    function _dashTopHosts() {
+        var rows = _topHostsByFindings(5);
+        var h = '<div class="dash-card">';
+        h += '<div class="dash-card-head">' + _icon("server", 16) + ' ' + esc(t("dash.top_hosts")) + '</div>';
+        if (!rows.length) {
+            h += '<div class="dash-empty">' + esc(t("dash.no_active_findings")) + '</div>';
+        }
+        else {
+            h += '<div class="dash-list">';
+            rows.forEach(function (row) {
+                var sev = _SEV_ORDER[row.maxSev] || "info";
+                h += '<div class="dash-list-row" data-click="_dashGotoHost" data-args=\'' + _da(row.host) + '\'>';
+                h += '<span class="ct-badge" data-tone="' + _surfaceTone(sev) + '">' + esc(sev) + '</span>';
+                h += '<span class="dash-list-main" title="' + esc(row.host) + '">' + esc(row.host) + '</span>';
+                h += '<span class="dash-list-count">' + row.total + '</span>';
+                h += '</div>';
+            });
+            h += '</div>';
+        }
+        h += '</div>';
+        return h;
+    }
+    function _dashTopTypes() {
+        var rows = _topFindingTypes(5);
+        var h = '<div class="dash-card">';
+        h += '<div class="dash-card-head">' + _icon("zap", 16) + ' ' + esc(t("dash.top_types")) + '</div>';
+        if (!rows.length) {
+            h += '<div class="dash-empty">' + esc(t("dash.no_active_findings")) + '</div>';
+        }
+        else {
+            h += '<div class="dash-list">';
+            rows.forEach(function (row) {
+                h += '<div class="dash-list-row">';
+                h += '<span class="dash-list-main" title="' + esc(row.type) + '">' + esc(row.type) + '</span>';
+                h += '<span class="dash-list-count">' + row.count + '</span>';
+                h += '</div>';
+            });
+            h += '</div>';
+        }
+        h += '</div>';
+        return h;
+    }
+    function _dashTopScanners() {
+        var rows = _topScanners(5);
+        var h = '<div class="dash-card">';
+        h += '<div class="dash-card-head">' + _icon("target", 16) + ' ' + esc(t("dash.top_scanners")) + '</div>';
+        if (!rows.length) {
+            h += '<div class="dash-empty">' + esc(t("dash.no_findings")) + '</div>';
+        }
+        else {
+            h += '<div class="dash-list">';
+            rows.forEach(function (row) {
+                h += '<div class="dash-list-row" data-click="_dashGotoScanner" data-args=\'' + _da(row.scanner) + '\'>';
+                h += '<span class="dash-list-main">' + esc(row.scanner) + '</span>';
+                h += '<span class="dash-list-count">' + row.count + '</span>';
+                h += '</div>';
+            });
+            h += '</div>';
+        }
+        h += '</div>';
+        return h;
+    }
+    // ── Surface inventory ─────────────────────────────────────────
+    function _dashSurface() {
+        var inv = _surfaceInventory();
+        var total = inv.totalAssets;
+        var h = '<div class="dash-card">';
+        h += '<div class="dash-card-head">' + _icon("globe", 16) + ' ' + esc(t("dash.surface_title")) + '</div>';
+        // Bars per kind
+        var kinds = [
+            { k: "domain", color: "var(--ct-info)", v: inv.byKind.domain },
+            { k: "host", color: "#10b981", v: inv.byKind.host },
+            { k: "ip_range", color: "#8b5cf6", v: inv.byKind.ip_range },
+        ];
+        h += '<div class="dash-surface-bars">';
+        kinds.forEach(function (row) {
+            var pct = total ? (row.v / total * 100) : 0;
+            h += '<div class="dash-surface-row">';
+            h += '<span class="dash-surface-lbl">' + esc(t("kind." + row.k)) + '</span>';
+            h += '<div class="dash-bar-bg"><div class="dash-bar-fill" style="width:' + pct + '%;background:' + row.color + '"></div></div>';
+            h += '<span class="dash-surface-count">' + row.v + '</span>';
+            h += '</div>';
+        });
+        h += '</div>';
+        // Hosts source split
+        var src = inv.hostsSource;
+        var srcTotal = src.auto + src.manual;
+        h += '<div class="dash-surface-sub">' + esc(t("dash.hosts_source")) + '</div>';
+        h += '<div class="dash-surface-bars">';
+        h += '<div class="dash-surface-row">';
+        h += '<span class="dash-surface-lbl">' + esc(t("hosts.source.auto")) + '</span>';
+        h += '<div class="dash-bar-bg"><div class="dash-bar-fill" style="width:' + (srcTotal ? src.auto / srcTotal * 100 : 0) + '%;background:var(--ct-accent)"></div></div>';
+        h += '<span class="dash-surface-count">' + src.auto + '</span>';
+        h += '</div>';
+        h += '<div class="dash-surface-row">';
+        h += '<span class="dash-surface-lbl">' + esc(t("hosts.source.manual")) + '</span>';
+        h += '<div class="dash-bar-bg"><div class="dash-bar-fill" style="width:' + (srcTotal ? src.manual / srcTotal * 100 : 0) + '%;background:var(--ct-info)"></div></div>';
+        h += '<span class="dash-surface-count">' + src.manual + '</span>';
+        h += '</div>';
+        h += '</div>';
+        h += '</div>';
+        return h;
+    }
+    // ── Measures burndown ────────────────────────────────────────
+    function _dashMeasures() {
+        var m = _measuresStats();
+        var h = '<div class="dash-card">';
+        h += '<div class="dash-card-head">' + _icon("check_circle", 16) + ' ' + esc(t("dash.measures_title")) + '</div>';
+        var total = m.total || 1;
+        // Stacked bar: a_faire / en_cours / termine
+        var segments = [
+            { key: "a_faire", label: t("measures.status.a_faire"), color: "var(--ct-medium)", v: m.byStatus.a_faire },
+            { key: "en_cours", label: t("measures.status.en_cours"), color: "var(--ct-info)", v: m.byStatus.en_cours },
+            { key: "termine", label: t("measures.status.termine"), color: "var(--ct-low)", v: m.byStatus.termine },
+        ];
+        h += '<div class="dash-burndown">';
+        h += '<div class="dash-burndown-bar">';
+        segments.forEach(function (s) {
+            var pct = m.total ? (s.v / m.total * 100) : 0;
+            if (pct > 0) {
+                h += '<div class="dash-burndown-seg" style="width:' + pct + '%;background:' + s.color + '" title="' + esc(s.label) + ': ' + s.v + '"></div>';
+            }
+        });
+        h += '</div>';
+        h += '<div class="dash-burndown-legend">';
+        segments.forEach(function (s) {
+            h += '<span class="dash-legend-item"><span class="dash-legend-sq" style="background:' + s.color + '"></span>' + esc(s.label) + ' <strong>' + s.v + '</strong></span>';
+        });
+        h += '</div>';
+        h += '</div>';
+        // Weekly delta
+        var delta = m.doneThisWeek - m.createdThisWeek;
+        var deltaCls = delta > 0 ? "positive" : delta < 0 ? "negative" : "";
+        h += '<div class="dash-measures-delta">';
+        h += '<div class="dash-measures-stat"><strong>' + m.createdThisWeek + '</strong> ' + esc(t("dash.measures_created_7d")) + '</div>';
+        h += '<div class="dash-measures-stat"><strong>' + m.doneThisWeek + '</strong> ' + esc(t("dash.measures_done_7d")) + '</div>';
+        h += '<div class="dash-measures-stat ' + deltaCls + '"><strong>' + (delta >= 0 ? "+" : "") + delta + '</strong> ' + esc(t("dash.measures_delta")) + '</div>';
+        h += '</div>';
+        if (m.overdue.length) {
+            h += '<div class="dash-measures-overdue">';
+            h += '<div class="dash-overdue-head">' + _icon("alert", 14) + ' ' + esc(t("dash.measures_overdue")).replace("{n}", String(m.overdue.length)) + '</div>';
+            m.overdue.slice(0, 3).forEach(function (mm) {
+                h += '<div class="dash-overdue-row">';
+                h += '<span class="dash-overdue-id">' + esc(mm.id) + '</span>';
+                h += '<span class="dash-overdue-title">' + esc(mm.title) + '</span>';
+                h += '<span class="dash-overdue-date">' + esc(mm.echeance) + '</span>';
+                h += '</div>';
+            });
+            h += '</div>';
+        }
+        h += '</div>';
+        return h;
+    }
+    // ── Scanner health ───────────────────────────────────────────
+    function _dashHealth() {
+        var hs = _schedulerHealth();
+        var h = '<div class="dash-card">';
+        h += '<div class="dash-card-head">' + _icon("clock", 16) + ' ' + esc(t("dash.health_title")) + '</div>';
+        var rateCls = hs.successRate == null ? "" : hs.successRate >= 90 ? "positive" : hs.successRate >= 70 ? "warning" : "negative";
+        h += '<div class="dash-health-stats">';
+        h += '<div class="dash-health-row"><span>' + esc(t("dash.health_jobs_24h")) + '</span><strong>' + hs.total24 + '</strong></div>';
+        h += '<div class="dash-health-row"><span>' + esc(t("dash.health_success_rate")) + '</span><strong class="' + rateCls + '">' + (hs.successRate == null ? "—" : hs.successRate + "%") + '</strong></div>';
+        h += '<div class="dash-health-row"><span>' + esc(t("dash.health_failed_24h")) + '</span><strong class="' + (hs.failed ? "negative" : "") + '">' + hs.failed + '</strong></div>';
+        h += '<div class="dash-health-row"><span>' + esc(t("dash.health_running")) + '</span><strong>' + hs.running + '</strong></div>';
+        h += '</div>';
+        if (hs.lastJob) {
+            var last = _fmtDate(hs.lastJob.created_at || "");
+            h += '<div class="dash-health-last"><span class="text-muted">' + esc(t("dash.health_last_job")) + '</span> ' + esc(last) + ' <span class="text-muted">(' + esc(_scannerLabel(hs.lastJob.scanner)) + ')</span></div>';
+        }
+        if (hs.nextAsset) {
+            var nextStr = hs.nextInHours === 0 ? t("monitored.next.imminent") : ("~" + hs.nextInHours + " h");
+            h += '<div class="dash-health-next"><span class="text-muted">' + esc(t("dash.health_next")) + '</span> <span class="mono">' + esc(hs.nextAsset.value) + '</span> ' + nextStr + '</div>';
+        }
+        h += '</div>';
+        return h;
+    }
+    // ── Coverage gaps ────────────────────────────────────────────
+    // ── Navigation helpers ───────────────────────────────────────
+    window._dashGotoSeverity = function (sev) {
+        _filterStatus = "open";
+        _filterSeverities = [sev];
+        _filterScanners = [];
+        _findingsSearch = "";
+        selectPanel("findings");
+    };
+    window._dashGotoRecent = function () {
+        _filterStatus = "";
+        _filterSeverities = [];
+        _filterScanners = [];
+        _findingsSearch = "";
+        selectPanel("findings");
+    };
+    window._dashGotoScanner = function (scanner) {
+        _filterStatus = "";
+        _filterSeverities = [];
+        _filterScanners = [scanner];
+        _findingsSearch = "";
+        selectPanel("findings");
+    };
+    // Dashboard "Top hosts" rows pivot here. We always land on the Findings
+    // panel filtered by target=host (substring match — picks up the host
+    // itself AND any port-suffixed variants like `host:8443` that nuclei
+    // emits). Works whether the host is in monitored_assets or not, so the
+    // click affordance is consistent regardless of auto-enrol state.
+    window._dashGotoHost = function (hostValue) {
+        _filterStatus = "";
+        _filterSeverities = [];
+        _filterScanners = [];
+        _findingsSearch = hostValue || "";
+        selectPanel("findings");
+    };
+    window._dashShowStale = function () {
+        selectPanel("hosts");
+    };
+    // ═══════════════════════════════════════════════════════════════
+    // FINDINGS
+    // ═══════════════════════════════════════════════════════════════
+    function _renderFindings(c) {
+        if (_selectedFinding) {
+            _renderFindingDetail(c);
+            return;
+        }
+        // Header (title + action buttons) and search bar are rendered ONCE.
+        // The pills + table + bulk bar live inside #findings-body-wrap and are
+        // refreshed by _refreshFindingsBody() on every filter/search change,
+        // leaving the search input alive in the DOM so focus/caret is preserved.
+        var h = '<div class="ct-row ct-row-wrap ct-mb-3">';
+        h += '<h2 class="ct-m-0">' + esc(t("findings.title")) + '</h2>';
+        h += '<span class="ct-flex-1"></span>';
+        h += '<button class="ct-btn mt-8" data-write data-variant="primary" data-click="_bulkImportDialog">' + _icon("list", 14) + ' ' + esc(t("findings.bulk_import")) + '</button>';
+        h += '</div>';
+        h += '<div class="surface-filters ct-mb-3">';
+        h += '<input type="text" class="surface-filter ct-minw-320 ct-flex-1" placeholder="' + esc(t("findings.search.placeholder")) + '"';
+        h += ' id="findings-search" value="' + esc(_findingsSearch) + '" data-input="_setFindingsSearch" data-pass-value autocomplete="off">';
+        h += '<button class="ct-btn mt-8 ct-hidden" data-write data-variant="primary" id="findings-search-clear" data-click="_clearFindingsSearch"' + (_findingsSearch ? '' : '') + '>x</button>';
+        h += '</div>';
+        h += '<div id="findings-body-wrap"></div>';
+        c.innerHTML = h;
+        _refreshFindingsBody();
+    }
+    function _refreshFindingsBody() {
+        var wrap = document.getElementById("findings-body-wrap");
+        if (!wrap)
+            return;
+        // Build distinct scanner list from current data
+        var scannerSetFindings = {};
+        _findings.forEach(function (f) { if (f.scanner)
+            scannerSetFindings[f.scanner] = true; });
+        var scannerList = Object.keys(scannerSetFindings).sort();
+        var h = "";
+        // ── Status filter pills ────────────────────────────────
+        var statusOptions = [
+            { v: "open", key: "status.open" },
+            { v: "new", key: "status.new" },
+            { v: "to_fix", key: "status.to_fix" },
+            { v: "false_positive", key: "dash.false_positive" },
+            { v: "fixed", key: "status.fixed" },
+            { v: "", key: "status.all" }
+        ];
+        h += '<div class="filter-pills-row">';
+        h += '<span class="filter-pills-lbl">' + esc(t("findings.filter.status")) + '</span>';
+        statusOptions.forEach(function (opt) {
+            var on = _filterStatus === opt.v;
+            h += '<button type="button" class="filter-pill status-pill-' + (opt.v || "all") + (on ? " active" : "") + '" data-click="_setStatusFilter" data-args=\'' + _da(opt.v) + '\'>' + esc(t(opt.key)) + '</button>';
+        });
+        h += '</div>';
+        // ── Severity multi-select pills ────────────────────────
+        h += '<div class="filter-pills-row">';
+        h += '<span class="filter-pills-lbl">' + esc(t("findings.filter.severity")) + '</span>';
+        ["critical", "high", "medium", "low", "info"].forEach(function (s) {
+            var on = _filterSeverities.indexOf(s) >= 0;
+            h += '<button type="button" class="filter-pill sev-' + s + (on ? " active" : "") + '" data-click="_toggleSeverity" data-args=\'' + _da(s) + '\'>' + esc(t("sev." + s)) + '</button>';
+        });
+        if (_filterSeverities.length) {
+            h += '<button type="button" class="filter-pill filter-pill-clear" data-click="_clearSeverityFilter">' + esc(t("findings.filter.reset")) + '</button>';
+        }
+        else {
+            h += '<span class="filter-pills-hint">' + esc(t("findings.filter.hint")) + '</span>';
+        }
+        h += '</div>';
+        // ── Scanner multi-select pills ─────────────────────────
+        if (scannerList.length) {
+            h += '<div class="filter-pills-row">';
+            h += '<span class="filter-pills-lbl">' + esc(t("findings.filter.scanner")) + '</span>';
+            scannerList.forEach(function (s) {
+                var on = _filterScanners.indexOf(s) >= 0;
+                h += '<button type="button" class="filter-pill' + (on ? " active" : "") + '" data-click="_toggleScanner" data-args=\'' + _da(s) + '\'>' + esc(_scannerLabel(s)) + '</button>';
+            });
+            if (_filterScanners.length) {
+                h += '<button type="button" class="filter-pill filter-pill-clear" data-click="_clearScannerFilter">' + esc(t("findings.filter.reset")) + '</button>';
+            }
+            else {
+                h += '<span class="filter-pills-hint">' + esc(t("findings.filter.hint_m")) + '</span>';
+            }
+            h += '</div>';
+        }
+        var searchQ = _findingsSearch.trim().toLowerCase();
+        var filtered = _findings.filter(function (f) {
+            if (_filterStatus === "open") {
+                if (f.status !== "new" && f.status !== "to_fix")
+                    return false;
+            }
+            else if (_filterStatus && f.status !== _filterStatus)
+                return false;
+            if (_filterSeverities.length && _filterSeverities.indexOf(f.severity) < 0)
+                return false;
+            if (_filterScanners.length && _filterScanners.indexOf(f.scanner) < 0)
+                return false;
+            if (searchQ) {
+                var hay = (_findingTitle(f) + " " + (f.target || "") + " " + _findingDesc(f) + " " + (f.scanner || "") + " " + (f.type || "")).toLowerCase();
+                if (hay.indexOf(searchQ) < 0)
+                    return false;
+            }
+            return true;
+        });
+        h += '<div class="ct-text-label ct-muted ct-mb-2">' + filtered.length + ' / ' + _findings.length + ' ' + esc(t("findings.count")) + '</div>';
+        if (!filtered.length) {
+            h += '<div class="empty-state">' + esc(t("findings.empty")) + '</div>';
+            wrap.innerHTML = h;
+            return;
+        }
+        // ct_bulkbar keeps its own selection set; we just need to prune
+        // entries that are no longer in the filtered view so bulk actions
+        // don't try to act on hidden rows.
+        var filteredIds = {};
+        filtered.forEach(function (f) { filteredIds[f.id] = true; });
+        var sel = ct_bulkbar.getSelection("surface-findings");
+        var prunedKeys = [];
+        sel.forEach(function (k) { if (filteredIds[k])
+            prunedKeys.push(k); });
+        if (prunedKeys.length !== sel.size)
+            ct_bulkbar.setSelection("surface-findings", prunedKeys);
+        h += ct_table.render({
+            // ct_table travaille en Record<string, any>[] (decl partagée)
+            rows: filtered,
+            rowKey: "id",
+            onRowClick: "_openFindingRow",
+            rowClass: function (f) { return "finding-row sev-" + f.severity + " status-" + f.status; },
+            bulk: { scope: "surface-findings" },
+            columns: [
+                { key: "severity", label: t("findings.col.severity"), width: "80px",
+                    render: function (f) { return '<span class="ct-badge" data-tone="' + _surfaceTone(f.severity) + '">' + esc(f.severity) + '</span>'; } },
+                { key: "type", label: t("findings.col.type"),
+                    render: function (f) { return '<span class="ct-text-label ct-muted">' + esc(f.type || "") + '</span>'; } },
+                { key: "title", label: t("findings.col.title"),
+                    render: function (f) { return '<span class="ct-strong">' + esc(_findingTitle(f)) + '</span>'; } },
+                { key: "target", label: t("findings.col.target"),
+                    render: function (f) { return '<span class="ct-text-label ct-journal-sep ct-break-all">' + esc(f.target || "-") + '</span>'; } },
+                { key: "status", label: t("findings.col.status"), width: "110px",
+                    render: function (f) { return '<span class="ct-badge" data-tone="' + _surfaceTone(f.status) + '">' + esc(_statusLabel(f.status)) + '</span>'; } },
+                { key: "created_at", label: t("findings.col.datetime"), width: "130px",
+                    render: function (f) { return '<span class="ct-text-label ct-muted ct-nowrap">' + esc(f.created_at ? _fmtDate(f.created_at) : "-") + '</span>'; } }
+            ],
+            actions: [
+                { icon: "check", label: t("status.to_fix"), onClick: "_quickTriageRow",
+                    show: function (f) { return f.status !== "to_fix"; } },
+                { icon: "x", label: t("status.false_positive"), onClick: "_quickTriageFpRow",
+                    show: function (f) { return f.status !== "false_positive"; } }
+            ]
+        });
+        wrap.innerHTML = h;
+        _setupFindingsBulkbar();
+        ct_bulkbar.update("surface-findings");
+    }
+    // ct_table passes the row object; wrappers adapt to the legacy quickTriage signature.
+    window._openFindingRow = function (row) { if (row && row.id)
+        window._openFinding(row.id); };
+    window._quickTriageRow = function (row) { if (row && row.id)
+        window._quickTriage(row.id, "to_fix"); };
+    window._quickTriageFpRow = function (row) { if (row && row.id)
+        window._quickTriage(row.id, "false_positive"); };
+    function _setupFindingsBulkbar() {
+        ct_bulkbar.attach({
+            scope: "surface-findings",
+            label: (t("bulk.findings_selected") || "{n} finding(s) sélectionné(s)"),
+            actions: [
+                { id: "to_fix", icon: "check", label: t("bulk.to_fix") || "À corriger",
+                    variant: "primary", onClick: "_bulkSurfaceToFix" },
+                { id: "fixed", icon: "check", label: t("bulk.fixed") || "Corrigé",
+                    variant: "success", onClick: "_bulkSurfaceFixed" },
+                { id: "fp", icon: "x", label: t("bulk.false_positive") || "Faux positif",
+                    variant: "muted", onClick: "_bulkSurfaceFP" },
+                { id: "delete", icon: "trash", label: t("bulk.delete") || "Supprimer", danger: true,
+                    onClick: "_bulkSurfaceDelete",
+                    confirm: { title: t("bulk.delete_confirm_title") || "Supprimer {n} finding(s) ?",
+                        message: t("bulk.delete_confirm_msg") || "Cette action est irréversible." } }
+            ]
+        });
+    }
+    window._bulkSurfaceToFix = function (scope) {
+        var ids = Array.from(ct_bulkbar.getSelection(scope));
+        if (!ids.length)
+            return;
+        if (ids.length > 10000) {
+            showStatus("Sélection trop grande : " + ids.length + " findings (max 10000 par remédiation). Réduisez la sélection.", true);
+            return;
+        }
+        var selected = _findings.filter(function (f) { return ids.indexOf(f.id) >= 0; });
+        // Interpolate {n} — t() returns the raw key/value, no placeholder handling.
+        var interp = function (key, fallback) {
+            var v = (t(key) || fallback || "").replace(/\{n\}/g, String(ids.length));
+            return v;
+        };
+        var defaultTitle = selected.length === 1 ? _findingTitle(selected[0])
+            : (t("bulk.measure_default_title") || "Mesure corrective") + " (" + ids.length + " findings)";
+        var defaultDesc = selected.map(function (f) { return "- " + _findingTitle(f); }).join("\n");
+        var helpText = interp("bulk.measure_help", "UNE remédiation sera créée et liée aux {n} findings sélectionnés.");
+        var summary = '<div class="ct-text-label ct-muted ct-mb-1">' + esc(helpText) + '</div>'
+            + '<div class="ct-text-label ct-muted ct-strong ct-mt-1">'
+            + esc("Findings couverts") + ' (' + ids.length + ')</div>'
+            + '<div class="ct-maxh-150 ct-scroll-y ct-bordered ct-r-md ct-p-2">'
+            + selected.map(function (f) {
+                return '<div class="ct-py-1 ct-px-0"><span class="ct-badge" data-tone="' + _surfaceTone(f.severity) + '">'
+                    + esc(f.severity) + '</span> ' + esc(_findingTitle(f).substring(0, 80)) + '</div>';
+            }).join("")
+            + '</div>';
+        ct_measure_modal.open({ title: defaultTitle, description: defaultDesc }, {
+            title: interp("bulk.measure_title", "Créer une remédiation couvrant {n} finding(s)"),
+            saveLabel: interp("bulk.measure_confirm", "Créer la remédiation"),
+            hideFields: ["type", "statut"],
+            ownerPicker: { pickerId: "surface-bulk-owner", directoryUrl: "api/directory" },
+            extraContent: summary
+        }).then(function (data) {
+            if (!data || data.__deleted)
+                return;
+            SurfaceAPI.bulkTriageFindings({
+                ids: ids, status: "to_fix",
+                measure_title: data.title,
+                measure_description: data.description,
+                responsable: data.responsable,
+                echeance: data.echeance
+            }).then(function (r) {
+                var msg = r.updated + " finding(s) → " + (t("status.to_fix") || "À corriger");
+                if (r.measures_created)
+                    msg += " (" + r.measures_created + " remédiation(s) créée(s))";
+                showStatus(msg);
+                ct_bulkbar.clear(scope);
+                _loadAndRender();
+            }).catch(function (e) { showStatus(e.message || t("common.error"), true); });
+        });
+    };
+    window._bulkSurfaceFixed = function (scope) {
+        var ids = Array.from(ct_bulkbar.getSelection(scope));
+        if (!ids.length)
+            return;
+        ct_modal.confirm({
+            title: t("bulk.fixed_confirm_title") || "Marquer " + ids.length + " finding(s) comme corrigés ?",
+            message: t("bulk.fixed_confirm_msg") || "Les findings seront marqués corrigés."
+        }).then(function (ok) {
+            if (!ok)
+                return;
+            SurfaceAPI.bulkTriageFindings({ ids: ids, status: "fixed" }).then(function (r) {
+                showStatus(r.updated + " finding(s) " + (t("bulk.fixed") || "corrigé(s)"));
+                ct_bulkbar.clear(scope);
+                _loadAndRender();
+            }).catch(function (e) { showStatus(e.message || t("common.error"), true); });
+        });
+    };
+    window._bulkSurfaceFP = function (scope) {
+        var ids = Array.from(ct_bulkbar.getSelection(scope));
+        if (!ids.length)
+            return;
+        var interp = function (key, fallback) {
+            return (t(key) || fallback || "").replace(/\{n\}/g, String(ids.length));
+        };
+        var body = '<div class="ct-text-label ct-muted ct-mb-3">'
+            + esc(interp("bulk.fp_help", "La justification sera attachée à chaque finding pour audit."))
+            + '</div>'
+            + '<div class="ct-measure-form">'
+            + '<label>' + esc(t("bulk.fp_justification") || "Justification") + ' *'
+            + '<textarea class="ct-input" id="surface-bulk-fp-notes" rows="5" placeholder="'
+            + esc(t("bulk.fp_placeholder") || "Expliquer pourquoi ces findings sont des faux positifs") + '"></textarea>'
+            + '</label>'
+            + '</div>';
+        ct_modal.open({
+            title: interp("bulk.fp_title", "Déclarer {n} finding(s) comme faux positifs"),
+            body: body,
+            size: "md",
+            onOpen: function () { var el = document.getElementById("surface-bulk-fp-notes"); if (el)
+                el.focus(); },
+            buttons: [
+                { id: "cancel", label: t("btn_cancel") || "Annuler" },
+                { id: "save", primary: true, label: interp("bulk.fp_confirm", "Confirmer ({n})"),
+                    result: function () {
+                        var notes = ((document.getElementById("surface-bulk-fp-notes") || {}).value || "").trim();
+                        if (!notes) {
+                            if (typeof showStatus === "function")
+                                showStatus(t("tm.justif_required") || "Justification requise", true);
+                            return false;
+                        }
+                        return { notes: notes };
+                    } }
+            ]
+        }).then(function (res) {
+            if (!res)
+                return;
+            SurfaceAPI.bulkTriageFindings({ ids: ids, status: "false_positive", notes: res.notes }).then(function (r) {
+                showStatus(r.updated + " finding(s) → " + (t("bulk.false_positive") || "faux positif"));
+                ct_bulkbar.clear(scope);
+                _loadAndRender();
+            }).catch(function (e) { showStatus(e.message || t("common.error"), true); });
+        });
+    };
+    window._bulkSurfaceDelete = function (scope) {
+        var ids = Array.from(ct_bulkbar.getSelection(scope));
+        if (!ids.length)
+            return;
+        SurfaceAPI.bulkDeleteFindings(ids).then(function (r) {
+            showStatus(r.deleted + " finding(s) " + (t("bulk.deleted") || "supprimé(s)"));
+            ct_bulkbar.clear(scope);
+            _loadAndRender();
+        }).catch(function (e) { showStatus(e.message || t("common.error"), true); });
+    };
+    function _statusLabel(s) {
+        return t("status." + s) || s;
+    }
+    // Measure status badge — colored span reused by the Plan d'action table.
+    function _measureStatusBadge(statut) {
+        var palette = {
+            a_faire: "background:var(--ct-surface-2);color:var(--ct-ink-2)",
+            en_cours: "background:var(--ct-info-tint);color:var(--ct-info)",
+            termine: "background:var(--ct-low-tint);color:var(--ct-low-ink)",
+            annule: "background:var(--ct-critical-tint);color:var(--ct-critical)"
+        };
+        var style = (statut && palette[statut]) || palette.a_faire;
+        var label = t("measures.status." + statut) || statut || "";
+        return '<span class="ct-badge" data-tone="neutral" style="' + style + '">' + esc(label) + '</span>';
+    }
+    // All findings filter toggles refresh ONLY the body wrapper, leaving the
+    // search input alive so keyboard focus/caret stays with the user.
+    window._setStatusFilter = function (v) { _filterStatus = v || ""; _refreshFindingsBody(); };
+    window._setFindingsSearch = function (v) {
+        _findingsSearch = v || "";
+        _refreshFindingsBody();
+        var clearBtn = document.getElementById("findings-search-clear");
+        if (clearBtn)
+            clearBtn.style.display = _findingsSearch ? "" : "none";
+    };
+    window._clearFindingsSearch = function () {
+        _findingsSearch = "";
+        var inp = document.getElementById("findings-search");
+        if (inp)
+            inp.value = "";
+        _refreshFindingsBody();
+        var clearBtn = document.getElementById("findings-search-clear");
+        if (clearBtn)
+            clearBtn.style.display = "none";
+        if (inp)
+            inp.focus();
+    };
+    window._toggleSeverity = function (s) {
+        var i = _filterSeverities.indexOf(s);
+        if (i >= 0)
+            _filterSeverities.splice(i, 1);
+        else
+            _filterSeverities.push(s);
+        _refreshFindingsBody();
+    };
+    window._clearSeverityFilter = function () { _filterSeverities = []; _refreshFindingsBody(); };
+    window._toggleScanner = function (s) {
+        var i = _filterScanners.indexOf(s);
+        if (i >= 0)
+            _filterScanners.splice(i, 1);
+        else
+            _filterScanners.push(s);
+        _refreshFindingsBody();
+    };
+    window._clearScannerFilter = function () { _filterScanners = []; _refreshFindingsBody(); };
+    window._openFinding = function (id) {
+        var f = _findings.find(function (x) { return x.id === id; });
+        if (!f)
+            return;
+        // Fetch full evidence (includes png_b64 stripped from list responses)
+        SurfaceAPI.get("/api/findings/" + id).then(function (full) {
+            _selectedFinding = full;
+            renderPanel();
+        }).catch(function () {
+            _selectedFinding = f;
+            renderPanel();
+        });
+    };
+    window._backToFindings = function () { _selectedFinding = null; renderPanel(); };
+    function _renderFindingDetail(c) {
+        var f = _selectedFinding;
+        var linked = null;
+        if (f.measure_id)
+            linked = _measures.find(function (x) { return x.id === f.measure_id; }) || null;
+        var fd = Object.assign({}, f, { title: _findingTitle(f), description: _findingDesc(f) });
+        c.innerHTML = ct_finding_view.render(fd, {
+            backHandler: "_backToFindings",
+            triageHandler: "_triageDetail",
+            aiEnabled: !!(window._aiIsEnabled && window._aiIsEnabled()),
+            aiHandler: "_aiTriageFinding",
+            deleteHandler: "_deleteFindingDetail",
+            linkedMeasure: linked || undefined,
+            cardClass: "surface-card"
+        });
+    }
+    // v0.3 — AI triage button: sends the finding to the configured LLM
+    // (via ai_common.js) and asks for a structured JSON response.
+    window._aiTriageFinding = async function () {
+        var f = _selectedFinding;
+        if (!f)
+            return;
+        var box = document.getElementById("ai-triage-result");
+        if (!box)
+            return;
+        if (typeof window._aiIsEnabled !== "function" || !window._aiIsEnabled()) {
+            box.style.display = "block";
+            box.innerHTML = '<strong>' + esc(t("fd.ai_not_configured")) + '</strong><br>' +
+                '<span class="ct-text-meta ct-muted">' + esc(t("fd.ai_open_settings")) + '</span>';
+            return;
+        }
+        box.style.display = "block";
+        box.innerHTML = '<em>' + esc(t("fd.ai_analyzing")) + '…</em>';
+        // Métier endpoint: the methodology prompt + NVD enrichment are built
+        // server-side (POST /api/ai/surface/analyze-finding). The browser only
+        // ships the raw finding — same-origin, so the strict CSP is satisfied
+        // (the old client-side NVD fetch was blocked by connect-src 'self').
+        try {
+            var parsed = await SurfaceAPI.post("/api/ai/surface/analyze-finding", {
+                scanner: f.scanner || "",
+                type: f.type || "",
+                target: f.target || "",
+                severity: f.severity || "",
+                title: f.title || "",
+                description: f.description || "",
+                evidence: f.evidence || {}
+            });
+            var fp = parsed.is_probable_false_positive;
+            var conf = Math.round((parsed.confidence || 0) * 100);
+            var sev = parsed.severity_recommendation || "";
+            var html = '';
+            html += '<div class="ct-mb-2"><strong>' + esc(t("fd.ai_verdict")) + ' :</strong> ';
+            html += fp
+                ? '<span class="ct-text-high">' + esc(t("fd.ai_fp_probable")) + ' (' + conf + '%)</span>'
+                : '<span class="ct-text-low-ink">' + esc(t("fd.ai_genuine")) + ' (' + conf + '%)</span>';
+            html += ' &mdash; <span>' + esc(t("fd.ai_sev_rec")) + ' : <strong>' + esc(sev) + '</strong></span></div>';
+            if (parsed.summary) {
+                html += '<div class="ct-mb-2"><strong>' + esc(t("fd.ai_summary")) + ' :</strong><br>' + esc(parsed.summary) + '</div>';
+            }
+            if (parsed.remediation && parsed.remediation.length) {
+                html += '<div class="ct-mb-2"><strong>' + esc(t("fd.ai_remediation")) + ' :</strong><ul style="margin:var(--ct-s1) 0 0 var(--ct-s5)">';
+                parsed.remediation.forEach(function (step) { html += '<li>' + esc(step) + '</li>'; });
+                html += '</ul></div>';
+            }
+            if (parsed.references && parsed.references.length) {
+                html += '<div><strong>' + esc(t("fd.ai_refs")) + ' :</strong><ul style="margin:var(--ct-s1) 0 0 var(--ct-s5);font-size:var(--ct-text-label)">';
+                parsed.references.forEach(function (ref) { if (/^https?:\/\//i.test(ref))
+                    html += '<li><a href="' + esc(ref) + '" target="_blank" rel="noopener">' + esc(ref) + '</a></li>'; });
+                html += '</ul></div>';
+            }
+            box.innerHTML = html;
+        }
+        catch (e) {
+            box.innerHTML = '<div class="ai-error">' + esc(t("ai.error", { msg: e.message || String(e) })) + '</div>';
+        }
+    };
+    // ── Triage flow (delegates to ct_finding_view) ─────────────────
+    function _runSurfaceTriage(finding, status) {
+        return ct_finding_view.openTriageModal(finding, status, {
+            ownerPickerId: "surface-triage-owner",
+            directoryUrl: "api/directory"
+        }).then(function (payload) {
+            if (!payload)
+                return;
+            return SurfaceAPI.triageFinding(finding.id, payload).then(function () {
+                showStatus(t("triage.status_prefix") + " " + _statusLabel(payload.status));
+                _selectedFinding = null;
+                _loadAndRender();
+            }).catch(function (e) { showStatus(e.message || t("common.error"), true); });
+        });
+    }
+    window._triageDetail = function (status) {
+        if (!_selectedFinding)
+            return;
+        _runSurfaceTriage(_selectedFinding, status);
+    };
+    window._quickTriage = function (id, status) {
+        var f = _findings.find(function (x) { return x.id === id; });
+        if (!f)
+            return;
+        _runSurfaceTriage(f, status);
+    };
+    window._deleteFindingDetail = function () {
+        if (!_selectedFinding)
+            return;
+        ct_modal.confirm({
+            title: t("fd.delete") || "Supprimer",
+            message: t("fd.delete_confirm") || "Supprimer ce finding ? Cette action est irréversible.",
+            danger: true
+        }).then(function (ok) {
+            if (!ok)
+                return;
+            SurfaceAPI.deleteFinding(_selectedFinding.id).then(function () {
+                _selectedFinding = null;
+                showStatus(t("fd.deleted") || "Finding supprimé");
+                _loadAndRender();
+            }).catch(function (e) { showStatus(e.message || t("common.error"), true); });
+        });
+    };
+    // ── Bulk import modal ───────────────────────────────────────────
+    // A rich dialog that documents the expected JSON schema inline,
+    // offers a downloadable template, accepts either file upload or
+    // textarea paste, and validates the payload before sending.
+    var _IMPORT_TEMPLATE = [
+        {
+            scanner: "nmap",
+            type: "open_port",
+            severity: "high",
+            title: "Port 3306 (MySQL) exposé sur db-prod.example.com",
+            description: "MySQL 5.7 detecté avec authentification anonyme désactivée mais port ouvert en externe. Restreindre l'accès au sous-réseau administratif ou fermer le port.",
+            target: "db-prod.example.com:3306",
+            evidence: {
+                port: 3306,
+                service: "mysql",
+                version: "5.7.38",
+                banner: "5.7.38-log MySQL Community Server (GPL)"
+            }
+        },
+        {
+            scanner: "shodan",
+            type: "exposed_service",
+            severity: "medium",
+            title: "Service RDP exposé sur Internet",
+            description: "Shodan a observé un service RDP (3389) joignable depuis Internet. Recommandation : placer derrière un VPN ou un bastion.",
+            target: "rdp.example.com",
+            evidence: {
+                port: 3389,
+                source: "https://www.shodan.io/host/1.2.3.4"
+            }
+        },
+        {
+            scanner: "manual",
+            type: "other",
+            severity: "low",
+            title: "En-tête HSTS manquant sur www.example.com",
+            description: "Le site ne renvoie pas Strict-Transport-Security. Ajouter 'Strict-Transport-Security: max-age=31536000; includeSubDomains'.",
+            target: "www.example.com",
+            evidence: {}
+        }
+    ];
+    function _bulkImportMarkup(tt) {
+        var sampleJson = JSON.stringify(_IMPORT_TEMPLATE, null, 2);
+        var h = "";
+        // Format spec block
+        h += '<div class="ct-text-label ct-muted ct-mb-2">' + esc(tt("bulk_import.intro")) + '</div>';
+        h += '<details class="bulk-import-spec">';
+        h += '<summary>' + esc(tt("bulk_import.spec_title")) + '</summary>';
+        h += '<table class="bulk-import-table"><thead><tr><th>' + esc(tt("bulk_import.col_field")) + '</th><th>' + esc(tt("bulk_import.col_required")) + '</th><th>' + esc(tt("bulk_import.col_description")) + '</th></tr></thead><tbody>';
+        var fields = [
+            { name: "title", required: true,
+                desc: tt("bulk_import.f_title") },
+            { name: "severity", required: false,
+                desc: tt("bulk_import.f_severity") },
+            { name: "scanner", required: false,
+                desc: tt("bulk_import.f_scanner") },
+            { name: "type", required: false,
+                desc: tt("bulk_import.f_type") },
+            { name: "target", required: false,
+                desc: tt("bulk_import.f_target") },
+            { name: "description", required: false,
+                desc: tt("bulk_import.f_description") },
+            { name: "evidence", required: false,
+                desc: tt("bulk_import.f_evidence") },
+        ];
+        fields.forEach(function (f) {
+            h += '<tr>';
+            h += '<td><code>' + esc(f.name) + '</code></td>';
+            h += '<td class="ct-ta-c">' + (f.required ? '<span class="ct-text-critical ct-strong">*</span>' : '–') + '</td>';
+            h += '<td>' + esc(f.desc) + '</td>';
+            h += '</tr>';
+        });
+        h += '</tbody></table>';
+        h += '<div class="ct-text-label ct-muted ct-mt-1">' + esc(tt("bulk_import.wrapper_note")) + '</div>';
+        h += '</details>';
+        // Sample + actions
+        h += '<div class="ct-field ct-mt-3">';
+        h += '<label class="surface-field-lbl">' + esc(tt("bulk_import.sample_label")) + '</label>';
+        h += '<pre id="bulk-import-sample" class="bulk-import-sample">' + esc(sampleJson) + '</pre>';
+        h += '<div class="ct-flex ct-gap-1 ct-mt-1 ct-row-wrap">';
+        h += '<button type="button" class="ct-btn mt-8" data-write data-variant="primary" id="bulk-import-download">' + _icon("check", 12) + ' ' + esc(tt("bulk_import.download_template")) + '</button>';
+        h += '<button type="button" class="ct-btn mt-8" data-write data-variant="primary" id="bulk-import-copy">' + _icon("list", 12) + ' ' + esc(tt("bulk_import.copy_sample")) + '</button>';
+        h += '<button type="button" class="ct-btn mt-8" data-write data-variant="primary" id="bulk-import-use-sample">' + _icon("arrow_right", 12) + ' ' + esc(tt("bulk_import.use_sample")) + '</button>';
+        h += '</div>';
+        h += '</div>';
+        // Upload or paste
+        h += '<div class="ct-field ct-mt-3">';
+        h += '<label class="surface-field-lbl">' + esc(tt("bulk_import.upload_label")) + '</label>';
+        h += '<input type="file" class="ct-input" id="bulk-import-file" accept=".json,application/json">';
+        h += '</div>';
+        h += '<div class="ct-field">';
+        h += '<label class="surface-field-lbl">' + esc(tt("bulk_import.paste_label")) + '</label>';
+        h += '<textarea class="ct-input ct-mono ct-text-label" id="bulk-import-textarea" rows="10" placeholder=\'[{"title":"...","severity":"high","target":"..."}]\'></textarea>';
+        h += '</div>';
+        h += '<div id="bulk-import-validation" class="bulk-import-feedback ct-hidden"></div>';
+        h += '<div class="surface-error ct-hidden" id="bulk-import-error"></div>';
+        return h;
+    }
+    function _ensureBulkImportModal() {
+        var ov = document.getElementById("bulk-import-overlay");
+        if (!ov) {
+            ov = document.createElement("div");
+            ov.id = "bulk-import-overlay";
+            ov.className = "ct-modal-overlay";
+            ov.hidden = true;
+            document.body.appendChild(ov);
+            var _md = null;
+            ov.addEventListener("mousedown", function (e) { _md = e.target; });
+            ov.addEventListener("click", function (e) { if (e.target === ov && _md === ov)
+                _closeBulkImportModal(); });
+        }
+        var tt = typeof t === "function" ? t : function (k) { return k; };
+        ov.innerHTML =
+            '<div class="ct-modal" style="max-width:720px">' +
+                '<div class="ct-modal-header"><span>' + esc(tt("bulk_import.title")) + '</span><button class="surface-modal-close" data-click="_closeBulkImportModal">' + _icon("x", 18) + '</button></div>' +
+                '<div class="ct-modal-body" id="bulk-import-body"></div>' +
+                '<div class="ct-modal-footer">' +
+                '<button class="ct-modal-btn" data-click="_closeBulkImportModal">' + esc(tt("action.cancel")) + '</button>' +
+                '<button class="ct-modal-btn ct-modal-btn--primary" id="bulk-import-submit">' + _icon("check", 14) + ' ' + esc(tt("bulk_import.submit")) + '</button>' +
+                '</div>' +
+                '</div>';
+        var body = ov.querySelector("#bulk-import-body");
+        body.innerHTML = _bulkImportMarkup(tt);
+        _wireBulkImportHandlers();
+        return ov;
+    }
+    window._closeBulkImportModal = function () {
+        var ov = document.getElementById("bulk-import-overlay");
+        if (ov)
+            ov.hidden = true;
+    };
+    function _wireBulkImportHandlers() {
+        document.getElementById("bulk-import-download").onclick = function () {
+            var blob = new Blob([JSON.stringify(_IMPORT_TEMPLATE, null, 2)], { type: "application/json" });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement("a");
+            a.href = url;
+            a.download = "surface-findings-template.json";
+            a.click();
+            setTimeout(function () { URL.revokeObjectURL(url); }, 100);
+        };
+        document.getElementById("bulk-import-copy").onclick = function () {
+            var json = JSON.stringify(_IMPORT_TEMPLATE, null, 2);
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(json).then(function () {
+                    showStatus(t("bulk_import.copied"));
+                });
+            }
+            else {
+                var ta = document.getElementById("bulk-import-textarea");
+                ta.value = json;
+                ta.focus();
+            }
+        };
+        document.getElementById("bulk-import-use-sample").onclick = function () {
+            var ta = document.getElementById("bulk-import-textarea");
+            ta.value = JSON.stringify(_IMPORT_TEMPLATE, null, 2);
+            _validateBulkImport();
+        };
+        document.getElementById("bulk-import-file").onchange = function (e) {
+            var input = e.target;
+            var file = input.files && input.files[0];
+            if (!file)
+                return;
+            var reader = new FileReader();
+            reader.onload = function () {
+                document.getElementById("bulk-import-textarea").value = reader.result;
+                _validateBulkImport();
+            };
+            reader.readAsText(file);
+        };
+        document.getElementById("bulk-import-textarea").oninput = _validateBulkImport;
+        document.getElementById("bulk-import-submit").onclick = _submitBulkImport;
+    }
+    function _validateBulkImport() {
+        var ta = document.getElementById("bulk-import-textarea");
+        var fb = document.getElementById("bulk-import-validation");
+        var err = document.getElementById("bulk-import-error");
+        err.style.display = "none";
+        var raw = (ta.value || "").trim();
+        if (!raw) {
+            fb.style.display = "none";
+            return null;
+        }
+        var parsed;
+        try {
+            parsed = JSON.parse(raw);
+        }
+        catch (e) {
+            fb.style.display = "block";
+            fb.className = "bulk-import-feedback bulk-import-feedback-error";
+            fb.textContent = t("bulk_import.json_error") + ": " + e.message;
+            return null;
+        }
+        var findings;
+        if (Array.isArray(parsed))
+            findings = parsed;
+        else if (parsed && Array.isArray(parsed.findings))
+            findings = parsed.findings;
+        else {
+            fb.style.display = "block";
+            fb.className = "bulk-import-feedback bulk-import-feedback-error";
+            fb.textContent = t("bulk_import.structure_error");
+            return null;
+        }
+        // Validate each finding
+        var validSev = { info: 1, low: 1, medium: 1, high: 1, critical: 1 };
+        var errors = [];
+        var warnings = 0;
+        findings.forEach(function (f, idx) {
+            if (!f || typeof f !== "object") {
+                errors.push("#" + idx + ": " + t("bulk_import.item_not_object"));
+                return;
+            }
+            if (!f.title || typeof f.title !== "string" || !f.title.trim()) {
+                errors.push("#" + idx + ": " + t("bulk_import.title_required"));
+            }
+            if (f.severity && !validSev[f.severity]) {
+                errors.push("#" + idx + ": " + t("bulk_import.invalid_severity") + " (" + f.severity + ")");
+            }
+            if (f.evidence && typeof f.evidence !== "object") {
+                warnings++;
+            }
+        });
+        if (errors.length) {
+            fb.style.display = "block";
+            fb.className = "bulk-import-feedback bulk-import-feedback-error";
+            fb.innerHTML = '<strong>' + esc(t("bulk_import.validation_failed")) + '</strong><br>' +
+                errors.slice(0, 5).map(esc).join("<br>") +
+                (errors.length > 5 ? "<br>... +" + (errors.length - 5) : "");
+            return null;
+        }
+        fb.style.display = "block";
+        fb.className = "bulk-import-feedback bulk-import-feedback-ok";
+        fb.innerHTML = '<strong>' + findings.length + ' ' + esc(t("bulk_import.validation_ok")) + '</strong>' +
+            (warnings ? ' (' + warnings + ' ' + esc(t("bulk_import.warnings")) + ')' : "");
+        return findings;
+    }
+    function _submitBulkImport() {
+        var findings = _validateBulkImport();
+        if (findings == null)
+            return;
+        var btn = document.getElementById("bulk-import-submit");
+        if (btn) {
+            btn.disabled = true;
+            btn.textContent = "...";
+        }
+        SurfaceAPI.bulkImport(findings).then(function (r) {
+            _closeBulkImportModal();
+            showStatus(r.inserted + " " + t("prompt.findings_imported") + (r.skipped ? ", " + r.skipped + " " + t("prompt.findings_skipped") : ""));
+            _loadAndRender();
+        }).catch(function (e) {
+            var err = document.getElementById("bulk-import-error");
+            if (err) {
+                err.textContent = e.message || t("common.error");
+                err.style.display = "block";
+            }
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = t("bulk_import.submit");
+            }
+        });
+    }
+    window._bulkImportDialog = function () {
+        var ov = _ensureBulkImportModal();
+        ov.hidden = false;
+    };
+    // ═══════════════════════════════════════════════════════════════
+    // MEASURES
+    // ═══════════════════════════════════════════════════════════════
+    function _renderMeasures(c) {
+        var total = _measures.length;
+        var done = _measures.filter(function (m) { return m.statut === "termine"; }).length;
+        var inProg = _measures.filter(function (m) { return m.statut === "en_cours"; }).length;
+        var todo = total - done - inProg;
+        var h = '<div class="ct-row ct-row-wrap ct-mb-3">';
+        h += '<h2 class="ct-m-0">' + esc(t("measures.title")) + '</h2>';
+        h += '<span class="ct-flex-1"></span>';
+        if (total > 0) {
+            h += '<span class="ct-badge ct-bg-low-tint ct-text-low-ink" data-tone="neutral">' + done + ' ' + esc(t("measures.status.termine")) + '</span>';
+            h += '<span class="ct-badge ct-bg-info-tint ct-text-info" data-tone="neutral">' + inProg + ' ' + esc(t("measures.status.en_cours")) + '</span>';
+            h += '<span class="ct-badge ct-bg-alt ct-muted" data-tone="neutral">' + todo + ' ' + esc(t("measures.status.a_faire")) + '</span>';
+        }
+        h += '</div>';
+        h += '<div class="ct-text-meta ct-muted ct-mb-3">' + esc(t("measures.help")) + '</div>';
+        if (!total) {
+            h += '<div class="empty-state">' + esc(t("measures.empty")) + '</div>';
+            c.innerHTML = h;
+            return;
+        }
+        var today = new Date().toISOString().substring(0, 10);
+        h += ct_table.render({
+            // ct_table travaille en Record<string, any>[] (decl partagée)
+            rows: _measures,
+            rowKey: "id",
+            onRowClick: "_editSurfaceMeasureRow",
+            bulk: { scope: "surface-measures" },
+            rowClass: function (m) {
+                return (m.echeance && m.statut !== "termine" && m.echeance < today) ? "row-overdue" : "";
+            },
+            columns: [
+                { key: "id", label: t("measures.col.id"), width: "110px",
+                    render: function (m) { return '<span class="ct-mono ct-text-meta ct-strong">' + esc(m.id) + '</span>'; } },
+                { key: "title", label: t("measures.col.title"),
+                    render: function (m) { return esc(m.title || ""); } },
+                { key: "finding_ids", label: t("measures.col.findings") || "Findings", width: "90px",
+                    render: function (m) {
+                        var n = (m.finding_ids && m.finding_ids.length) ? m.finding_ids.length : (m.finding_id ? 1 : 0);
+                        return '<span class="fs-sm text-muted">' + n + '</span>';
+                    } },
+                { key: "statut", label: t("measures.col.status"), width: "110px",
+                    render: function (m) { return _measureStatusBadge(m.statut); } },
+                { key: "responsable", label: t("measures.col.owner"),
+                    render: function (m) { return esc(m.responsable || ""); } },
+                { key: "echeance", label: t("measures.col.due"), width: "140px",
+                    render: function (m) {
+                        if (!m.echeance)
+                            return "";
+                        var overdue = m.statut !== "termine" && m.echeance < today;
+                        return overdue
+                            ? '<span class="ct-text-critical ct-strong">' + esc(m.echeance) + ' ⚠</span>'
+                            : esc(m.echeance);
+                    } }
+            ]
+        });
+        c.innerHTML = h;
+        ct_bulkbar.attach({
+            scope: "surface-measures",
+            label: "{n} remédiation(s) sélectionnée(s)",
+            actions: [
+                { id: "done", icon: "check", label: t("measures.status.termine") || "Terminé", variant: "success",
+                    onClick: "_bulkSurfaceMeasuresDone" },
+                { id: "delete", icon: "trash", label: t("bulk.delete") || "Supprimer", danger: true,
+                    onClick: "_bulkSurfaceMeasuresDelete",
+                    confirm: { title: "Supprimer {n} remédiation(s) ?", message: "Cette action est irréversible." } }
+            ]
+        });
+        ct_bulkbar.update("surface-measures");
+    }
+    window._editSurfaceMeasureRow = function (row) {
+        var m = _measures.find(function (x) { return x.id === row.id; });
+        if (!m)
+            return;
+        ct_measure_modal.open(m, {
+            title: m.id + " — " + (m.title || "Mesure"),
+            hideFields: ["type"],
+            statusOptions: [
+                { value: "a_faire", label: t("measures.status.a_faire") || "À faire" },
+                { value: "en_cours", label: t("measures.status.en_cours") || "En cours" },
+                { value: "termine", label: t("measures.status.termine") || "Terminé" }
+            ],
+            defaultStatus: "a_faire",
+            ownerPicker: { pickerId: "surface-measure-owner", directoryUrl: "api/directory" },
+            onAddNote: function (_entry, fullLog) {
+                m.progress_log = fullLog;
+                return SurfaceAPI.updateMeasure(m.id, { progress_log: fullLog });
+            },
+            onDelete: function () {
+                ct_modal.confirm({
+                    title: "Supprimer la remédiation",
+                    message: "Cette action est irréversible.",
+                    danger: true
+                }).then(function (ok) {
+                    if (!ok)
+                        return;
+                    SurfaceAPI.deleteMeasure(m.id).then(function () {
+                        showStatus(t("measures.deleted") || "Mesure supprimée");
+                        _loadAndRender();
+                    }).catch(function (e) { showStatus(e.message || t("common.error"), true); });
+                });
+            }
+        }).then(function (result) {
+            if (!result || result.__deleted)
+                return;
+            SurfaceAPI.updateMeasure(m.id, result).then(function () {
+                showStatus(t("measures.updated") || "Mesure mise à jour");
+                _loadAndRender();
+            }).catch(function (e) { showStatus(e.message || t("common.error"), true); });
+        });
+    };
+    window._bulkSurfaceMeasuresDone = function (scope) {
+        var ids = Array.from(ct_bulkbar.getSelection(scope));
+        if (!ids.length)
+            return;
+        Promise.all(ids.map(function (id) { return SurfaceAPI.updateMeasure(id, { statut: "termine" }); }))
+            .then(function () {
+            showStatus(ids.length + " " + (t("measures.marked_done") || "remédiation(s) terminée(s)"));
+            ct_bulkbar.clear(scope);
+            _loadAndRender();
+        })
+            .catch(function (e) { showStatus(e.message || t("common.error"), true); });
+    };
+    window._bulkSurfaceMeasuresDelete = function (scope) {
+        var ids = Array.from(ct_bulkbar.getSelection(scope));
+        if (!ids.length)
+            return;
+        Promise.all(ids.map(function (id) { return SurfaceAPI.deleteMeasure(id); }))
+            .then(function () {
+            showStatus(ids.length + " " + (t("measures.deleted") || "remédiation(s) supprimée(s)"));
+            ct_bulkbar.clear(scope);
+            _loadAndRender();
+        })
+            .catch(function (e) { showStatus(e.message || t("common.error"), true); });
+    };
+    // ═══════════════════════════════════════════════════════════════
+    // HOSTS (all MonitoredAsset of kind=host, search + detail view)
+    // ═══════════════════════════════════════════════════════════════
+    // Cached {host → png_b64} map fetched once from /api/findings/screenshots.
+    // Populated lazily when the Hosts tab renders for the first time.
+    var _screenshotCache = null;
+    function _loadScreenshotsForHostCards() {
+        if (_screenshotCache)
+            return Promise.resolve(_screenshotCache);
+        return SurfaceAPI.get("/api/findings/screenshots").then(function (map) {
+            _screenshotCache = map || {};
+            return _screenshotCache;
+        }).catch(function () {
+            _screenshotCache = {};
+            return _screenshotCache;
+        });
+    }
+    // XSS-05: screenshots come from scans of third-party hosts (attacker-influenced
+    // content). Only ever emit strict base64 into the data: URI.
+    var _B64_RE = /^[A-Za-z0-9+/=]+$/;
+    function _screenshotB64ForHost(values) {
+        if (!_screenshotCache)
+            return null;
+        var vs = Array.isArray(values) ? values : [values];
+        for (var i = 0; i < vs.length; i++) {
+            var b64 = _screenshotCache[vs[i]];
+            if (b64 && _B64_RE.test(b64))
+                return b64;
+        }
+        return null;
+    }
+    // A file share lives ON a host. We surface its findings under that host so
+    // SMB results are visible in the Hosts view like every other scan. The share
+    // asset keeps its UNC value; the "host key" is the server name parsed from it.
+    function _shareHostname(value) {
+        var v = (value || "").trim().replace(/^smb:\/\//i, "").replace(/^[\\/]+/, "").replace(/\\/g, "/");
+        var i = v.indexOf("/");
+        return (i >= 0 ? v.slice(0, i) : v).toLowerCase();
+    }
+    // The grouping key for a monitored asset in the Hosts view.
+    function _assetHostKey(a) {
+        return a.kind === "file_share" ? _shareHostname(a.value) : a.value;
+    }
+    // All file-share assets hosted on a given server (hostname). A single file
+    // server can expose several shares, each its own MonitoredAsset; they all roll
+    // up onto the one host card for that server, so the card/detail must list every
+    // share, not just the first one.
+    function _sharesForHost(hostKey) {
+        var k = String(hostKey || "").toLowerCase();
+        return (_monitored || []).filter(function (a) {
+            return a.kind === "file_share" && _shareHostname(a.value) === k;
+        }).sort(function (a, b) { return (a.value || "").localeCompare(b.value || ""); });
+    }
+    // Host/IP part of a finding target, minus any trailing :port. Lower-cased.
+    // "93.184.216.34:443" -> "93.184.216.34" ; "host.tld:8080" -> "host.tld".
+    function _targetHostPart(target) {
+        var t = (target || "").trim();
+        if (!t)
+            return "";
+        if (/^(\\\\|\/\/|smb:\/\/)/i.test(t))
+            return _shareHostname(t);
+        var m = t.match(/^(.*):(\d+)$/); // strip a trailing :<port> (greedy — IPv6-safe enough)
+        return (m ? m[1] : t).toLowerCase();
+    }
+    // IPv4 membership test: is `ip` inside `cidr` (a.b.c.d/n) ? false for
+    // non-IPv4 addresses or malformed CIDR (so hostnames simply don't match).
+    function _ipInCidr(ip, cidr) {
+        if (!ip || !cidr || cidr.indexOf("/") < 0)
+            return false;
+        var parts = cidr.split("/");
+        var bits = parseInt(parts[1], 10);
+        if (isNaN(bits) || bits < 0 || bits > 32)
+            return false;
+        var toInt = function (s) {
+            var o = (s || "").split(".");
+            if (o.length !== 4)
+                return null;
+            var n = 0;
+            for (var i = 0; i < 4; i++) {
+                var v = parseInt(o[i], 10);
+                if (String(v) !== o[i] || v < 0 || v > 255)
+                    return null;
+                n = (n * 256) + v;
+            }
+            return n >>> 0;
+        };
+        var ipN = toInt(ip), netN = toInt(parts[0]);
+        if (ipN === null || netN === null)
+            return false;
+        var mask = bits === 0 ? 0 : (0xFFFFFFFF << (32 - bits)) >>> 0;
+        return ((ipN & mask) >>> 0) === ((netN & mask) >>> 0);
+    }
+    // Does a finding belong to a monitored asset? Scanners key findings
+    // differently: nmap/discovery put the resolved IP in `target` (the hostname
+    // only survives in evidence.hostname), while tls/headers/quick-scan put the
+    // hostname. We reconcile by matching on ANY of: the target host/ip part, the
+    // evidence hostname, or the evidence/target IP against the asset's resolved_ip.
+    // Domains roll up their subdomains; ip_ranges match by CIDR containment.
+    function _findingMatchesAsset(f, a) {
+        var target = f.target || "";
+        var ev = f.evidence || {};
+        var evHost = String(ev.hostname || ev.host || "").toLowerCase();
+        var evAddr = String(ev.address || "").toLowerCase();
+        var hostPart = _targetHostPart(target);
+        var val = (a.value || "").toLowerCase();
+        if (a.kind === "file_share") {
+            return _shareHostname(target) === _shareHostname(a.value);
+        }
+        if (a.kind === "domain") {
+            // exact domain, or any subdomain of it (rollup): "x.y.domain".
+            var isSub = function (n) {
+                return !!n && (n === val || (n.length > val.length + 1 && n.slice(-(val.length + 1)) === "." + val));
+            };
+            return isSub(hostPart) || isSub(evHost);
+        }
+        if (a.kind === "ip_range") {
+            // exact CIDR (e.g. discovery_summary target) or an IP inside the range.
+            return hostPart === val || _ipInCidr(hostPart, a.value) || _ipInCidr(evAddr, a.value);
+        }
+        // host — hostname or IP, direct or via the asset's cached resolved_ip.
+        if (hostPart === val || evHost === val)
+            return true;
+        var rip = (a.resolved_ip || "").toLowerCase();
+        if (rip && (hostPart === rip || evAddr === rip))
+            return true;
+        return false;
+    }
+    // A host plus its same-IP aliases: findings keyed by a shared resolved IP
+    // belong to all of them, so a card and its detail count/list the same set.
+    function _assetAliases(a) {
+        if (a.kind !== "host" || !a.resolved_ip)
+            return [];
+        return (_monitored || []).filter(function (x) {
+            return x.kind === "host" && x.id !== a.id && x.resolved_ip === a.resolved_ip;
+        });
+    }
+    function _assetGroup(a) {
+        return [a].concat(_assetAliases(a));
+    }
+    // Assets shown as cards in the Hosts view: every host, plus one card per
+    // file-share hostname that isn't already a monitored host (its findings would
+    // otherwise be invisible). When a host of the same name exists, the share's
+    // findings already roll up onto that host card, so we don't duplicate it.
+    // Disabled DOMAINS are also surfaced here (as greyed cards in the disabled
+    // section) so an operator can see and re-enable a domain they turned off
+    // without leaving the Hosts view; enabled domains stay in the Surveillance
+    // table only (this view is host-centric).
+    function _hostsViewAssets() {
+        var hostAssets = _monitored.filter(function (a) { return a.kind === "host"; });
+        var hostNames = {};
+        hostAssets.forEach(function (a) { hostNames[(a.value || "").toLowerCase()] = true; });
+        var seenShare = {};
+        var shareAssets = _monitored.filter(function (a) {
+            if (a.kind !== "file_share")
+                return false;
+            var hn = _shareHostname(a.value);
+            if (hostNames[hn] || seenShare[hn])
+                return false;
+            seenShare[hn] = true;
+            return true;
+        });
+        var disabledDomains = _monitored.filter(function (a) {
+            return a.kind === "domain" && a.enabled === false;
+        });
+        return hostAssets.concat(shareAssets, disabledDomains);
+    }
+    // Aggregate finding counts over a set of assets (a host + its aliases, or a
+    // domain + itself). A finding matching several assets in the set is counted
+    // ONCE (union), so card and detail totals never double up.
+    //   `total`          — all findings on these assets (audit)
+    //   `active`         — new/to_fix + not info (actionable work)
+    //   `open`           — displayed as "N à traiter" — MUST exclude info so
+    //                      informational findings (tls_valid, scan_clean,
+    //                      ct_discovery, shodan_no_data...) never require triage.
+    //   `critical..info` — per-severity counts of new/to_fix only
+    //   `false_positive` / `fixed` — separated for audit display
+    function _countFindingsForAssets(assets) {
+        var out = {
+            total: 0, active: 0, open: 0,
+            critical: 0, high: 0, medium: 0, low: 0, info: 0,
+            false_positive: 0, fixed: 0,
+        };
+        _findings.forEach(function (f) {
+            var hit = false;
+            for (var i = 0; i < assets.length; i++) {
+                if (_findingMatchesAsset(f, assets[i])) {
+                    hit = true;
+                    break;
+                }
+            }
+            if (!hit)
+                return;
+            out.total++;
+            if (f.status === "false_positive") {
+                out.false_positive++;
+                return;
+            }
+            if (f.status === "fixed") {
+                out.fixed++;
+                return;
+            }
+            // status === new | to_fix beyond this point
+            if (out[f.severity] != null)
+                out[f.severity]++;
+            if (f.severity === "info")
+                return; // info: no action counter
+            out.active++;
+            out.open++;
+        });
+        return out;
+    }
+    // Single-asset convenience wrapper (does NOT fold in aliases — callers that
+    // want the shared-IP rollup pass _assetGroup(a) to _countFindingsForAssets).
+    function _countFindingsByHost(a) {
+        return _countFindingsForAssets([a]);
+    }
+    function _renderHosts(c) {
+        if (_selectedHost) {
+            _renderHostDetail(c);
+            return;
+        }
+        var hosts = _hostsViewAssets();
+        var h = '<div class="ct-row ct-row-wrap ct-mb-3">';
+        h += '<h2 class="ct-m-0">' + esc(t("hosts.title")) + '</h2>';
+        h += '<span class="ct-flex-1"></span>';
+        h += '<span class="ct-text-label ct-muted">' + hosts.length + ' ' + esc(t("hosts.count")) + '</span>';
+        h += '</div>';
+        h += '<div class="ct-text-meta ct-muted ct-mb-3">' + esc(t("hosts.help")) + '</div>';
+        // Search bar — rendered ONCE. Subsequent updates only touch #host-cards-wrap
+        // so the input element is never destroyed and keeps focus naturally.
+        h += '<div class="surface-filters ct-mb-3">';
+        h += '<input type="text" class="surface-filter ct-minw-320 ct-flex-1" placeholder="' + esc(t("hosts.search.placeholder")) + '"';
+        h += ' id="host-search" value="' + esc(_hostSearch) + '" data-input="_setHostSearch" data-pass-value autocomplete="off">';
+        h += '<button class="ct-btn mt-8 ct-hidden" data-write data-variant="primary" id="host-search-clear" data-click="_clearHostSearch"' + (_hostSearch ? '' : '') + '>x</button>';
+        h += '</div>';
+        // Empty wrapper the search handler refreshes in-place
+        h += '<div id="host-cards-wrap"></div>';
+        c.innerHTML = h;
+        // Render the card grid immediately (without thumbnails), then
+        // lazy-load screenshots and re-render only the cards that need them.
+        _refreshHostCards();
+        if (!_screenshotCache) {
+            _loadScreenshotsForHostCards().then(function (map) {
+                if (map && Object.keys(map).length)
+                    _refreshHostCards();
+            });
+        }
+    }
+    function _refreshHostCards() {
+        var wrap = document.getElementById("host-cards-wrap");
+        if (!wrap)
+            return;
+        var hosts = _hostsViewAssets();
+        var q = _hostSearch.trim().toLowerCase();
+        var filtered = hosts.filter(function (a) {
+            if (!q)
+                return true;
+            return (a.value || "").toLowerCase().indexOf(q) >= 0
+                || _assetHostKey(a).indexOf(q) >= 0
+                || (a.label || "").toLowerCase().indexOf(q) >= 0
+                || (a.notes || "").toLowerCase().indexOf(q) >= 0;
+        });
+        // v0.2: group filtered hosts by resolved_ip so hostnames pointing to
+        // the same physical machine render as a single card. A group's
+        // "primary" host is the one with the most active findings; the
+        // others are listed as aliases below the card header. Hosts without
+        // a resolved_ip (manual IP-literal entries, unresolvable names) are
+        // still rendered individually.
+        var groups = {};
+        var singletons = [];
+        // First pass: bucket every host that has a resolved_ip into groups.
+        // IP-literal entries (value === resolved_ip) are NOT excluded — they
+        // must join the same bucket as any hostname that resolved to them.
+        // Only hosts with NO resolved_ip go to singletons.
+        filtered.forEach(function (a) {
+            // Only hosts group by resolved_ip. Domains and file-shares are always
+            // their own card, never merged onto a host that shares their IP.
+            var ip = a.kind === "host" ? (a.resolved_ip || "") : "";
+            if (!ip) {
+                singletons.push({ primary: a, aliases: [], ip: "" });
+                return;
+            }
+            if (!groups[ip])
+                groups[ip] = [];
+            groups[ip].push(a);
+        });
+        // Build entries: each group = one card whose primary is the host
+        // with the most active findings
+        var entries = singletons.slice();
+        Object.keys(groups).forEach(function (ip) {
+            var members = groups[ip];
+            if (members.length === 1) {
+                entries.push({ primary: members[0], aliases: [], ip: ip });
+                return;
+            }
+            members.sort(function (x, y) {
+                return _countFindingsByHost(y).active - _countFindingsByHost(x).active;
+            });
+            entries.push({ primary: members[0], aliases: members.slice(1), ip: ip });
+        });
+        // Precompute each card's aggregated counts ONCE (union over primary +
+        // aliases, deduped) — reused by the sort and the render below, so we never
+        // rescan all findings per comparison.
+        var _entryCounts = {};
+        entries.forEach(function (e) {
+            _entryCounts[e.primary.id] = _countFindingsForAssets([e.primary].concat(e.aliases));
+        });
+        // Sort: enabled cards first (most ACTIVE findings first, then alpha), then
+        // all scanning-disabled cards grouped at the very end (alpha).
+        entries.sort(function (a, b) {
+            var da = a.primary.enabled === false ? 1 : 0;
+            var db = b.primary.enabled === false ? 1 : 0;
+            if (da !== db)
+                return da - db;
+            var ca = _entryCounts[a.primary.id].active;
+            var cb = _entryCounts[b.primary.id].active;
+            if (ca !== cb)
+                return cb - ca;
+            return (a.primary.value || "").localeCompare(b.primary.value || "");
+        });
+        var _disabledCount = entries.filter(function (e) { return e.primary.enabled === false; }).length;
+        var shownHosts = entries.reduce(function (n, e) { return n + 1 + e.aliases.length; }, 0);
+        var h = '<div class="ct-text-label ct-muted ct-mb-2">' + shownHosts + ' / ' + hosts.length + ' ' + esc(t("hosts.count")) + ' · ' + entries.length + ' ' + esc(t("hosts.groups")) + '</div>';
+        if (!filtered.length) {
+            h += '<div class="empty-state">' + esc(hosts.length ? t("hosts.no_match") : t("hosts.empty")) + '</div>';
+            wrap.innerHTML = h;
+            return;
+        }
+        h += '<div class="host-cards-grid">';
+        var _dividerShown = false;
+        entries.forEach(function (entry) {
+            var a = entry.primary;
+            var isShare = a.kind === "file_share";
+            // Divider before the first scanning-disabled card (they're sorted last).
+            if (a.enabled === false && !_dividerShown) {
+                _dividerShown = true;
+                h += '<div class="host-cards-divider">' + esc(t("hosts.disabled_section")) + ' (' + _disabledCount + ')</div>';
+            }
+            // Counts aggregated over primary + aliases (deduped union), precomputed
+            // above — reflects everything observable at this IP without double
+            // counting a finding that matches several same-IP aliases.
+            var counts = _entryCounts[a.id];
+            var autoDiscovered = (a.notes || "").indexOf("Auto-decouvert") === 0;
+            var last = a.last_scan_at ? _fmtDate(a.last_scan_at) : t("monitored.last.never");
+            var score = _riskScoreFor(a, counts);
+            var tier = _riskTier(score);
+            var _cardCls = "host-card" + (a.enabled === false ? " host-card-disabled" : "");
+            h += '<div class="' + _cardCls + '" data-click="_openHost" data-args=\'' + _da(a.id) + '\'>';
+            h += '<div class="host-card-top">';
+            h += '<div class="host-card-value">' + esc(isShare ? _assetHostKey(a) : a.value) + '</div>';
+            if (isShare)
+                h += '<span class="ct-badge" data-size="sm" data-tone="medium">' + esc(t("hosts.badge.share")) + '</span>';
+            if (a.kind === "domain")
+                h += '<span class="ct-badge" data-size="sm" data-tone="info">' + esc(_kindLabel("domain")) + '</span>';
+            if (!a.enabled)
+                h += '<span class="ct-badge" data-size="sm" data-tone="neutral">' + esc(t("hosts.badge.disabled")) + '</span>';
+            if (autoDiscovered)
+                h += '<span class="ct-badge" data-size="sm" data-tone="accent">' + esc(t("hosts.source.auto")) + '</span>';
+            else
+                h += '<span class="ct-badge" data-size="sm" data-tone="info">' + esc(t("hosts.source.manual")) + '</span>';
+            if (a.criticality && a.criticality !== "medium") {
+                h += '<span class="ct-badge" data-size="sm" data-tone="' + _surfaceTone(a.criticality) + '">' + esc(t("crit." + a.criticality)) + '</span>';
+            }
+            h += '<span class="ct-badge" data-fill data-tone="' + _surfaceTone(tier.lvl) + '" title="' + esc(t("risk.score_tooltip")) + '">' + score + '</span>';
+            h += '</div>';
+            // Screenshot thumbnail from the cached /api/findings/screenshots map.
+            var shotValues = [a.value].concat(entry.aliases.map(function (al) { return al.value; }));
+            var shotB64 = _screenshotB64ForHost(shotValues);
+            if (shotB64) {
+                h += '<div class="host-card-thumb"><img src="data:image/png;base64,' + esc(shotB64) + '" alt="" loading="lazy"/></div>';
+            }
+            if (isShare) {
+                // A file server can host several shares — list every one, not just
+                // the card's primary asset.
+                var cardShares = _sharesForHost(_assetHostKey(a));
+                if (cardShares.length > 1) {
+                    h += '<div class="host-card-sharecount">' + _icon("folder", 11) + ' ' + esc(t("hosts.share_count").replace("{n}", String(cardShares.length))) + '</div>';
+                }
+                cardShares.forEach(function (sh) {
+                    h += '<div class="host-card-ip" title="' + esc(sh.value) + '">' + _icon("folder", 11) + ' ' + esc(sh.value) + (!sh.enabled ? ' <span class="ct-badge" data-size="sm" data-tone="neutral">' + esc(t("hosts.badge.disabled")) + '</span>' : '') + '</div>';
+                });
+            }
+            if (a.label)
+                h += '<div class="host-card-label">' + esc(a.label) + '</div>';
+            if (entry.ip) {
+                h += '<div class="host-card-ip" title="' + esc(t("hosts.resolved_ip_tooltip")) + '">' + _icon("target", 11) + ' ' + esc(entry.ip) + '</div>';
+            }
+            if (entry.aliases.length) {
+                h += '<div class="host-card-aliases">';
+                h += '<span class="host-card-aliases-lbl">' + esc(t("hosts.aliases").replace("{n}", String(entry.aliases.length))) + '</span>';
+                entry.aliases.forEach(function (al) {
+                    // data-stop so clicking an alias pill doesn't open the primary's detail
+                    h += '<button class="host-alias-pill" data-click="_openHost" data-args=\'' + _da(al.id) + '\' data-stop title="' + esc(al.value) + '">' + esc(al.value) + '</button>';
+                });
+                h += '</div>';
+            }
+            if (a.tags && a.tags.length) {
+                h += '<div class="host-card-tags">';
+                a.tags.forEach(function (tag) {
+                    h += '<span class="host-tag">' + esc(tag) + '</span>';
+                });
+                h += '</div>';
+            }
+            h += '<div class="host-card-meta">' + esc(t("hosts.last_scan")) + ' : ' + esc(last) + '</div>';
+            if (counts.active) {
+                h += '<div class="host-card-findings">';
+                ["critical", "high", "medium", "low", "info"].forEach(function (s) {
+                    if (counts[s]) {
+                        h += '<span class="ct-badge" data-tone="' + _surfaceTone(s) + '" title="' + counts[s] + ' ' + esc(t("sev." + s)) + '">' + counts[s] + '</span>';
+                    }
+                });
+                if (counts.open)
+                    h += '<span class="host-card-open">' + counts.open + ' ' + esc(t("hosts.findings.to_triage")) + '</span>';
+                h += '</div>';
+            }
+            else {
+                h += '<div class="host-card-findings empty">' + esc(t("hosts.findings.none")) + '</div>';
+            }
+            // Footer with a scanner count + quick-edit button. Stops propagation
+            // so the click doesn't bubble to the host-card "open detail" handler.
+            var scs = a.enabled_scanners || [];
+            h += '<div class="host-card-footer">';
+            h += '<span class="host-card-scancount">' + _icon("search", 12) + ' ' + scs.length + ' ' + esc(t("hosts.scanners")) + '</span>';
+            if (a.enabled === false) {
+                // Re-enable scanning straight from the greyed card. data-stop so the
+                // click doesn't bubble to the card's "open detail" handler.
+                h += '<button class="ct-btn" data-size="sm" data-variant="success" data-click="_toggleHostFromDetail" data-args=\'' + _da(a.id) + '\' data-stop title="' + esc(t("host.enable_scan")) + '">' + _icon("check", 12) + ' ' + esc(t("hosts.reactivate")) + '</button>';
+            }
+            else {
+                h += '<button class="ct-btn" data-size="sm" data-click="_editScannersDialog" data-args=\'' + _da(a.id) + '\' data-stop title="' + esc(t("hosts.configure_scans")) + '">' + _icon("edit", 12) + ' ' + esc(t("hosts.configure")) + '</button>';
+            }
+            h += '</div>';
+            h += '</div>';
+        });
+        h += '</div>';
+        wrap.innerHTML = h;
+    }
+    window._setHostSearch = function (v) {
+        _hostSearch = v || "";
+        // Update only the cards grid, NOT the whole panel — the input stays alive
+        // and keeps focus naturally.
+        _refreshHostCards();
+        var clearBtn = document.getElementById("host-search-clear");
+        if (clearBtn)
+            clearBtn.style.display = _hostSearch ? "" : "none";
+    };
+    window._clearHostSearch = function () {
+        _hostSearch = "";
+        var inp = document.getElementById("host-search");
+        if (inp)
+            inp.value = "";
+        _refreshHostCards();
+        var clearBtn = document.getElementById("host-search-clear");
+        if (clearBtn)
+            clearBtn.style.display = "none";
+        if (inp)
+            inp.focus();
+    };
+    window._openHost = function (id) {
+        var a = _monitored.find(function (x) { return x.id === id; });
+        // Any monitored asset is openable in the detail view — hosts and file
+        // shares, but also domains (which roll up their subdomains' findings) and
+        // ip_ranges (CIDR containment). Only unknown ids are rejected.
+        if (!a)
+            return;
+        _selectedHost = a;
+        _selectedHostReturnPanel = null; // opened from the Hosts grid → back goes there
+        _bulkSelection = {}; // fresh selection when entering the host detail
+        renderPanel();
+    };
+    // Open any monitored asset's detail from the Surveillance table: switch to the
+    // Hosts view (where the detail lives) and select it. Lets domains and
+    // ip_ranges — which have no card of their own — reach the same detail panel.
+    window._openMonitoredDetail = function (id) {
+        var a = _monitored.find(function (x) { return x.id === id; });
+        if (!a)
+            return;
+        _selectedHostReturnPanel = _panel; // come back to the Surveillance table
+        _panel = "hosts";
+        _selectedHost = a;
+        _hostSelectedFinding = null;
+        _bulkSelection = {};
+        renderPanel();
+    };
+    window._backToHosts = function () {
+        _selectedHost = null;
+        _hostSelectedFinding = null;
+        _bulkSelection = {};
+        // Return to whichever list the user opened the detail from. Domains/
+        // ip_ranges are reached from the Surveillance table; hosts from the grid.
+        if (_selectedHostReturnPanel) {
+            _panel = _selectedHostReturnPanel;
+            _selectedHostReturnPanel = null;
+        }
+        renderPanel();
+    };
+    // NB: hostValue jamais passé par l'appelant (param mort hérité de la source).
+    function _renderHostFindingInline(c, hostValue) {
+        var f = _hostSelectedFinding;
+        // Same shared vertical card stack as the main findings detail page,
+        // only the back button goes to the host detail instead of the findings
+        // list.
+        var linked = null;
+        if (f.measure_id)
+            linked = _measures.find(function (x) { return x.id === f.measure_id; }) || null;
+        var fd = Object.assign({}, f, { title: _findingTitle(f), description: _findingDesc(f) });
+        c.innerHTML = ct_finding_view.render(fd, {
+            backHandler: "_backToHostFromFinding",
+            triageHandler: "_triageHostFindingDetail",
+            aiEnabled: !!(window._aiIsEnabled && window._aiIsEnabled()),
+            aiHandler: "_aiTriageFinding",
+            linkedMeasure: linked || undefined,
+            cardClass: "surface-card"
+        });
+    }
+    function _renderHostDetail(c) {
+        if (_hostSelectedFinding) {
+            _renderHostFindingInline(c);
+            return;
+        }
+        var a = _selectedHost;
+        var isShare = a.kind === "file_share";
+        var hostKey = _assetHostKey(a);
+        // Detail counts/list use the same deduped union as the card: the asset plus
+        // its same-IP aliases (empty for domains/ip_ranges), so card and detail agree.
+        var detailGroup = _assetGroup(a);
+        var counts = _countFindingsForAssets(detailGroup);
+        var autoDiscovered = (a.notes || "").indexOf("Auto-decouvert") === 0;
+        var last = a.last_scan_at ? _fmtDate(a.last_scan_at, "long") : t("monitored.last.never");
+        var score = _riskScoreFor(a, counts);
+        var tier = _riskTier(score);
+        var h = '<div class="ct-row ct-row-wrap ct-mb-3">';
+        var backLabel = _selectedHostReturnPanel === "monitored" ? t("host.back_monitored") : t("host.back");
+        h += '<button class="ct-btn" data-variant="ghost" data-size="sm" data-click="_backToHosts">' + _icon("arrow_left", 14) + ' ' + esc(backLabel) + '</button>';
+        h += '<span class="ct-ref" data-size="sm">' + esc(_kindLabel(a.kind)) + '</span>';
+        h += '<h2 class="ct-m-0 ct-flex-1">' + esc(isShare ? hostKey : a.value) + '</h2>';
+        if (isShare)
+            h += '<span class="ct-badge" data-size="sm" data-tone="medium">' + esc(t("hosts.badge.share")) + '</span>';
+        if (autoDiscovered)
+            h += '<span class="ct-badge" data-size="sm" data-tone="accent">' + esc(t("hosts.source.auto")) + '</span>';
+        else
+            h += '<span class="ct-badge" data-size="sm" data-tone="info">' + esc(t("hosts.source.manual")) + '</span>';
+        if (a.criticality && a.criticality !== "medium") {
+            h += '<span class="ct-badge" data-size="sm" data-tone="' + _surfaceTone(a.criticality) + '">' + esc(t("crit." + a.criticality)) + '</span>';
+        }
+        h += '<span class="ct-badge" data-fill data-tone="' + _surfaceTone(tier.lvl) + '" title="' + esc(t("risk.score_tooltip")) + '">' + score + ' — ' + esc(tier.lbl) + '</span>';
+        h += '</div>';
+        // A file server can host several shares (each its own asset) — list every
+        // one with its own scan/edit/delete actions, so the detail isn't limited to
+        // the single share the card was opened from.
+        var detailShares = isShare ? _sharesForHost(hostKey) : [];
+        // Info card
+        h += '<div class="surface-card">';
+        if (isShare) {
+            var sharesRows = detailShares.map(function (sh) {
+                var acts = '<button class="ct-btn" data-size="xs" data-click="_scanHost" data-args=\'' + _da(sh.id) + '\' data-stop title="' + esc(t("host.scan_now")) + '" data-icon>' + _icon("search", 12) + '</button>' +
+                    '<button class="ct-btn" data-size="xs" data-click="_editMonitoredDialog" data-args=\'' + _da(sh.id) + '\' data-stop title="' + esc(t("host.edit")) + '" data-icon>' + _icon("edit", 12) + '</button>' +
+                    '<button class="ct-btn" data-size="xs" data-variant="danger" data-click="_deleteHostFromDetail" data-args=\'' + _da(sh.id) + '\' data-stop title="' + esc(t("action.delete")) + '" data-icon>' + _icon("trash", 12) + '</button>';
+                var shScanners = (sh.enabled_scanners || []).map(function (s) { return '<span class="ct-badge" data-size="sm" data-tone="low" title="' + esc(s) + '">' + esc(_scannerLabel(s)) + '</span>'; }).join(" ");
+                var shLast = sh.last_scan_at ? _fmtDate(sh.last_scan_at) : t("monitored.last.never");
+                return '<div class="host-share-row">' +
+                    '<div class="host-share-path ct-mono" title="' + esc(sh.value) + '">' + _icon("folder", 12) + ' ' + esc(sh.value) + (!sh.enabled ? ' <span class="ct-badge" data-size="sm" data-tone="neutral">' + esc(t("hosts.badge.disabled")) + '</span>' : '') + '</div>' +
+                    '<div class="host-share-acts">' + acts + '</div>' +
+                    (shScanners ? '<div class="host-share-scanners">' + shScanners + '</div>' : '') +
+                    '<div class="host-share-meta">' + esc(t("hosts.last_scan")) + ' : ' + esc(shLast) + '</div>' +
+                    '</div>';
+            }).join("");
+            h += '<div class="surface-row"><div class="surface-lbl">' + esc(t("host.shares")) + ' (' + detailShares.length + ')</div><div class="ct-flex-1">' + sharesRows + '</div></div>';
+        }
+        else {
+            h += '<div class="surface-row"><div class="surface-lbl">' + esc(t("host.col.value")) + '</div><div class="ct-mono">' + esc(a.value) + '</div></div>';
+        }
+        if (a.resolved_ip && a.resolved_ip !== a.value) {
+            h += '<div class="surface-row"><div class="surface-lbl">' + esc(t("host.col.resolved_ip")) + '</div><div class="ct-mono">' + esc(a.resolved_ip) + '</div></div>';
+        }
+        // Aliases sharing the same IP (hosts only) — computed at render time.
+        if (a.kind === "host" && a.resolved_ip) {
+            var aliases = _assetAliases(a);
+            if (aliases.length) {
+                var aliH = aliases.map(function (al) {
+                    return '<button class="host-alias-pill" data-click="_openHost" data-args=\'' + _da(al.id) + '\' title="' + esc(al.value) + '">' + esc(al.value) + '</button>';
+                }).join(" ");
+                h += '<div class="surface-row"><div class="surface-lbl">' + esc(t("host.col.aliases")) + '</div><div>' + aliH + '</div></div>';
+            }
+        }
+        // Subdomains rolled up under a domain — every monitored asset whose value is
+        // a subdomain of this domain, clickable through to its own detail.
+        if (a.kind === "domain") {
+            var domVal = (a.value || "").toLowerCase();
+            var subs = (_monitored || []).filter(function (x) {
+                var xv = (x.value || "").toLowerCase();
+                return x.id !== a.id && xv.length > domVal.length + 1 && xv.slice(-(domVal.length + 1)) === "." + domVal;
+            }).sort(function (x, y) { return (x.value || "").localeCompare(y.value || ""); });
+            if (subs.length) {
+                var subH = subs.map(function (sd) {
+                    return '<button class="host-alias-pill" data-click="_openHost" data-args=\'' + _da(sd.id) + '\' title="' + esc(sd.value) + '">' + esc(sd.value) + '</button>';
+                }).join(" ");
+                h += '<div class="surface-row"><div class="surface-lbl">' + esc(t("host.col.subdomains")) + ' (' + subs.length + ')</div><div>' + subH + '</div></div>';
+            }
+        }
+        if (a.label)
+            h += '<div class="surface-row"><div class="surface-lbl">' + esc(t("host.col.label")) + '</div><div>' + esc(a.label) + '</div></div>';
+        // enabled / frequency / last-scan are per-share for a file server — shown
+        // in the per-share list above, so skip the single-asset rows there.
+        if (!isShare) {
+            h += '<div class="surface-row"><div class="surface-lbl">' + esc(t("host.col.enabled")) + '</div><div>' + (a.enabled ? "✓" : "✗") + '</div></div>';
+            h += '<div class="surface-row"><div class="surface-lbl">' + esc(t("host.col.frequency")) + '</div><div>' + _tn("host.frequency_hours", a.scan_frequency_hours || 0) + '</div></div>';
+            h += '<div class="surface-row"><div class="surface-lbl">' + esc(t("host.col.last_scan")) + '</div><div>' + esc(last) + '</div></div>';
+        }
+        if (!isShare && a.enabled_scanners && a.enabled_scanners.length) {
+            h += '<div class="surface-row"><div class="surface-lbl">' + esc(t("host.col.scanners")) + '</div><div>' + a.enabled_scanners.map(function (s) { return '<span class="ct-badge" data-size="sm" data-tone="low" title="' + esc(s) + '">' + esc(_scannerLabel(s)) + '</span>'; }).join(" ") + '</div></div>';
+        }
+        if (a.notes)
+            h += '<div class="surface-row"><div class="surface-lbl">' + esc(t("host.col.notes")) + '</div><div style="white-space:pre-wrap;font-size:var(--ct-text-meta);color:var(--ct-ink-2)">' + esc(a.notes) + '</div></div>';
+        h += '</div>';
+        // Action buttons. For a multi-share server, "scan now" fans out to every
+        // share and per-share edit/delete live in the shares list above, so we only
+        // offer the bulk scan here. A single share keeps the usual scan/edit/delete.
+        h += '<div style="display:flex;gap:var(--ct-s2);margin:var(--ct-s3) 0;flex-wrap:wrap">';
+        if (isShare && detailShares.length > 1) {
+            h += '<button class="ct-btn mt-8" data-write data-variant="primary" data-click="_scanSharesOnHost" data-args=\'' + _da(hostKey) + '\'>' + _icon("search", 14) + ' ' + esc(t("host.scan_all_shares")) + '</button>';
+        }
+        else {
+            h += '<button class="ct-btn mt-8" data-write data-variant="primary" data-click="_scanHost" data-args=\'' + _da(a.id) + '\'>' + _icon("search", 14) + ' ' + esc(t("host.scan_now")) + '</button>';
+            // Single enable/disable control. Disabling opens a confirmation that
+            // ALSO offers, via a checkbox, the stronger "exclude permanently"
+            // (blocklist) action — so the two related operations live behind one
+            // button instead of two look-alike ones.
+            var toggleLbl = a.enabled ? t("host.disable_scan") : t("host.enable_scan");
+            h += '<button class="ct-btn mt-8" data-write data-variant="' + (a.enabled ? "warning" : "success") + '" data-click="_toggleHostFromDetail" data-args=\'' + _da(a.id) + '\'>' + _icon(a.enabled ? "x" : "check", 14) + ' ' + esc(toggleLbl) + '</button>';
+            h += '<button class="ct-btn mt-8" data-write data-variant="primary" data-click="_editMonitoredDialog" data-args=\'' + _da(a.id) + '\'>' + esc(t("host.edit")) + '</button>';
+            h += '<span class="ct-flex-1"></span>';
+            h += '<button class="ct-btn mt-8" data-write data-variant="danger" data-click="_deleteHostFromDetail" data-args=\'' + _da(a.id) + '\'>' + esc(t("host.delete")) + '</button>';
+        }
+        h += '</div>';
+        // Per-host scan timeline — list the last 8 scan jobs that targeted
+        // this asset, newest first. Each entry shows the scanner, the time
+        // delta, and the diff bubble (+N / ↻N) so the operator can see at
+        // a glance what changed between runs.
+        // History covers every share on this server, not just the opened one.
+        var histTargets = isShare ? detailShares.map(function (s) { return s.value; }) : [a.value];
+        var hostJobs = (_jobs || []).filter(function (j) { return histTargets.indexOf(j.target) >= 0; }).slice(0, 8);
+        if (hostJobs.length) {
+            h += '<h3 class="ct-mt-5">' + esc(t("host.scan_history")) + '</h3>';
+            h += '<div class="host-timeline">';
+            hostJobs.forEach(function (j) {
+                var dateStr = _fmtDate(j.created_at || "");
+                var diff = j.diff || {};
+                h += '<div class="host-timeline-row">';
+                h += '<span class="host-timeline-dot"></span>';
+                h += '<span class="host-timeline-date">' + esc(dateStr) + '</span>';
+                h += '<span class="ct-badge" data-size="sm" data-tone="' + _scannerTone(j.scanner) + '">' + esc(_scannerLabel(j.scanner)) + '</span>';
+                h += '<span class="host-timeline-status ct-badge" data-size="sm" data-tone="' + _jobTone(j.status) + '"' + (j.status === "running" ? " data-live" : "") + '>' + esc(_jobStatusLabel(j.status)) + '</span>';
+                var bits = [];
+                if (diff.added)
+                    bits.push('<span class="job-diff-added">+' + diff.added + '</span>');
+                if (diff.reopened)
+                    bits.push('<span class="job-diff-reopened">↻' + diff.reopened + '</span>');
+                if (diff.refreshed)
+                    bits.push('<span class="job-diff-refreshed">~' + diff.refreshed + '</span>');
+                if (bits.length)
+                    h += '<span class="host-timeline-diff">' + bits.join(" ") + '</span>';
+                else
+                    h += '<span class="host-timeline-diff text-muted">—</span>';
+                if (diff.scanned != null)
+                    h += '<span class="host-timeline-scanned text-muted">' + esc(t("jobs.scanned_files").replace("{n}", String(diff.scanned))) + '</span>';
+                if (j.error)
+                    h += '<span class="host-timeline-err" title="' + esc(_jobErrorText(j.error)) + '">' + _icon("alert", 12) + '</span>';
+                h += '</div>';
+            });
+            h += '</div>';
+        }
+        // Findings summary + list. Severity stats count only active findings
+        // (new / to_fix). False positives and fixed are kept as separate tiles
+        // for audit visibility without polluting the main severity counters.
+        h += '<h3 class="ct-mt-5">' + esc(t("host.findings_title")) + '</h3>';
+        if (counts.total) {
+            h += '<div class="ct-kpigrid ct-mb-4">';
+            h += _statCard(counts.active, t("dash.findings_total"), "");
+            h += _statCard(counts.critical, t("sev.critical"), counts.critical ? "stat-critical" : "stat-muted");
+            h += _statCard(counts.high, t("sev.high"), counts.high ? "stat-high" : "stat-muted");
+            h += _statCard(counts.medium, t("sev.medium"), counts.medium ? "stat-medium" : "stat-muted");
+            h += _statCard(counts.low, t("sev.low"), counts.low ? "stat-low" : "stat-muted");
+            h += _statCard(counts.info, t("sev.info"), counts.info ? "stat-info" : "stat-muted");
+            if (counts.false_positive)
+                h += _statCard(counts.false_positive, t("dash.false_positive"), "stat-muted");
+            if (counts.fixed)
+                h += _statCard(counts.fixed, t("status.fixed"), "stat-muted");
+            h += '</div>';
+        }
+        var hostFindingsAll = _findings.filter(function (f) {
+            for (var i = 0; i < detailGroup.length; i++) {
+                if (_findingMatchesAsset(f, detailGroup[i]))
+                    return true;
+            }
+            return false;
+        });
+        var fpCount = hostFindingsAll.filter(function (f) { return f.status === "false_positive"; }).length;
+        var hostFindings = _hostHideFP ? hostFindingsAll.filter(function (f) { return f.status !== "false_positive"; }) : hostFindingsAll;
+        // Sort: severity desc, then date desc
+        var sevOrder = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
+        hostFindings.sort(function (f1, f2) {
+            var d = (sevOrder[f1.severity] || 9) - (sevOrder[f2.severity] || 9);
+            if (d !== 0)
+                return d;
+            return (f2.created_at || "").localeCompare(f1.created_at || "");
+        });
+        if (fpCount > 0) {
+            h += '<div class="ct-flex ct-items-center ct-gap-2 ct-mb-2 ct-text-meta ct-muted">';
+            h += '<label class="ct-flex ct-items-center ct-gap-1 ct-clickable">';
+            h += '<input type="checkbox"' + (_hostHideFP ? " checked" : "") + ' data-change="_toggleHostHideFP">';
+            h += esc(t("host.hide_fp").replace("{n}", String(fpCount)));
+            h += '</label></div>';
+        }
+        if (!hostFindings.length) {
+            h += '<div class="empty-state">' + esc(t("host.findings_empty")) + '</div>';
+        }
+        else {
+            // Render via the shared ct_table + ct_bulkbar so the host view
+            // uses the same chrome / bulk actions as the main Findings panel.
+            // The scope 'surface-findings' is shared — a selection made here
+            // survives navigation back to the main panel, which is what the
+            // user expects (selection follows findings, not the view).
+            h += ct_table.render({
+                // ct_table travaille en Record<string, any>[] (decl partagée)
+                rows: hostFindings,
+                rowKey: "id",
+                onRowClick: "_openFindingRowFromHost",
+                rowClass: function (f) { return "finding-row sev-" + f.severity + " status-" + f.status; },
+                bulk: { scope: "surface-findings" },
+                columns: [
+                    { key: "severity", label: t("findings.col.severity"), width: "80px",
+                        render: function (f) { return '<span class="ct-badge" data-tone="' + _surfaceTone(f.severity) + '">' + esc(f.severity) + '</span>'; } },
+                    { key: "scanner", label: "Scanner",
+                        render: function (f) { return '<span class="ct-text-label ct-muted">' + esc(f.scanner || "") + '</span>'; } },
+                    { key: "type", label: t("findings.col.type"),
+                        render: function (f) { return '<span class="ct-text-label ct-muted">' + esc(f.type || "") + '</span>'; } },
+                    { key: "title", label: t("findings.col.title"),
+                        render: function (f) { return '<span class="ct-strong">' + esc(_findingTitle(f)) + '</span>'; } },
+                    { key: "status", label: t("findings.col.status"), width: "110px",
+                        render: function (f) { return '<span class="ct-badge" data-tone="' + _surfaceTone(f.status) + '">' + esc(_statusLabel(f.status)) + '</span>'; } },
+                    { key: "created_at", label: t("findings.col.datetime"), width: "130px",
+                        render: function (f) { return '<span class="ct-text-label ct-muted ct-nowrap">' + esc(f.created_at ? _fmtDate(f.created_at) : "-") + '</span>'; } }
+                ],
+                actions: [
+                    { icon: "check", label: t("status.to_fix"), onClick: "_quickTriageRow",
+                        show: function (f) { return f.status !== "to_fix"; } },
+                    { icon: "x", label: t("status.false_positive"), onClick: "_quickTriageFpRow",
+                        show: function (f) { return f.status !== "false_positive"; } }
+                ]
+            });
+        }
+        c.innerHTML = h;
+        // Attach the same bulkbar handlers used by the main Findings panel
+        // so "À corriger" / "Corrigé" / "FP" / "Supprimer" behave identically.
+        _setupFindingsBulkbar();
+        ct_bulkbar.update("surface-findings");
+    }
+    // Row click in the host-detail table: same legacy behaviour as the
+    // <tr data-click="_openFindingFromHost"> but signature adapted to
+    // ct_table which passes the row object.
+    window._openFindingRowFromHost = function (row) {
+        if (row && row.id)
+            window._openFindingFromHost(row.id);
+    };
+    window._toggleMonitoredScanner = function (s) {
+        var i = _monitoredFilterScanners.indexOf(s);
+        if (i >= 0)
+            _monitoredFilterScanners.splice(i, 1);
+        else
+            _monitoredFilterScanners.push(s);
+        renderPanel();
+    };
+    window._clearMonitoredScannerFilter = function () {
+        _monitoredFilterScanners = [];
+        renderPanel();
+    };
+    window._backToHostFromFinding = function () {
+        _hostSelectedFinding = null;
+        renderPanel();
+    };
+    // Host-detail finding triage delegates to the same shared dialog as the
+    // main Findings panel (ct_finding_view.openTriageModal → ct_measure_modal
+    // for to_fix, ct_modal for fp/new). The only difference is that after a
+    // successful triage we return to the host detail, not the findings list.
+    window._triageHostFindingDetail = function (newStatus) {
+        var f = _hostSelectedFinding;
+        if (!f)
+            return;
+        ct_finding_view.openTriageModal(f, newStatus, {
+            ownerPickerId: "surface-host-triage-owner",
+            directoryUrl: "api/directory"
+        }).then(function (payload) {
+            if (!payload)
+                return;
+            return SurfaceAPI.triageFinding(f.id, payload).then(function () {
+                showStatus(t("fd.triage_ok") || "Triage enregistré");
+                _hostSelectedFinding = null;
+                _loadAndRender();
+            }).catch(function (e) { showStatus(e.message || t("common.error"), true); });
+        });
+    };
+    // Kept for backwards compat: any stale data-click referencing the old
+    // handler still resolves to the new flow.
+    window._triageHostFinding = window._triageHostFindingDetail;
+    window._toggleHostHideFP = function () {
+        _hostHideFP = !_hostHideFP;
+        _bulkSelection = {};
+        renderPanel();
+    };
+    // Legacy handler kept so old toolbars referencing it don't error out.
+    // ct_table's bulk column now handles "select all" natively via
+    // _ctTableBulkToggleAll on the header checkbox.
+    window._toggleHostBulkAll = function () { };
+    window._openFindingFromHost = function (id) {
+        var f = _findings.find(function (x) { return x.id === id; });
+        if (!f)
+            return;
+        // Fetch full evidence (with png_b64) then render inline in host detail
+        SurfaceAPI.get("/api/findings/" + id).then(function (full) {
+            _hostSelectedFinding = full;
+            renderPanel();
+        }).catch(function () {
+            _hostSelectedFinding = f;
+            renderPanel();
+        });
+    };
+    window._scanSharesOnHost = function (hostKey) {
+        // Trigger a scan on every share hosted on this server.
+        var shares = _sharesForHost(hostKey).filter(function (s) { return s.enabled; });
+        if (!shares.length) {
+            showStatus(t("common.error"), true);
+            return;
+        }
+        showStatus(t("mon_modal.scan_in_progress"));
+        shares.forEach(function (sh) {
+            SurfaceAPI.scanMonitored(sh.id).then(function (r) {
+                _loadAndRender();
+                if (r && r.job_id)
+                    _pollScanJob(r.job_id, r.target);
+            }).catch(function () { });
+        });
+    };
+    window._scanHost = function (id) {
+        showStatus(t("mon_modal.scan_in_progress"));
+        SurfaceAPI.scanMonitored(id).then(function (r) {
+            // v0.2 — scan is now asynchronous server-side. The POST returns
+            // immediately with a job_id in "running" state. Refresh the
+            // jobs/findings lists right away so the running job is visible,
+            // then poll until the job is no longer running.
+            _loadAndRender();
+            if (r && r.job_id)
+                _pollScanJob(r.job_id, r.target);
+        }).catch(function (e) { showStatus(e.message || t("common.error"), true); });
+    };
+    // Poll a running ScanJob until it reaches completed/failed, then refresh
+    // the findings + jobs lists so the new data shows up without requiring a
+    // manual reload.
+    function _pollScanJob(jobId, target) {
+        var attempts = 0;
+        var maxAttempts = 120; // 6 minutes with 3 s interval
+        var iv = setInterval(function () {
+            attempts++;
+            SurfaceAPI.listJobs().then(function (jobs) {
+                var job = (jobs || []).find(function (j) { return j.id === jobId; });
+                if (!job || job.status === "running" || job.status === "pending") {
+                    if (attempts >= maxAttempts) {
+                        clearInterval(iv);
+                        showStatus(t("host.scan_timeout").replace("{target}", target || ""), true);
+                    }
+                    return;
+                }
+                clearInterval(iv);
+                var label = (job.status === "completed" || job.status === "partial") ? "host.scan_done" : "host.scan_failed";
+                showStatus(t(label)
+                    .replace("{target}", target || job.target)
+                    .replace("{n}", String(job.findings_count || 0)));
+                _loadAndRender();
+            }).catch(function () { });
+        }, 3000);
+    }
+    window._deleteHostFromDetail = function (id) {
+        if (!confirm(t("host.delete_confirm")))
+            return;
+        SurfaceAPI.deleteMonitored(id).then(function () {
+            showStatus(t("host.deleted"));
+            _selectedHost = null;
+            _loadAndRender();
+        }).catch(function (e) { showStatus(e.message || t("common.error"), true); });
+    };
+    // Enable/disable scanning for this asset (used by the detail button AND the
+    // card re-activate button). A plain, reversible toggle: a disabled asset stays
+    // visible (greyed) and is never scanned NOR re-enrolled/re-enabled if a later
+    // scan rediscovers it — the auto-enroll skips any value that already exists as
+    // an asset, enabled or not (see scheduler.py). It stays off until re-enabled
+    // here. Permanent blocklisting is a separate concept managed in the Surveillance
+    // "scan exclusions" panel.
+    window._toggleHostFromDetail = function (id) {
+        var a = _monitored.find(function (x) { return x.id === id; });
+        if (!a)
+            return;
+        var next = !a.enabled;
+        SurfaceAPI.updateMonitored(id, { enabled: next }).then(function () {
+            a.enabled = next;
+            if (_selectedHost && _selectedHost.id === id)
+                _selectedHost.enabled = next;
+            showStatus(next ? t("host.enabled_ok") : t("host.disabled_ok"));
+            renderPanel();
+        }).catch(function (e) { showStatus(e.message || t("common.error"), true); });
+    };
+    // ═══════════════════════════════════════════════════════════════
+    // SETTINGS PANEL — Nuclei tuning injected into the shared AI panel
+    // ═══════════════════════════════════════════════════════════════
+    // The shared panel is opened by ai_common.js's window.openSettings(). Our
+    // section is rendered via AI_APP_CONFIG.settingsExtraHTML (at the top of
+    // this file) as a placeholder div. We hook into openSettings to populate
+    // and wire up the Nuclei form AFTER the panel's innerHTML is set.
+    function _surfaceWireNucleiSection() {
+        var holder = document.getElementById("surface-nuclei-section");
+        if (!holder)
+            return;
+        SurfaceAPI.nucleiConfig().then(function (cfg) {
+            _renderNucleiFormInto(holder, cfg);
+        }).catch(function (e) {
+            holder.innerHTML = '<div class="ct-text-critical">' + esc(e.message || t("nuclei.config_error")) + '</div>';
+        });
+    }
+    // Last config received from GET /nuclei/config — used by the reset button
+    // to restore the env-var defaults without a new HTTP round-trip.
+    var _nucleiLastConfig = null;
+    function _renderNucleiFormInto(holder, cfg) {
+        _nucleiLastConfig = cfg;
+        if (!cfg || !cfg.installed) {
+            holder.innerHTML = '<div class="ct-text-critical">' + esc(t("nuclei.not_installed")) + '</div>';
+            return;
+        }
+        var tuning = cfg.tuning || {};
+        var limits = cfg.tuning_limits || {};
+        var defaults = cfg.tuning_defaults || {};
+        var last = cfg.last_update ? _fmtDate(cfg.last_update, "long") : t("nuclei.unknown");
+        function numField(key, labelKey, helpKey) {
+            var lim = limits[key] || { min: 0, max: 99999 };
+            var def = defaults[key];
+            var cur = tuning[key] != null ? tuning[key] : def;
+            return '<div class="ct-mb-2">'
+                + '<label class="ct-block ct-strong ct-text-label ct-mb-1">' + esc(t(labelKey)) + '</label>'
+                + '<input type="number" class="settings-input ct-w-full" id="nuclei-' + key + '" value="' + cur + '" min="' + lim.min + '" max="' + lim.max + '">'
+                + '<div class="ct-text-label ct-muted ct-mt-1">'
+                + esc(t(helpKey)) + ' (' + esc(t("nuclei.form.def")) + ': ' + def + ', ' + esc(t("nuclei.form.min")) + ' ' + lim.min + ', ' + esc(t("nuclei.form.max")) + ' ' + lim.max + ')'
+                + '</div>'
+                + '</div>';
+        }
+        var h = "";
+        h += '<div class="ct-bg-alt ct-bordered ct-r-sm ct-p-2 ct-mb-2">';
+        h += '<div><strong>' + esc(t("nuclei.version")) + '</strong> ' + esc(cfg.version || "?") + '</div>';
+        h += '<div><strong>' + esc(t("nuclei.templates")) + '</strong> ' + esc(String(cfg.templates_count)) + ' <span class="ct-muted">(' + esc(t("nuclei.last_update")) + ' ' + esc(last) + ')</span></div>';
+        h += '</div>';
+        h += '<div class="ct-text-label ct-muted ct-mb-2">' + esc(t("nuclei.help")) + '</div>';
+        h += numField("rate_limit", "nuclei.form.rate_limit", "nuclei.form.rate_limit_h");
+        h += numField("concurrency", "nuclei.form.concurrency", "nuclei.form.concurrency_h");
+        h += numField("bulk_size", "nuclei.form.bulk_size", "nuclei.form.bulk_size_h");
+        h += numField("timeout", "nuclei.form.timeout", "nuclei.form.timeout_h");
+        h += numField("retries", "nuclei.form.retries", "nuclei.form.retries_h");
+        h += '<div class="ct-flex ct-gap-2 ct-mt-3 ct-row-wrap">';
+        h += '<button class="ct-btn ai-btn-accept ct-flex-1" data-variant="primary" id="nuclei-save-btn" data-click="_nucleiSaveTuning">' + esc(t("nuclei.save_btn")) + '</button>';
+        h += '<button class="ct-btn ai-btn-close" id="nuclei-reset-btn" data-click="_nucleiResetTuning" title="' + esc(t("nuclei.save_btn")) + '" data-size="xs" data-icon>' + _icon("refresh", 14) + '</button>';
+        h += '</div>';
+        h += '<div style="border-top:1px solid var(--ct-line);margin:var(--ct-s3) 0;padding-top:10px">';
+        h += '<button class="ct-btn ai-btn-close ct-w-full" data-click="_nucleiUpdateTemplates" id="nuclei-update-btn">' + _icon("refresh", 14) + ' ' + esc(t("nuclei.update_btn")) + '</button>';
+        h += '<div id="nuclei-update-result" class="ct-mt-2 ct-text-label"></div>';
+        h += '</div>';
+        holder.innerHTML = h;
+    }
+    window._nucleiResetTuning = function () {
+        var defaults = (_nucleiLastConfig && _nucleiLastConfig.tuning_defaults) || {};
+        ["rate_limit", "concurrency", "bulk_size", "timeout", "retries"].forEach(function (k) {
+            var el = document.getElementById("nuclei-" + k);
+            if (el && defaults[k] != null)
+                el.value = String(defaults[k]);
+        });
+    };
+    window._nucleiSaveTuning = function () {
+        var btn = document.getElementById("nuclei-save-btn");
+        if (btn) {
+            btn.disabled = true;
+            btn.textContent = "...";
+        }
+        var payload = {};
+        ["rate_limit", "concurrency", "bulk_size", "timeout", "retries"].forEach(function (k) {
+            var el = document.getElementById("nuclei-" + k);
+            if (el && el.value !== "")
+                payload[k] = parseInt(el.value, 10);
+        });
+        SurfaceAPI.nucleiUpdateConfig(payload).then(function (r) {
+            showStatus(t("nuclei.saved"));
+            var holder = document.getElementById("surface-nuclei-section");
+            if (holder)
+                SurfaceAPI.nucleiConfig().then(function (cfg) { _renderNucleiFormInto(holder, cfg); });
+        }).catch(function (e) {
+            showStatus(e.message || t("nuclei.save_error"), true);
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = t("nuclei.save_btn");
+            }
+        });
+    };
+    window._nucleiUpdateTemplates = function () {
+        var btn = document.getElementById("nuclei-update-btn");
+        var res = document.getElementById("nuclei-update-result");
+        if (btn) {
+            btn.disabled = true;
+            btn.textContent = t("nuclei.updating");
+        }
+        if (res)
+            res.innerHTML = "";
+        SurfaceAPI.nucleiUpdateTemplates().then(function (r) {
+            if (res) {
+                res.innerHTML = '<div class="ct-text-low ct-mb-1 ct-flex ct-items-center ct-gap-1">' + _icon("check_circle", 16) + ' ' + esc(String(r.templates_count)) + ' ' + esc(t("nuclei.templates_after")) + '</div>'
+                    + (r.stdout ? '<pre style="background:var(--ct-surface);padding:var(--ct-s1);border-radius:var(--ct-r-sm);font-size:var(--ct-text-label);overflow:auto;max-height:140px">' + esc(r.stdout) + '</pre>' : '');
+            }
+            var holder = document.getElementById("surface-nuclei-section");
+            if (holder)
+                SurfaceAPI.nucleiConfig().then(function (cfg) { _renderNucleiFormInto(holder, cfg); });
+        }).catch(function (e) {
+            if (res)
+                res.innerHTML = '<div class="ct-text-critical">' + esc(e.message || t("common.error")) + '</div>';
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = "\u21bb " + t("nuclei.update_btn");
+            }
+        });
+    };
+    // Bootstrap on page load:
+    //   1. Load data and render the initial dashboard panel.
+    //   2. Wrap openSettings so that, after ai_common.js builds the shared side
+    //      panel, we populate the Nuclei section.
+    document.addEventListener("DOMContentLoaded", function () {
+        // Apply static translations now that the app i18n dicts are registered.
+        // i18n.js only auto-applies at boot when the locale is EN (or on a manual
+        // switchLang); in the default FR locale nothing applies the dictionaries,
+        // so data-i18n-html blocks (the Méthodologie / Utilisation help content,
+        // which have no baked fallback) would render empty. Apply once here so the
+        // help core content is present before any add-on doc is injected.
+        if (typeof _applyStaticTranslations === "function")
+            _applyStaticTranslations();
+        // Initial data load + render
+        if (typeof _loadAndRender === "function")
+            _loadAndRender();
+        // Hash-based deep link: Pilot opens /surface/#measures to land on
+        // the measures tab directly. Read the hash once after first render.
+        var _hashPanel = (location.hash || "").replace("#", "");
+        if (_hashPanel && typeof selectPanel === "function") {
+            setTimeout(function () { selectPanel(_hashPanel); }, 200);
+        }
+        // FEAT-13 — deep-linked measure from Pilot (?measure=MES-xxx): open the
+        // native edit modal once the measures list is loaded (shared retry loop).
+        if (typeof window.ct_handleMeasureDeepLink === "function") {
+            window.ct_handleMeasureDeepLink({ open: function (mid) {
+                    if (!_measures.some(function (m) { return m.id === mid; }))
+                        return false;
+                    if (typeof selectPanel === "function")
+                        selectPanel("measures");
+                    if (typeof window._editSurfaceMeasureRow === "function")
+                        window._editSurfaceMeasureRow({ id: mid });
+                    return true;
+                } });
+        }
+        // Settings wrapper
+        var original = window.openSettings;
+        if (typeof original === "function") {
+            window.openSettings = function () {
+                var r = original.apply(this, arguments);
+                setTimeout(_surfaceWireNucleiSection, 0);
+                setTimeout(_surfaceWireShodanSection, 0);
+                setTimeout(_surfaceWireSmtpSection, 0);
+                // Wrap the ai_common.js sections (Language, Assistant IA) in
+                // the same accordion style as our extra sections so the whole
+                // panel reads consistently.
+                setTimeout(_wrapSharedSettingsSections, 0);
+                return r;
+            };
+        }
+    });
+    // Placeholder File-menu actions (wired in toolbar; real impl coming later)
+    window.importHosts = function () { showStatus(t("feature.coming_soon")); };
+    window.exportReport = function () { showStatus(t("feature.coming_soon")); };
+    // ═══════════════════════════════════════════════════════════════
+    // SHODAN SETTINGS SECTION
+    // ═══════════════════════════════════════════════════════════════
+    // The API key is stored backend-side (AppSettings). The frontend only
+    // ever sees {configured, masked} — never the raw key. Saving pushes
+    // a new key to the server which tests it against Shodan before persisting.
+    function _surfaceWireShodanSection() {
+        var holder = document.getElementById("surface-shodan-section");
+        if (!holder)
+            return;
+        SurfaceAPI.shodanConfig().then(function (cfg) {
+            _renderShodanFormInto(holder, cfg);
+        }).catch(function (e) {
+            holder.innerHTML = '<div class="ct-text-critical">' + esc(e.message || t("common.error")) + '</div>';
+        });
+    }
+    function _renderShodanFormInto(holder, cfg) {
+        var tt = typeof t === "function" ? t : function (k) { return k; };
+        var isConfigured = cfg && cfg.configured;
+        var masked = (cfg && cfg.masked) || "";
+        var lastCheck = (cfg && cfg.last_check_at) ? _fmtDate(cfg.last_check_at, "long") : "";
+        var h = "";
+        h += '<div class="ct-text-label ct-muted ct-mb-2">' + esc(tt("shodan.help")) + '</div>';
+        if (isConfigured) {
+            h += '<div style="background:var(--ct-low-tint);border:1px solid var(--ct-low-tint);border-radius:var(--ct-r-sm);padding:var(--ct-s2);margin-bottom:var(--ct-s3)">';
+            h += '<div class="ct-flex ct-items-center ct-gap-2 ct-strong ct-text-low-ink">' + _icon("check_circle", 16) + ' ' + esc(tt("shodan.configured")) + '</div>';
+            h += '<div class="ct-mono ct-text-data ct-mt-1">' + esc(masked) + '</div>';
+            if (lastCheck) {
+                h += '<div class="ct-text-label ct-muted ct-mt-1">' + esc(tt("shodan.last_check")) + ' : ' + esc(lastCheck) + '</div>';
+            }
+            h += '</div>';
+            h += '<div class="ct-flex ct-gap-2 ct-row-wrap">';
+            h += '<button class="ct-btn ai-btn-accept" data-variant="primary" data-size="sm" id="shodan-replace-btn">' + _icon("edit", 14) + ' ' + esc(tt("shodan.replace")) + '</button>';
+            h += '<button class="ct-btn" data-variant="danger" data-size="sm" id="shodan-delete-btn">' + _icon("trash", 14) + ' ' + esc(tt("shodan.delete")) + '</button>';
+            h += '</div>';
+        }
+        else {
+            h += '<div style="background:var(--ct-medium-tint);border-left:4px solid var(--ct-medium);padding:var(--ct-s2);margin-bottom:var(--ct-s3);border-radius:0 6px 6px 0;font-size:var(--ct-text-label);color:var(--ct-high-ink)">';
+            h += '<strong>' + esc(tt("shodan.warning_title")) + '</strong> ' + esc(tt("shodan.warning_body"));
+            h += '</div>';
+            _renderShodanKeyInput(h, holder, tt);
+            return;
+        }
+        h += '<div id="shodan-input-area" class="ct-mt-3 ct-hidden"></div>';
+        holder.innerHTML = h;
+        document.getElementById("shodan-replace-btn").onclick = function () {
+            var area = document.getElementById("shodan-input-area");
+            area.style.display = "";
+            area.innerHTML = _shodanInputMarkup(tt);
+            _wireShodanInputHandlers();
+            var inp = document.getElementById("shodan-key-input");
+            if (inp)
+                inp.focus();
+        };
+        document.getElementById("shodan-delete-btn").onclick = function () {
+            if (!confirm(tt("shodan.delete_confirm")))
+                return;
+            SurfaceAPI.shodanDeleteKey().then(function (r) {
+                showStatus(tt("shodan.deleted"));
+                _surfaceWireShodanSection();
+            }).catch(function (e) { showStatus(e.message || t("common.error"), true); });
+        };
+    }
+    function _shodanInputMarkup(tt) {
+        return '<div class="ct-field">' +
+            '<label class="surface-field-lbl">' + esc(tt("shodan.key_label")) + '</label>' +
+            '<input type="password" class="settings-input ct-w-full ct-mono" id="shodan-key-input" autocomplete="off" spellcheck="false">' +
+            '<div class="ct-text-label ct-muted ct-mt-1">' + esc(tt("shodan.key_help")) + '</div>' +
+            '</div>' +
+            '<div class="ct-flex ct-gap-2 ct-mt-2">' +
+            '<button class="ct-btn ai-btn-accept ct-flex-1" data-variant="primary" id="shodan-save-btn">' + _icon("check", 14) + ' ' + esc(tt("shodan.save")) + '</button>' +
+            '<button class="ct-btn ai-btn-close" id="shodan-cancel-btn">' + _icon("x", 14) + ' ' + esc(tt("action.cancel")) + '</button>' +
+            '</div>' +
+            '<div id="shodan-save-result" class="ct-mt-2 ct-text-label"></div>';
+    }
+    function _renderShodanKeyInput(hPrefix, holder, tt) {
+        var h = hPrefix;
+        h += _shodanInputMarkup(tt);
+        holder.innerHTML = h;
+        _wireShodanInputHandlers();
+        setTimeout(function () {
+            var inp = document.getElementById("shodan-key-input");
+            if (inp)
+                inp.focus();
+        }, 50);
+    }
+    function _wireShodanInputHandlers() {
+        var saveBtn = document.getElementById("shodan-save-btn");
+        var cancelBtn = document.getElementById("shodan-cancel-btn");
+        if (saveBtn)
+            saveBtn.onclick = _shodanSaveKey;
+        if (cancelBtn)
+            cancelBtn.onclick = _surfaceWireShodanSection;
+        var inp = document.getElementById("shodan-key-input");
+        if (inp)
+            inp.onkeydown = function (e) {
+                if (e.key === "Enter") {
+                    e.preventDefault();
+                    _shodanSaveKey();
+                }
+            };
+    }
+    function _shodanSaveKey() {
+        var inp = document.getElementById("shodan-key-input");
+        if (!inp)
+            return;
+        var key = (inp.value || "").trim();
+        var saveBtn = document.getElementById("shodan-save-btn");
+        var res = document.getElementById("shodan-save-result");
+        if (!key) {
+            if (res)
+                res.innerHTML = '<div class="ct-text-critical">' + esc(t("shodan.key_required")) + '</div>';
+            return;
+        }
+        if (saveBtn) {
+            saveBtn.disabled = true;
+            saveBtn.textContent = "...";
+        }
+        if (res)
+            res.innerHTML = '<div class="ct-muted">' + esc(t("shodan.testing")) + '</div>';
+        SurfaceAPI.shodanSaveKey(key).then(function (r) {
+            showStatus(t("shodan.saved"));
+            _surfaceWireShodanSection();
+        }).catch(function (e) {
+            if (res)
+                res.innerHTML = '<div class="ct-text-critical">' + esc(e.message || t("common.error")) + '</div>';
+            if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.textContent = t("shodan.save");
+            }
+        });
+    }
+    // Convert each top-level .settings-section produced by ai_common.js
+    // (Language, Assistant IA, Demo when visible) into a <details> accordion
+    // matching the style we use for our own extra sections. Collapsed by
+    // default so the panel opens clean.
+    function _wrapSharedSettingsSections() {
+        // ai_common.js creates <div class="ai-panel"> with a nested
+        // .ai-panel-body where the HTML ends up. Both are CLASSES, not ids.
+        var panel = document.querySelector(".ai-panel .ai-panel-body");
+        if (!panel)
+            return;
+        var sections = panel.querySelectorAll(".settings-section");
+        sections.forEach(function (sec) {
+            // Skip sections already wrapped or placed inside our extra wrap
+            if (sec.dataset.surfaceWrapped === "1")
+                return;
+            if (sec.closest(".surface-settings-wrap"))
+                return;
+            var labelEl = sec.querySelector(".settings-label");
+            if (!labelEl)
+                return;
+            var title = labelEl.textContent.trim();
+            var details = document.createElement("details");
+            details.className = "surface-settings-accordion";
+            details.setAttribute("name", "surface-settings"); // exclusive accordion
+            // Collapsed by default per the UX request.
+            var summary = document.createElement("summary");
+            summary.className = "surface-settings-summary";
+            summary.innerHTML = '<span class="surface-settings-chevron">▸</span><span>' + esc(title) + '</span>';
+            details.appendChild(summary);
+            // Move the rest of the section content (without the original
+            // label) inside a body div
+            labelEl.remove();
+            var body = document.createElement("div");
+            body.className = "surface-settings-body";
+            while (sec.firstChild)
+                body.appendChild(sec.firstChild);
+            details.appendChild(body);
+            sec.replaceWith(details);
+            details.dataset.surfaceWrapped = "1";
+        });
+    }
+    // ═══════════════════════════════════════════════════════════════
+    // SMTP / EMAIL DIGEST SETTINGS SECTION
+    // ═══════════════════════════════════════════════════════════════
+    function _surfaceWireSmtpSection() {
+        var holder = document.getElementById("surface-smtp-section");
+        if (!holder)
+            return;
+        SurfaceAPI.smtpConfig().then(function (cfg) {
+            _renderSmtpFormInto(holder, cfg || {});
+        }).catch(function () {
+            holder.innerHTML = '<div class="surface-settings-muted">' + esc(t("smtp.load_error")) + '</div>';
+        });
+    }
+    function _renderSmtpFormInto(holder, cfg) {
+        var h = '';
+        // Suite : la config SERVEUR (hôte/auth/expéditeur) est centralisée dans
+        // Pilot et poussée au module — seuls les destinataires se règlent ici.
+        if (cfg.managed) {
+            h += '<div class="surface-settings-help">' + esc(t("smtp.managed_notice")) + '</div>';
+            h += '<div class="surface-settings-grid">';
+            h += '<label class="surface-settings-label">' + esc(t("smtp.host")) + '</label>';
+            h += '<div class="surface-settings-muted">' + (cfg.host ? esc(cfg.host) + (cfg.port ? ":" + esc(String(cfg.port)) : "") : esc(t("smtp.not_configured"))) + '</div>';
+            h += '<label class="surface-settings-label">' + esc(t("smtp.recipients")) + '</label>';
+            h += '<input type="text" id="surface-smtp-rcpt" class="surface-settings-input" placeholder="ciso@example.com, soc@example.com" value="' + esc(cfg.recipients || "") + '">';
+            h += '</div>';
+            h += '<div class="ct-flex ct-gap-2 ct-mt-2">';
+            h += '<button class="ct-btn mt-8" data-write data-variant="primary" data-click="_saveSmtpRecipients">' + esc(t("smtp.save")) + '</button>';
+            h += '<button class="ct-btn mt-8" data-write data-click="_sendSmtpDigestNow">' + esc(t("smtp.send_now")) + '</button>';
+            h += '</div>';
+            holder.innerHTML = h;
+            return;
+        }
+        h += '<div class="surface-settings-help">' + esc(t("smtp.help")) + '</div>';
+        h += '<div class="surface-settings-grid">';
+        h += '<label class="surface-settings-label">' + esc(t("smtp.host")) + '</label>';
+        h += '<input type="text" id="surface-smtp-host" class="surface-settings-input" placeholder="smtp.example.com" value="' + esc(cfg.host || "") + '">';
+        h += '<label class="surface-settings-label">' + esc(t("smtp.port")) + '</label>';
+        h += '<input type="number" id="surface-smtp-port" class="surface-settings-input" value="' + esc(String(cfg.port || 587)) + '">';
+        h += '<label class="surface-settings-label">' + esc(t("smtp.user")) + '</label>';
+        h += '<input type="text" id="surface-smtp-user" class="surface-settings-input" value="' + esc(cfg.username || "") + '">';
+        h += '<label class="surface-settings-label">' + esc(t("smtp.password")) + '</label>';
+        var ph = cfg.password_set ? "•••••••• (" + t("smtp.already_set") + ")" : t("smtp.password_ph");
+        h += '<input type="password" id="surface-smtp-pass" class="surface-settings-input" placeholder="' + esc(ph) + '">';
+        h += '<label class="surface-settings-label">' + esc(t("smtp.sender")) + '</label>';
+        h += '<input type="email" id="surface-smtp-sender" class="surface-settings-input" placeholder="surface@example.com" value="' + esc(cfg.sender || "") + '">';
+        h += '<label class="surface-settings-label">' + esc(t("smtp.recipients")) + '</label>';
+        h += '<input type="text" id="surface-smtp-rcpt" class="surface-settings-input" placeholder="ciso@example.com, soc@example.com" value="' + esc(cfg.recipients || "") + '">';
+        h += '</div>';
+        h += '<label class="surface-settings-check"><input type="checkbox" id="surface-smtp-tls"' + (cfg.use_tls !== false ? " checked" : "") + '> ' + esc(t("smtp.use_tls")) + '</label>';
+        h += '<div class="ct-flex ct-gap-2 ct-mt-2">';
+        h += '<button class="ct-btn mt-8" data-write data-variant="primary" data-click="_saveSmtpConfig">' + esc(t("smtp.save")) + '</button>';
+        h += '<button class="ct-btn mt-8" data-write data-click="_sendSmtpDigestNow">' + esc(t("smtp.send_now")) + '</button>';
+        h += '</div>';
+        holder.innerHTML = h;
+    }
+    window._saveSmtpRecipients = function () {
+        var body = {
+            recipients: (document.getElementById("surface-smtp-rcpt") || {}).value || "",
+        };
+        SurfaceAPI.smtpSetConfig(body).then(function () {
+            showStatus(t("smtp.saved"));
+        }).catch(function (e) { showStatus(e.message || String(e), true); });
+    };
+    window._saveSmtpConfig = function () {
+        var body = {
+            host: (document.getElementById("surface-smtp-host") || {}).value || "",
+            port: parseInt((document.getElementById("surface-smtp-port") || {}).value || "587", 10),
+            username: (document.getElementById("surface-smtp-user") || {}).value || "",
+            password: (document.getElementById("surface-smtp-pass") || {}).value || "",
+            sender: (document.getElementById("surface-smtp-sender") || {}).value || "",
+            recipients: (document.getElementById("surface-smtp-rcpt") || {}).value || "",
+            use_tls: !!(document.getElementById("surface-smtp-tls") || {}).checked,
+        };
+        SurfaceAPI.smtpSetConfig(body).then(function () {
+            showStatus(t("smtp.saved"));
+            _surfaceWireSmtpSection();
+        }).catch(function (e) { showStatus(e.message || t("common.error"), true); });
+    };
+    window._sendSmtpDigestNow = function () {
+        showStatus(t("smtp.sending"));
+        SurfaceAPI.sendEmailDigest().then(function (r) {
+            // Confirmation bloquante : le toast de 3 s se rate (retour utilisateur),
+            // et un envoi mail mérite un accusé explicite.
+            alert(t("smtp.sent_confirm").replace("{recipients}", (r.recipients || []).join(", ")));
+        }).catch(function (e) { alert(t("smtp.send_failed").replace("{msg}", e.message || String(e))); });
+    };
+})();
+// FEAT-35 — préférences de notification (modale partagée ct_notifprefs)
+window._openNotifPrefs = function () {
+    if (!window.ct_notifprefs)
+        return;
+    var isAdmin = !!(window._currentUser && window._currentUser.role === "admin");
+    var cfg = (window.CT_CONFIG || {});
+    var mods = cfg.modules ? cfg.modules.map(function (m) { return m.id; })
+        : (cfg.deployed && cfg.deployed.length ? cfg.deployed : null);
+    window.ct_notifprefs.open({
+        fetchPrefs: function () { return SurfaceAPI.get("/me/notification-prefs"); },
+        savePrefs: function (prefs) { return SurfaceAPI.put("/me/notification-prefs", prefs); },
+        sendTest: function () { return SurfaceAPI.post("/me/notification-prefs/test"); },
+        isAdmin: isAdmin,
+        modules: mods
+    });
+};

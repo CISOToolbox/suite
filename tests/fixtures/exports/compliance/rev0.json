@@ -1,0 +1,12 @@
+{
+ "meta": {
+  "tool": "compliance",
+  "societe": "Fixture"
+ },
+ "controls": [
+  {
+   "id": "C1",
+   "statut": "conforme"
+  }
+ ]
+}

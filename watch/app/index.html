@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Watch - CISO Toolbox</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="stylesheet" href="css/cisotoolbox.css">
+<link rel="stylesheet" href="css/Watch.css">
+</head>
+<body>
+
+<div class="ct-app">
+<header class="ct-appbar">
+    <button class="btn-hamburger" data-click="_toggleSidebarMobile">&#9776;</button>
+    <span class="ct-modulepicker" role="img" aria-label="Watch"><span data-i18n="module.watch">Watch</span></span>
+    <span class="ct-appbar-sep"></span>
+    <nav class="ct-appbar-context" aria-label="Contexte"><span class="ct-muted" id="header-subtitle"></span></nav>
+    <span class="ct-spacer"></span>
+    <span class="ct-appbar-saved" id="status-msg"></span>
+    <div class="ct-appbar-actions">
+        <button class="ct-iconaction" data-click="ct_toggleLang" data-icon="globe" aria-label="Langue" title="Langue FR / EN"></button>
+        <button class="ct-iconaction" data-click="ct_toggleTheme" data-icon="moon" aria-label="Thème" title="Thème clair / sombre"></button>
+        <span class="toolbar-right" id="toolbar-right"></span>
+    </div>
+</header>
+
+<div class="ct-body">
+<nav class="ct-rail" id="sidebar" aria-label="Navigation du module">
+  <div class="ct-rail-scroll">
+    <div class="ct-rail-section">
+      <button class="ct-rail-group" aria-expanded="true" data-click="ct_toggleRailGroup" data-pass-el>
+        <span class="ct-icon-btn-slot" data-icon="chevron-right"></span><span>WATCH</span>
+      </button>
+      <button class="ct-rail-item" aria-current="page" data-click="selectPanel" data-args='["dashboard"]'><span class="ct-rail-item-label" data-i18n="nav.dashboard">Tableau de bord</span></button>
+      <button class="ct-rail-item" data-click="selectPanel" data-args='["scopes"]'><span class="ct-rail-item-label" data-i18n="nav.scopes">Mes périmètres</span></button>
+      <button class="ct-rail-item" data-click="selectPanel" data-args='["alerts"]'><span class="ct-rail-item-label" data-i18n="nav.alerts">Alertes</span></button>
+      <button class="ct-rail-item" data-click="selectPanel" data-args='["digest"]'><span class="ct-rail-item-label" data-i18n="nav.digest">Digest quotidien</span></button>
+    </div>
+    <div class="ct-rail-section admin-only">
+      <button class="ct-rail-group" aria-expanded="true" data-click="ct_toggleRailGroup" data-pass-el>
+        <span class="ct-icon-btn-slot" data-icon="chevron-right"></span><span data-i18n="nav.admin_section">ADMINISTRATION</span>
+      </button>
+      <button class="ct-rail-item" data-click="selectPanel" data-args='["sources"]'><span class="ct-rail-item-label" data-i18n="nav.sources">Sources de veille</span></button>
+      <button class="ct-rail-item" data-click="selectPanel" data-args='["audit"]'><span class="ct-rail-item-label" data-i18n="nav.audit">Journal d'audit</span></button>
+    </div>
+    <div class="ct-rail-section">
+      <button class="ct-rail-group" aria-expanded="true" data-click="ct_toggleRailGroup" data-pass-el>
+        <span class="ct-icon-btn-slot" data-icon="chevron-right"></span><span data-i18n="watch.sidebar.section_aide">Aide</span>
+      </button>
+      <button class="ct-rail-item" data-click="toggleHelp" data-args='["methodo"]'><span class="ct-rail-item-label" data-i18n="watch.sidebar.methodo">Méthodologie</span></button>
+      <button class="ct-rail-item" data-click="toggleHelp" data-args='["usage"]'><span class="ct-rail-item-label" data-i18n="watch.sidebar.usage">Utilisation</span></button>
+    </div>
+  </div>
+
+  <div class="ct-rail-foot">
+    <a href="https://www.cisotoolbox.org" target="_blank" rel="noopener noreferrer" class="sidebar-brand">cisotoolbox.org</a>
+  </div>
+</nav>
+
+<main class="ct-content" id="content"></main>
+</div>
+</div>
+
+
+<!-- Panel d'aide -->
+<div class="help-overlay" id="help-overlay" data-click-self="toggleHelp">
+<div class="help-panel">
+<button class="close-help" data-click="toggleHelp">&times;</button>
+
+<div class="help-tabs">
+    <div class="help-tab active" id="help-tab-methodo" data-click="switchHelpTab" data-args='["methodo"]' data-i18n="watch.help.tab_methodo">Méthodologie de veille</div>
+    <div class="help-tab" id="help-tab-usage" data-click="switchHelpTab" data-args='["usage"]' data-i18n="watch.help.tab_usage">Utilisation de l'application</div>
+</div>
+
+<div class="help-content" id="help-content-methodo" data-i18n-html="watch.help.methodo"></div>
+<div class="help-content ct-hidden" id="help-content-usage" data-i18n-html="watch.help.usage"></div>
+
+</div>
+</div>
+
+<script src="js/i18n.js"></script>
+<script src="js/i18n_core_en.js"></script>
+<script src="js/i18n_core_fr.js"></script>
+<script src="js/cisotoolbox.js"></script>
+<script src="js/ct_modules.js"></script>
+<script src="js/ct_audit.js"></script>
+<script src="js/cisotoolbox_backend.js"></script>
+<script src="js/ct_modal.js"></script>
+<script src="js/ct_userpicker.js"></script>
+<script src="js/ct_table.js"></script>
+<script src="js/ct_bulkbar.js"></script>
+<script src="js/Watch_i18n_fr.js"></script>
+<script src="js/Watch_i18n_en.js"></script>
+<script src="js/watch_api.js"></script>
+<script src="js/Watch_app.js"></script>
+<script src="js/ai_common.js"></script>
+<script src="js/ct_settings.js"></script>
+<script src="js/ai_backend.js"></script>
+</body>
+</html>

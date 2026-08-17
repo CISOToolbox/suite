@@ -1,0 +1,513 @@
+/* Sur une teinte, l'encre est le grade -ink du MÊME ton. La couleur de base y
+   passe de justesse ou échoue selon le ton — medium tombe à 4,49:1 en clair — et
+   l'écart ne se voit qu'à la mesure. Règle uniforme plutôt que cas par cas. */
+.pilot-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin-bottom: 24px; }
+.pilot-card { background: var(--ct-surface); border: 1px solid var(--ct-line); border-radius: 10px; padding: 20px; transition: box-shadow 0.2s; }
+.pilot-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+.pilot-card-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.pilot-card-icon { font-size: 1.5em; }
+.pilot-card-title { font-weight: 700; font-size: 1em; }
+.pilot-card-status { font-size: 0.75em; padding: 2px 8px; border-radius: 10px; }
+.pilot-card-status.active { background: var(--ct-low-tint); color: var(--ct-low-ink); }
+.pilot-card-status.unreachable { background: var(--ct-critical-tint); color: var(--ct-critical-ink); }
+.pilot-card-status.external { background: var(--ct-info-tint); color: var(--ct-info-ink); }
+.pilot-card-status.error { background: var(--ct-medium-tint); color: var(--ct-medium-ink); }
+
+.pilot-card-link { display: inline-block; margin-top: 12px; font-size: 0.85em; color: var(--ct-accent); text-decoration: none; font-weight: 600; }
+.pilot-card-link:hover { text-decoration: underline; }
+
+.pilot-stat { background: var(--ct-surface); border: 1px solid var(--ct-line); border-radius: 8px; padding: 16px; text-align: center; }
+.pilot-stat-value { font-size: 1.8em; font-weight: 700; color: var(--ct-ink); }
+.pilot-stat-label { font-size: 0.78em; color: var(--ct-ink-2); margin-top: 4px; }
+.pilot-stat-value.warning { color: var(--ct-high); }
+.pilot-stat-value.critical { color: var(--ct-critical); }
+
+
+
+.pilot-actions { display: flex; gap: 8px; margin-bottom: 16px; }
+/* .pilot-btn supprimé — migré vers le système .btn/.btn-primary standard. */
+
+.pilot-label { display: block; font-size: 0.78em; font-weight: 600; color: var(--ct-ink-2); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.3px; }
+
+/* ═══════════════════════════════════════════════════════════════
+   Dashboard v2 — CISO posture cockpit
+   See shared/docs/pilot-dashboard-contract.md for data contract.
+   ═══════════════════════════════════════════════════════════════ */
+
+.dash-section-title { margin: 28px 0 14px; font-size: 1.05em; font-weight: 700; color: var(--ct-ink); }
+
+/* ── KPI row ─────────────────────────────────────────────────── */
+/* Dashboard KPI tiles migrated to the shared .ct-kpi socle component
+   (see Pilot_app.ts _renderDashboard). Only two local helpers remain:
+   .dash-kpi-empty (also used by the activity feed) and .dash-kpi-gauge,
+   the minimal wrapper that centres the posture gauge SVG inside .ct-kpi. */
+.dash-kpi-empty { color: var(--ct-ink-2); font-size: 0.85em; font-style: italic; margin-top: 8px; }
+.dash-kpi-gauge { display: flex; justify-content: center; margin-top: 6px; }
+
+.dash-upcoming { list-style: none; padding: 0; margin: 6px 0 0; font-size: 0.82em; }
+.dash-upcoming li { display: flex; align-items: baseline; gap: 10px; padding: 4px 0; border-bottom: 1px dashed var(--ct-line); }
+.dash-upcoming li:last-child { border-bottom: none; }
+.dash-upcoming-days { flex-shrink: 0; min-width: 70px; font-weight: 700; color: var(--ct-ink-2); }
+.dash-upcoming-soon .dash-upcoming-days { color: var(--ct-critical); }
+
+/* ── Module grid ─────────────────────────────────────────────── */
+.dash-modules {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 16px;
+}
+.dash-module-card {
+    background: var(--ct-surface);
+    border: 1px solid var(--ct-line);
+    border-radius: 12px;
+    padding: 18px 20px;
+    display: flex;
+    flex-direction: column;
+    transition: box-shadow 0.2s, border-color 0.2s;
+}
+.dash-module-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); border-color: var(--ct-accent); }
+.dash-module-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.dash-module-name { font-weight: 700; font-size: 1em; flex: 1; }
+.dash-module-legend { font-size: 0.82em; color: var(--ct-ink-2); text-align: center; margin-bottom: 6px; }
+.dash-module-legend strong { color: var(--ct-ink); font-size: 1.15em; }
+.dash-module-viz { display: flex; justify-content: center; align-items: center; flex: 1; }
+.dash-module-empty { color: var(--ct-ink-2); font-size: 0.85em; text-align: center; padding: 30px 10px; font-style: italic; flex: 1; }
+/* Footer block: alerts + measures pushed to the bottom of every card */
+.dash-module-footer { margin-top: auto; }
+.dash-module-alerts { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+.dash-alert { font-size: 0.78em; padding: 4px 10px; border-radius: 4px; display: flex; align-items: center; gap: 6px; }
+.dash-alert--critical { background: var(--ct-critical-tint); color: var(--ct-critical-ink); }
+.dash-alert--warning { background: var(--ct-medium-tint); color: var(--ct-medium-ink); }
+.dash-alert--info { background: var(--ct-info-tint); color: var(--ct-info-ink); }
+.dash-module-measures { padding-top: 10px; border-top: 1px solid var(--ct-line); }
+.dash-measures-label { font-size: 0.72em; color: var(--ct-ink-2); margin-bottom: 4px; }
+.dash-measures-none { font-style: italic; }
+.dash-measures-bar { height: 6px; background: var(--ct-canvas); border-radius: 3px; overflow: hidden; }
+.dash-measures-fill { height: 100%; background: var(--ct-accent); border-radius: 3px; transition: width 0.3s; }
+
+/* ── SVG helpers used by the cards ──────────────────────────── */
+.ct-donut-wrap { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.ct-donut-legend { display: flex; flex-wrap: wrap; gap: 4px 10px; justify-content: center; font-size: 0.72em; color: var(--ct-ink-2); }
+.ct-donut-legend-item { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+.ct-donut-dot { width: 8px; height: 8px; border-radius: 2px; display: inline-block; flex-shrink: 0; }
+/* .ct-empty n'est plus redéfini ici : il est émis par les composants partagés
+   (ct_table, cisotoolbox) et le socle en fait une colonne centrée icône / titre /
+   texte. L'override local le réduisait à une ligne italique — dans Pilot seulement.
+   L'état vide y prend désormais la même forme que dans les neuf autres modules. */
+
+/* ── Activity feed ───────────────────────────────────────────── */
+.dash-activity {
+    background: var(--ct-surface);
+    border: 1px solid var(--ct-line);
+    border-radius: 12px;
+    padding: 18px 20px;
+}
+.dash-activity-list { list-style: none; padding: 0; margin: 0; }
+.dash-activity-list li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px dashed var(--ct-line);
+    font-size: 0.85em;
+}
+.dash-activity-list li:last-child { border-bottom: none; }
+.dash-activity-label { flex: 1; }
+.dash-activity-date { color: var(--ct-ink-2); font-size: 0.78em; font-variant-numeric: tabular-nums; }
+
+/* ── Directory personnel edit modal (ported from vendor TPRM.css) ─── */
+.form-grid > .form-row { margin-bottom: 0; }
+
+/* ── Measures view toggle (Liste / Kanban) ─────────────────────────── */
+.pilot-view-btn {
+    padding: 4px 12px; font-size: 0.82em; border: 1px solid var(--ct-line);
+    background: var(--ct-surface); color: var(--ct-ink-2);
+    cursor: pointer; border-radius: 0;
+}
+.pilot-view-btn:first-of-type { border-radius: 4px 0 0 4px; }
+.pilot-view-btn:last-of-type { border-radius: 0 4px 4px 0; border-left: 0; }
+.pilot-view-btn.active {
+    background: var(--ct-accent); color: var(--ct-onaccent);
+    border-color: var(--ct-accent);
+}
+.pilot-view-btn:hover:not(.active) { background: var(--ct-surface-2); }
+
+/* ── Measures Kanban board ─────────────────────────────────────────── */
+.pilot-kanban {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+    margin-top: 8px;
+}
+.pilot-kanban-col {
+    background: var(--ct-surface-2); border: 1px solid var(--ct-line); border-radius: 6px;
+    padding: 8px; display: flex; flex-direction: column; min-height: 220px;
+}
+.pilot-kanban-col-head {
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 0.82em; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.3px; padding: 4px 6px; margin-bottom: 8px;
+    border-bottom: 2px solid;
+}
+.pilot-kanban-col-head.planned { color: var(--ct-ink-2); border-color: var(--ct-ink-3); }
+.pilot-kanban-col-head.in_progress { color: var(--ct-info); border-color: var(--ct-info); }
+.pilot-kanban-col-head.completed { color: var(--ct-low-ink); border-color: var(--ct-low); }
+.pilot-kanban-col-head.backlog { color: var(--ct-medium-ink); border-color: var(--ct-high); }
+.pilot-kanban-col-count {
+    background: var(--ct-neutral-tint); color: inherit; padding: 1px 8px;
+    border-radius: 10px; font-size: 0.78em; font-weight: 600;
+}
+.pilot-kanban-col-body {
+    display: flex; flex-direction: column; gap: 6px; flex: 1; min-height: 60px;
+    padding: 4px; border-radius: 4px;
+    transition: background 0.15s, outline 0.15s;
+}
+.pilot-kanban-col-body.drop-target {
+    background: var(--ct-info-tint);
+    outline: 2px dashed var(--ct-accent);
+    outline-offset: -2px;
+}
+.pilot-kanban-card {
+    background:var(--ct-surface); border: 1px solid var(--ct-line); border-radius: 5px;
+    padding: 8px 10px; font-size: 0.85em; cursor: grab; user-select: none;
+    transition: box-shadow 0.15s;
+    display: flex; flex-direction: column; gap: 4px;
+}
+.pilot-kanban-card:hover { box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
+.pilot-kanban-card.dragging { opacity: 0.4; cursor: grabbing; }
+.pilot-kanban-card.overdue { border-left: 3px solid var(--ct-critical); }
+.pilot-kanban-card-top {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 6px; font-size: 0.72em; color: var(--ct-ink-2);
+}
+.pilot-kanban-card-ref { font-variant-numeric: tabular-nums; font-size: 0.95em; }
+.pilot-kanban-card-title { font-weight: 500; color: var(--ct-ink); line-height: 1.3; }
+.pilot-kanban-card-entity {
+    font-size: 0.78em; color: var(--ct-ink-2);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pilot-kanban-card-foot {
+    display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+    font-size: 0.75em; color: var(--ct-ink-2); margin-top: 2px;
+}
+.pilot-kanban-card-due { font-variant-numeric: tabular-nums; }
+.pilot-kanban-card-due.overdue { color: var(--ct-critical); font-weight: 600; }
+.pilot-kanban-card-assignee {
+    font-size: 0.72em; color: var(--ct-ink-2); font-style: italic;
+}
+.pilot-kanban-empty {
+    color: var(--ct-ink-2); font-size: 0.8em; text-align: center;
+    padding: 16px 4px; opacity: 0.5;
+}
+@media (max-width: 1024px) {
+    .pilot-kanban { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * KPI panel — catalogue grid, cards, framework badges
+ * ───────────────────────────────────────────────────────────────────────── */
+.kpi-toolbar {
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    margin: 0 0 12px 0;
+}
+.kpi-toolbar select { font-size: 0.85em; }
+
+.kpi-cat-title {
+    font-size: 1.05em; font-weight: 600; color: var(--ct-ink);
+    margin: 0 0 8px 0; padding-bottom: 4px;
+    border-bottom: 1px solid var(--ct-line);
+}
+
+.kpi-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 12px;
+}
+/* La tuile KPI est migrée sur la primitive socle .ct-kpi-adv (liseré de ton,
+   valeur encrée, statut, seuils). Les sous-classes .kpi-card-* ci-dessous
+   restent utilisées par la vue détail (_renderDetailBody). */
+
+.kpi-card-src {
+    padding: 1px 6px; border-radius: 3px;
+    font-size: 0.72em; font-weight: 600; letter-spacing: 0.5px;
+}
+.kpi-card-src--auto { background: var(--ct-info-tint); color: var(--ct-info-ink); }
+.kpi-card-src--ext  { background: var(--ct-medium-tint); color: var(--ct-medium-ink); }
+
+.kpi-card-value {
+    font-size: 1.6em; font-weight: 700; font-variant-numeric: tabular-nums;
+    margin: 4px 0 2px 0;
+}
+.kpi-card-value--green { color: var(--ct-low); }
+.kpi-card-value--amber { color: var(--ct-high); }
+.kpi-card-value--red   { color: var(--ct-critical); }
+.kpi-card-value--grey  { color: var(--ct-ink-2); }
+
+.kpi-card-meta {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    font-size: 0.74em; color: var(--ct-ink-2);
+    font-variant-numeric: tabular-nums;
+}
+.kpi-card-meta-amber { color: var(--ct-high); }
+.kpi-card-meta-red   { color: var(--ct-critical); }
+
+/* Modificateur de .ct-badge : chip rectangulaire compacte. Le fond et l'encre
+   viennent du ton, cette regle ne garde que la forme. */
+.kpi-fw-badge { font-size: 0.68em; padding: 1px 5px; border-radius: 3px; white-space: nowrap; }
+
+.kpi-history-table { width: 100%; font-size: 0.85em; margin-top: 8px; }
+.kpi-history-table th, .kpi-history-table td {
+    padding: 4px 8px; border-bottom: 1px solid var(--ct-line);
+    text-align: left;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * KPI panel — synthetic overview, detail modal, framework management
+ * ───────────────────────────────────────────────────────────────────────── */
+
+/* Overview: top row (donut + stats) above a full-width row of NIST CSF function columns */
+.kpi-overview {
+    display: flex; flex-direction: column; gap: 16px;
+    padding: 14px; margin: 0 0 18px 0;
+    border: 1px solid var(--ct-line); border-radius: 8px;
+    background: var(--ct-surface);
+}
+.kpi-overview-top {
+    display: grid; grid-template-columns: 220px 1fr; gap: 20px;
+    align-items: center;
+}
+.kpi-overview-donut { display: flex; align-items: center; justify-content: center; }
+.kpi-overview-stats { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.kpi-overview-headline {
+    font-size: 1.05em; font-weight: 600; color: var(--ct-ink);
+    display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+}
+.kpi-overview-score {
+    font-size: 0.85em; font-weight: 500; color: var(--ct-ink-2);
+    font-variant-numeric: tabular-nums;
+}
+.kpi-overview-stat-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.kpi-stat {
+    font-size: 0.78em; padding: 3px 9px; border-radius: 12px;
+    border: 1px solid var(--ct-line); background: var(--ct-surface-2); color: var(--ct-ink);
+    font-variant-numeric: tabular-nums;
+}
+.kpi-stat--green { background: var(--ct-low-tint); color: var(--ct-low-ink); border-color: var(--ct-low-tint); }
+.kpi-stat--amber { background: var(--ct-medium-tint); color: var(--ct-medium-ink); border-color: var(--ct-medium-tint); }
+.kpi-stat--red   { background: var(--ct-critical-tint); color: var(--ct-critical-ink); border-color: var(--ct-critical-tint); }
+.kpi-stat--grey  { background: var(--ct-surface-2); color: var(--ct-ink-2); border-color: var(--ct-surface-2); }
+
+/* Full-width row of NIST CSF function columns under the donut/stats */
+.kpi-overview-cats {
+    display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px;
+    padding-top: 12px; border-top: 1px solid var(--ct-line);
+}
+.kpi-overview-cat {
+    display: flex; flex-direction: column; gap: 6px;
+    padding: 8px; min-width: 0;
+    border: 1px solid var(--ct-line); border-radius: 6px;
+    background: var(--ct-surface-2);
+}
+.kpi-overview-cat-label {
+    color: var(--ct-ink); font-weight: 600; font-size: 0.82em;
+    display: flex; align-items: baseline; justify-content: space-between; gap: 6px;
+}
+.kpi-overview-cat-count {
+    color: var(--ct-ink-2); font-variant-numeric: tabular-nums;
+    font-size: 0.78em; font-weight: 500;
+}
+.kpi-overview-cat-strip {
+    display: flex; flex-wrap: wrap; gap: 4px; min-height: 18px;
+}
+.kpi-overview-cat-empty {
+    color: var(--ct-ink-2); font-size: 0.8em; font-style: italic;
+}
+@media (max-width: 1024px) {
+    .kpi-overview-cats { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 480px) {
+    .kpi-overview-cats { grid-template-columns: repeat(2, 1fr); }
+    .kpi-overview-top { grid-template-columns: 1fr; }
+}
+.kpi-light {
+    width: 14px; height: 14px; border-radius: 50%;
+    border: 1px solid rgba(0,0,0,0.1);
+    cursor: pointer; transition: transform 0.1s ease, box-shadow 0.1s ease;
+    display: inline-block;
+}
+.kpi-light:hover { transform: scale(1.25); box-shadow: var(--ct-focus-soft); }
+.kpi-light--green { background: var(--ct-low); }
+.kpi-light--amber { background: var(--ct-high); }
+.kpi-light--red   { background: var(--ct-critical); }
+.kpi-light--grey  { background: var(--ct-ink-3); }
+.kpi-light--empty { background: var(--ct-surface-2); cursor: default; }
+.kpi-light--empty:hover { transform: none; box-shadow: none; }
+
+/* Pills on cards (source, category, inactive flag) */
+.kpi-card-pill {
+    font-size: 0.7em; padding: 1px 6px; border-radius: 10px;
+    background: var(--ct-surface-2); color: var(--ct-ink-1); border: 1px solid var(--ct-surface-2);
+    letter-spacing: 0.3px;
+}
+.kpi-card-pill--inactive { background: var(--ct-critical-tint); color: var(--ct-critical-ink); border-color: var(--ct-critical-tint); font-weight: 600; }
+.kpi-card-pill--cat { background: var(--ct-info-tint); color: var(--ct-info-ink); border-color: var(--ct-accent-tint); }
+
+/* Status label next to value (e.g. "Sous la cible") */
+.kpi-card-status { font-size: 0.78em; margin-left: 6px; font-variant-numeric: normal; font-weight: 500; }
+.kpi-card-status--green { color: var(--ct-low); }
+.kpi-card-status--amber { color: var(--ct-high); }
+.kpi-card-status--red   { color: var(--ct-critical); }
+.kpi-card-status--grey  { color: var(--ct-ink-2); }
+
+/* CTA button on inactive card */
+
+/* Detail modal */
+.kpi-detail-pills {
+    display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+    margin: 0 0 10px 0;
+}
+.kpi-detail-desc {
+    font-size: 0.88em; color: var(--ct-ink-2); line-height: 1.4;
+    margin: 0 0 12px 0;
+}
+.kpi-detail-value-row {
+    display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+    margin: 0 0 4px 0;
+}
+.kpi-detail-value {
+    font-size: 2.2em; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.kpi-detail-ts { font-size: 0.78em; color: var(--ct-ink-2); }
+.kpi-detail-thresholds {
+    font-size: 0.78em; color: var(--ct-ink-2);
+    margin: 0 0 12px 0;
+    font-variant-numeric: tabular-nums;
+}
+.kpi-detail-sparkline { margin: 4px 0 12px 0; }
+.kpi-detail-empty {
+    padding: 16px; text-align: center; color: var(--ct-ink-2);
+    background: var(--ct-surface-2); border: 1px dashed var(--ct-line); border-radius: 4px;
+    margin: 0 0 12px 0; font-size: 0.88em;
+}
+
+.kpi-detail-section {
+    margin: 16px 0 0 0; padding-top: 12px;
+    border-top: 1px solid var(--ct-line);
+}
+.kpi-detail-section-title {
+    font-size: 0.95em; font-weight: 600; color: var(--ct-ink);
+    margin: 0 0 8px 0;
+}
+.kpi-detail-note { font-size: 0.78em; color: var(--ct-ink-2); margin: 4px 0 0 0; }
+
+.kpi-detail-manual {
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+}
+.kpi-detail-manual input { font-size: 0.88em; padding: 4px 6px; }
+.kpi-detail-manual button { font-size: 0.85em; padding: 4px 10px; }
+
+.kpi-detail-frameworks {
+    display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px 0;
+}
+.kpi-fw-badge--with-action {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding-right: 2px;
+}
+.kpi-fw-remove {
+    background: transparent; border: none; cursor: pointer;
+    color: inherit; opacity: 0.6; padding: 0 4px;
+    font-size: 1.1em; line-height: 1;
+}
+.kpi-fw-remove:hover { opacity: 1; color: var(--ct-critical); }
+
+.kpi-detail-add-fw {
+    display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+    margin-top: 6px;
+}
+.kpi-detail-add-fw select,
+.kpi-detail-add-fw input { font-size: 0.85em; padding: 3px 6px; }
+.kpi-detail-add-fw button { font-size: 0.82em; padding: 3px 9px; }
+
+.kpi-detail-tune {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+    margin-bottom: 10px;
+}
+.kpi-detail-tune label {
+    display: flex; flex-direction: column; gap: 3px;
+    font-size: 0.82em; color: var(--ct-ink-2);
+}
+.kpi-detail-tune input { font-size: 0.9em; padding: 4px 6px; }
+.kpi-detail-tune-actions {
+    display: flex; gap: 8px; justify-content: space-between; align-items: center;
+}
+
+@media (max-width: 768px) {
+    .kpi-detail-tune { grid-template-columns: 1fr; }
+}
+
+/* Toolbar count badge on the "+ KPI automatique" button */
+/* Modificateur de .ct-badge : pastille de comptage sur un bouton. */
+.kpi-btn-badge { min-width: 18px; padding: 0 5px; margin-left: 4px; border-radius: 9px;
+    font-size: 0.78em; font-weight: 700; line-height: 16px; text-align: center;
+    justify-content: center; vertical-align: middle; }
+
+/* Auto-KPI picker modal — list of inactive auto KPIs grouped by category */
+.kpi-picker-cat { margin-bottom: 16px; }
+.kpi-picker-cat-title {
+    font-size: 0.85em; font-weight: 600; text-transform: uppercase;
+    color: var(--ct-ink-2); letter-spacing: 0.5px;
+    margin: 0 0 6px 0; padding-bottom: 3px;
+    border-bottom: 1px solid var(--ct-line);
+}
+.kpi-picker-row {
+    display: flex; gap: 12px; align-items: center;
+    padding: 8px 4px; border-bottom: 1px solid var(--ct-surface-2);
+}
+.kpi-picker-row:last-child { border-bottom: none; }
+.kpi-picker-row-main { flex: 1; min-width: 0; }
+.kpi-picker-row-title {
+    font-weight: 600; color: var(--ct-ink); font-size: 0.92em;
+    margin-bottom: 2px;
+}
+.kpi-picker-row-desc {
+    font-size: 0.8em; color: var(--ct-ink-2); line-height: 1.35;
+    margin-bottom: 4px;
+}
+.kpi-picker-row-fw {
+    display: flex; flex-wrap: wrap; gap: 4px;
+}
+.kpi-picker-row button { flex-shrink: 0; }
+
+/* Slim card: tighter meta row */
+.kpi-card-meta { font-size: 0.78em; }
+
+/* ═══════════════════════════════════════════════════════════════
+   Dark mode fixes — scoped :root[data-theme="dark"] only, the
+   light rendering is untouched. Tokens come from cisotoolbox.css.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Variables consumed by inline styles in the TS sources.
+   Light keeps the inline fallbacks (ink button / #fff text);
+   dark switches solid action buttons to the accent + dark text,
+   matching :root[data-theme="dark"] .ct-btn[data-variant="primary"]. */
+
+/* Solid saturated buttons → dark text (dark-mode convention). */
+
+/* Badge convention in dark: -tint background + -ink text, never
+   base color + white. */
+
+/* KPI cards: hard-coded light-mode reds/ambers/greens on dark surface. */
+
+/* CTA / count badge built as "info-ink background + white text":
+   in dark -ink is a light color, making white text unreadable.
+   Use the tint/ink pair instead. */
+
+
+/* Kanban: hard-coded light-mode blues/greens/reds. */
+
+/* (SVG partagés : désormais thémés à la source via variables — plus d'overrides.) */
+
+/* Extrait des styles inline : la classe portait deja le nom, la mise en
+   forme vivait a cote dans un attribut style. Rendu identique. */
+.conn-card { background:var(--ct-surface); border:1px solid var(--ct-line); border-radius:12px; padding:18px; display:flex; flex-direction:column; gap:10px; }
+.pilot-view-toggle { margin-left:auto; display:inline-flex; border:1px solid var(--ct-line); border-radius:6px; overflow:hidden; }
+
+/* Extrait du balisage : la classe existait, son style vivait a cote. */
+.conn-result { margin-left:auto; font-size:var(--ct-text-meta); align-self:center; color:var(--ct-ink-2); }

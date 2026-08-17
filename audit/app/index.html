@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Audit ISO 27001 interactif — CISO Toolbox. Outil open-source pour realiser des audits de conformite ISO 27001 et HDS.">
+
+<title>Audit - CISO Toolbox</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="stylesheet" href="css/cisotoolbox.css">
+<link rel="stylesheet" href="css/ISO_Audit.css">
+</head>
+<body class="ct-app-shell">
+
+<div class="ct-app">
+<header class="ct-appbar">
+    <button class="btn-hamburger" data-click="_toggleSidebarMobile">&#9776;</button>
+    <span class="ct-modulepicker" role="img" aria-label="Audit"><span data-i18n="module.audit">Audit</span></span>
+    <span class="ct-appbar-sep"></span>
+    <nav class="ct-appbar-context" aria-label="Contexte"><span class="ct-muted" id="header-subtitle"></span></nav>
+    <div class="toolbar-menu">
+        <button class="ct-btn" data-size="sm" data-click="toggleMenu"><span data-i18n="audit.menu.file">Fichier</span></button>
+        <div class="toolbar-dropdown" id="io-menu">
+            <div class="toolbar-dropdown-item" data-click="_openAuditPicker" data-i18n="auditapi.title">Mes audits</div>
+            <div class="toolbar-dropdown-sep"></div>
+            <div class="toolbar-dropdown-item" data-click="_menuAction" data-args='["openFile"]' data-i18n="audit.menu.open">Ouvrir</div>
+            <div class="toolbar-dropdown-item" id="menu-item-save" data-click="_menuAction" data-args='["quickSaveJSON"]' data-i18n="audit.menu.save">Enregistrer</div>
+            <div class="toolbar-dropdown-item" data-click="_menuAction" data-args='["saveJSON"]' data-i18n="audit.menu.save_as">Enregistrer sous</div>
+            <div class="toolbar-dropdown-sep"></div>
+            <div class="toolbar-dropdown-item" data-click="_menuAction" data-args='["exportCSV"]' data-i18n="audit.export.csv">Export CSV</div>
+            <div class="toolbar-dropdown-item" data-click="_menuAction" data-args='["exportWord"]' data-i18n="audit.export.word">Export Word</div>
+            <div class="toolbar-dropdown-sep"></div>
+            <div class="toolbar-dropdown-item" id="menu-report" data-click="_menuAction" data-args='["generateReport"]' data-i18n="audit.menu.report" style="display:none">Générer rapport IA</div>
+            <div class="toolbar-dropdown-sep"></div>
+            <div class="toolbar-dropdown-item" data-click="_menuAction" data-args='["newAnalysis"]' data-i18n="audit.menu.new">Nouvel audit</div>
+        </div>
+    </div>
+    <input type="file" id="file-input" accept=".json,.enc" class="hidden" data-change="loadJSON" data-pass-event>
+    <span class="ct-spacer"></span>
+    <span class="ct-appbar-saved" id="status-msg"></span>
+    <div class="ct-appbar-actions">
+        <button class="ct-iconaction" data-click="ct_toggleLang" data-icon="globe" aria-label="Langue" title="Langue FR / EN"></button>
+        <button class="ct-iconaction" data-click="ct_toggleTheme" data-icon="moon" aria-label="Thème" title="Thème clair / sombre"></button>
+        <span class="toolbar-right" id="toolbar-right"></span>
+    </div>
+</header>
+
+<div class="ct-body">
+
+<nav class="ct-rail" aria-label="Navigation du module">
+  <div class="ct-rail-scroll">
+    <button class="ct-rail-item" aria-current="page" data-click="selectPanel" data-args='["dashboard"]'><span class="ct-rail-item-label" data-i18n="audit.sidebar.dashboard">Tableau de bord</span></button>
+
+    <div class="ct-rail-section">
+      <button class="ct-rail-group" aria-expanded="true" data-click="ct_toggleRailGroup" data-pass-el>
+        <span class="ct-icon-btn-slot" data-icon="chevron-right"></span><span data-i18n="audit.sidebar.section_clauses">Clauses ISO 27001</span>
+      </button>
+      <button class="ct-rail-item" data-click="selectPanel" data-args='["domain-4"]'><span class="ct-rail-item-label" data-i18n="audit.sidebar.domain.4">&sect;4 Contexte</span></button>
+      <button class="ct-rail-item" data-click="selectPanel" data-args='["domain-5"]'><span class="ct-rail-item-label" data-i18n="audit.sidebar.domain.5">&sect;5 Leadership</span></button>
+      <button class="ct-rail-item" data-click="selectPanel" data-args='["domain-6"]'><span class="ct-rail-item-label" data-i18n="audit.sidebar.domain.6">&sect;6 Planification</span></button>
+      <button class="ct-rail-item" data-click="selectPanel" data-args='["domain-7"]'><span class="ct-rail-item-label" data-i18n="audit.sidebar.domain.7">&sect;7 Support</span></button>
+      <button class="ct-rail-item" data-click="selectPanel" data-args='["domain-8"]'><span class="ct-rail-item-label" data-i18n="audit.sidebar.domain.8">&sect;8 Realisation</span></button>
+      <button class="ct-rail-item" data-click="selectPanel" data-args='["domain-9"]'><span class="ct-rail-item-label" data-i18n="audit.sidebar.domain.9">&sect;9 Evaluation</span></button>
+      <button class="ct-rail-item" data-click="selectPanel" data-args='["domain-10"]'><span class="ct-rail-item-label" data-i18n="audit.sidebar.domain.10">&sect;10 Amelioration</span></button>
+    </div>
+
+    <div class="ct-rail-section">
+      <button class="ct-rail-group" aria-expanded="true" data-click="ct_toggleRailGroup" data-pass-el>
+        <span class="ct-icon-btn-slot" data-icon="chevron-right"></span><span data-i18n="audit.sidebar.section_annexe">Annexe A</span>
+      </button>
+      <button class="ct-rail-item" data-click="selectPanel" data-args='["domain-A5"]'><span class="ct-rail-item-label" data-i18n="audit.sidebar.domain.A5">A.5 Organisationnelles</span></button>
+      <button class="ct-rail-item" data-click="selectPanel" data-args='["domain-A6"]'><span class="ct-rail-item-label" data-i18n="audit.sidebar.domain.A6">A.6 Personnes</span></button>
+      <button class="ct-rail-item" data-click="selectPanel" data-args='["domain-A7"]'><span class="ct-rail-item-label" data-i18n="audit.sidebar.domain.A7">A.7 Physiques</span></button>
+      <button class="ct-rail-item" data-click="selectPanel" data-args='["domain-A8"]'><span class="ct-rail-item-label" data-i18n="audit.sidebar.domain.A8">A.8 Technologiques</span></button>
+    </div>
+
+    <div class="ct-rail-section">
+      <button class="ct-rail-group" aria-expanded="true" data-click="ct_toggleRailGroup" data-pass-el>
+        <span class="ct-icon-btn-slot" data-icon="chevron-right"></span><span data-i18n="audit.sidebar.section_outils">Outils</span>
+      </button>
+      <button class="ct-rail-item" data-click="selectPanel" data-args='["docreview"]'><span class="ct-rail-item-label" data-i18n="audit.sidebar.docreview">Revue documentaire</span></button>
+      <button class="ct-rail-item" data-click="selectPanel" data-args='["planning"]'><span class="ct-rail-item-label" data-i18n="audit.sidebar.planning">Planning</span></button>
+      <button class="ct-rail-item" data-click="selectPanel" data-args='["journal"]'><span class="ct-rail-item-label" data-i18n="audit.sidebar.journal">Journal</span></button>
+      <button class="ct-rail-item" data-click="selectPanel" data-args='["measures"]'><span class="ct-rail-item-label" data-i18n="audit.sidebar.measures">Actions correctives</span></button>
+    </div>
+
+    <div class="ct-rail-section">
+      <button class="ct-rail-group" aria-expanded="true" data-click="ct_toggleRailGroup" data-pass-el>
+        <span class="ct-icon-btn-slot" data-icon="chevron-right"></span><span data-i18n="audit.sidebar.section_aide">Aide</span>
+      </button>
+      <button class="ct-rail-item" data-click="toggleHelp" data-args='["methodo"]'><span class="ct-rail-item-label" data-i18n="audit.sidebar.methodo">Methodologie</span></button>
+      <button class="ct-rail-item" data-click="toggleHelp" data-args='["usage"]'><span class="ct-rail-item-label" data-i18n="audit.sidebar.usage">Utilisation</span></button>
+    </div>
+
+  </div>
+
+  <div class="ct-rail-foot">
+
+    <a href="https://www.cisotoolbox.org" target="_blank" rel="noopener noreferrer" class="sidebar-brand">cisotoolbox.org</a>
+  </div>
+</nav>
+
+<main class="ct-content">
+
+<div class="subtabs" id="subtab-bar"></div>
+
+
+<!-- Tableau de bord -->
+<div class="tab-panel active" id="panel-dashboard" data-panel="dashboard">
+<div class="panel-desc" data-i18n="audit.desc.dashboard">Tableau de bord de l'audit : indicateurs, scores par domaine, non-conformités.</div>
+
+<div class="meta-grid" id="audit-meta">
+    <div class="meta-field">
+        <label data-i18n="audit.meta.name">Nom du client</label>
+        <input type="text" id="meta-name" data-change="onMetaChange" data-args='["name"]' data-pass-value placeholder="Nom de l'organisme audité">
+    </div>
+    <div class="meta-field">
+        <label data-i18n="audit.meta.ref">Référence audit</label>
+        <input type="text" id="meta-ref" data-change="onMetaChange" data-args='["ref"]' data-pass-value placeholder="AUD-2026-001">
+    </div>
+    <div class="meta-field">
+        <label data-i18n="audit.meta.date">Date</label>
+        <input type="date" id="meta-date" data-change="onMetaChange" data-args='["date"]' data-pass-value>
+    </div>
+    <div class="meta-field">
+        <label data-i18n="audit.meta.auditor">Auditeur</label>
+        <input type="text" id="meta-auditor" data-change="onMetaChange" data-args='["auditor"]' data-pass-value placeholder="Nom de l'auditeur">
+    </div>
+    <div class="meta-field">
+        <label data-i18n="audit.meta.scope">Périmètre</label>
+        <input type="text" id="meta-scope" data-change="onMetaChange" data-args='["scope"]' data-pass-value placeholder="Périmètre de l'audit">
+    </div>
+    <div class="meta-field">
+        <label data-i18n="audit.meta.hds">HDS</label>
+        <select id="meta-hds" data-change="onMetaChange" data-args='["hds"]' data-pass-value>
+            <option value="non" data-i18n="audit.meta.hds_non">Non</option>
+            <option value="oui" data-i18n="audit.meta.hds_oui">Oui</option>
+            <option value="partiel" data-i18n="audit.meta.hds_partiel">Partiel</option>
+        </select>
+    </div>
+</div>
+
+<div id="dashboard-content"></div>
+</div>
+
+<!-- §4 Contexte de l'organisme -->
+<div class="tab-panel" id="panel-measures" data-panel="measures">
+<div class="panel-desc" data-i18n="audit.desc.measures">Actions correctives issues des non-conformités : suivi, responsable, échéance.</div>
+<div id="measures-content"></div>
+</div>
+
+<div class="tab-panel" id="panel-domain-4" data-panel="domain-4">
+<div class="panel-desc" data-i18n="audit.desc.domain.4">&sect;4 Contexte de l'organisme : compréhension de l'organisme, des parties intéressées, du périmètre du SMSI.</div>
+<div id="domain-4-content"></div>
+</div>
+
+<!-- §5 Leadership -->
+<div class="tab-panel" id="panel-domain-5" data-panel="domain-5">
+<div class="panel-desc" data-i18n="audit.desc.domain.5">&sect;5 Leadership : engagement de la direction, politique de sécurité, rôles et responsabilités.</div>
+<div id="domain-5-content"></div>
+</div>
+
+<!-- §6 Planification -->
+<div class="tab-panel" id="panel-domain-6" data-panel="domain-6">
+<div class="panel-desc" data-i18n="audit.desc.domain.6">&sect;6 Planification : appréciation des risques, traitement des risques, objectifs de sécurité.</div>
+<div id="domain-6-content"></div>
+</div>
+
+<!-- §7 Support -->
+<div class="tab-panel" id="panel-domain-7" data-panel="domain-7">
+<div class="panel-desc" data-i18n="audit.desc.domain.7">&sect;7 Support : ressources, compétences, sensibilisation, communication, informations documentées.</div>
+<div id="domain-7-content"></div>
+</div>
+
+<!-- §8 Réalisation -->
+<div class="tab-panel" id="panel-domain-8" data-panel="domain-8">
+<div class="panel-desc" data-i18n="audit.desc.domain.8">&sect;8 Réalisation : planification et maîtrise opérationnelles, appréciation et traitement des risques.</div>
+<div id="domain-8-content"></div>
+</div>
+
+<!-- §9 Évaluation -->
+<div class="tab-panel" id="panel-domain-9" data-panel="domain-9">
+<div class="panel-desc" data-i18n="audit.desc.domain.9">&sect;9 Évaluation des performances : surveillance, audit interne, revue de direction.</div>
+<div id="domain-9-content"></div>
+</div>
+
+<!-- §10 Amélioration -->
+<div class="tab-panel" id="panel-domain-10" data-panel="domain-10">
+<div class="panel-desc" data-i18n="audit.desc.domain.10">&sect;10 Amélioration : non-conformités, actions correctives, amélioration continue.</div>
+<div id="domain-10-content"></div>
+</div>
+
+<!-- A.5 Organisationnelles -->
+<div class="tab-panel" id="panel-domain-A5" data-panel="domain-A5">
+<div class="panel-desc" data-i18n="audit.desc.domain.A5">A.5 Mesures organisationnelles : politiques, rôles, inventaire, contrôle d'accès, relations fournisseurs.</div>
+<div id="domain-A5-content"></div>
+</div>
+
+<!-- A.6 Personnes -->
+<div class="tab-panel" id="panel-domain-A6" data-panel="domain-A6">
+<div class="panel-desc" data-i18n="audit.desc.domain.A6">A.6 Mesures liées aux personnes : sélection, conditions d'emploi, sensibilisation, télétravail.</div>
+<div id="domain-A6-content"></div>
+</div>
+
+<!-- A.7 Physiques -->
+<div class="tab-panel" id="panel-domain-A7" data-panel="domain-A7">
+<div class="panel-desc" data-i18n="audit.desc.domain.A7">A.7 Mesures physiques : périmètres de sécurité, contrôle d'accès physique, protection des équipements.</div>
+<div id="domain-A7-content"></div>
+</div>
+
+<!-- A.8 Technologiques -->
+<div class="tab-panel" id="panel-domain-A8" data-panel="domain-A8">
+<div class="panel-desc" data-i18n="audit.desc.domain.A8">A.8 Mesures technologiques : terminaux, accès privilégiés, restriction d'accès, code source, réseaux, cryptographie.</div>
+<div id="domain-A8-content"></div>
+</div>
+
+<!-- Revue documentaire -->
+<div class="tab-panel" id="panel-docreview" data-panel="docreview">
+<div class="panel-desc" data-i18n="audit.desc.docreview">Revue documentaire : vérification des documents et preuves attendus.</div>
+<div id="docreview-content"></div>
+</div>
+
+<!-- Planning -->
+<div class="tab-panel" id="panel-planning" data-panel="planning">
+<div class="panel-desc" data-i18n="audit.desc.planning">Planning de l'audit : répartition des domaines sur les créneaux.</div>
+<div id="planning-content"></div>
+</div>
+
+<!-- Journal -->
+<div class="tab-panel" id="panel-journal" data-panel="journal">
+<div class="panel-desc" data-i18n="audit.desc.journal">Journal d'audit : historique chronologique des actions.</div>
+<div id="journal-content"></div>
+</div>
+
+
+</main><!-- ct-content -->
+</div><!-- ct-body -->
+</div><!-- ct-app -->
+
+<footer data-i18n="audit.footer">Audit interactif ISO 27001 — Données modifiables, sauvegarde JSON</footer>
+
+<!-- Modale mot de passe -->
+<div class="pwd-overlay" id="pwd-overlay">
+<div class="pwd-panel">
+    <div class="pwd-title" id="pwd-title"></div>
+    <input type="password" class="pwd-input" id="pwd-input" placeholder="Mot de passe" data-i18n-placeholder="pwd_placeholder" autocomplete="off">
+    <input type="password" class="pwd-input hidden" id="pwd-input2" placeholder="Confirmer le mot de passe" data-i18n-placeholder="pwd_confirm_placeholder" autocomplete="off">
+    <div class="pwd-error" id="pwd-error"></div>
+    <div class="btn-group-end">
+        <button class="pwd-btn pwd-cancel" id="pwd-cancel" data-i18n="btn_cancel">Annuler</button>
+        <button class="pwd-btn pwd-ok" id="pwd-ok" data-i18n="btn_validate">Valider</button>
+    </div>
+</div>
+</div>
+
+<div class="pwd-overlay" id="confirm-overlay">
+<div class="pwd-panel">
+    <div class="pwd-title" id="confirm-title"></div>
+    <div id="confirm-body" class="help-subtitle"></div>
+    <div class="btn-group-end">
+        <button class="pwd-btn pwd-cancel" id="confirm-non" data-i18n="btn_no">Non</button>
+        <button class="pwd-btn pwd-ok" id="confirm-oui" data-i18n="btn_yes">Oui</button>
+    </div>
+</div>
+</div>
+
+<div class="search-overlay" id="search-overlay">
+    <div class="search-panel">
+        <div class="search-header">
+            <input type="text" class="search-input" id="search-input" placeholder="Rechercher..." data-input="onSearchInput" data-pass-value>
+            <select class="search-scope" id="search-scope" data-change="onSearchScope" data-pass-value>
+                <option value="all" data-i18n="audit.search.scope.all">Tous les champs</option>
+                <option value="findings" data-i18n="audit.search.scope.findings">Constats uniquement</option>
+                <option value="nc" data-i18n="audit.search.scope.nc">NC uniquement</option>
+            </select>
+        </div>
+        <div class="search-count" id="search-count"></div>
+        <div class="search-results" id="search-results"></div>
+        <div class="search-footer" data-i18n="audit.search.footer">Échap pour fermer · Ctrl+K pour ouvrir</div>
+    </div>
+</div>
+
+
+<!-- Help overlay — content is bilingual via data-i18n-html (see i18n files) -->
+<div class="help-overlay" id="help-overlay" data-click-self="toggleHelp">
+<div class="help-panel">
+<button class="close-help" data-click="toggleHelp">&times;</button>
+<div class="help-tabs">
+    <div class="help-tab active" id="help-tab-methodo" data-click="switchHelpTab" data-args='["methodo"]' data-i18n="audit.help.tab_methodo">M&eacute;thodologie d'audit</div>
+    <div class="help-tab" id="help-tab-usage" data-click="switchHelpTab" data-args='["usage"]' data-i18n="audit.help.tab_usage">Utilisation de l'application</div>
+</div>
+<div class="help-content" id="help-content-methodo" data-i18n-html="audit.help.methodo"></div>
+<div class="help-content ct-hidden" id="help-content-usage" data-i18n-html="audit.help.usage"></div>
+</div>
+</div>
+
+<script src="js/i18n.js"></script>
+<script src="js/i18n_core_en.js"></script>
+<script src="js/i18n_core_fr.js"></script>
+<script src="js/ct_schema.js"></script>
+<script src="js/cisotoolbox.js"></script>
+<script src="js/cisotoolbox_backend.js"></script>
+<script src="js/ct_modal.js"></script>
+<script src="js/ct_userpicker.js"></script>
+<script src="js/ct_measure_modal.js"></script>
+<script src="js/directory_picker.js"></script>
+<script src="js/ct_modules.js"></script>
+<script src="js/ISO_Audit_data.js"></script>
+<script src="js/ISO_Audit_controls.js"></script>
+<script src="js/ISO_Audit_i18n_fr.js"></script>
+<script src="js/ISO_Audit_i18n_en.js"></script>
+<script src="js/audit_api.js"></script>
+<script src="js/ISO_Audit_app.js"></script>
+<script src="js/ISO_Audit_docreview.js"></script>
+<script src="js/ISO_Audit_planning.js"></script>
+<script src="js/ISO_Audit_export.js"></script>
+<script src="js/ISO_Audit_images.js"></script>
+<script src="js/ai_common.js"></script>
+<script src="js/ct_settings.js"></script>
+<script src="js/ai_backend.js"></script>
+</body>
+</html>

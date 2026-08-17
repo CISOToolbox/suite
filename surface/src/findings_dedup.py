@@ -1,0 +1,268 @@
+"""Deduplication helper for findings.
+
+When a scanner produces a finding, we don't want to re-create a row that already
+exists. The behavior depends on the existing finding's status:
+
+    new            → refresh title/description/evidence/severity, bump last_seen_at
+    false_positive → keep frozen (just bump last_seen_at), do NOT re-emit
+    to_fix +
+        measure not 'termine' → keep frozen, bump last_seen_at
+        measure  'termine'    → reopen as 'new' (the issue came back after fix)
+    fixed          → reopen as 'new'
+
+The dedup key is `<scanner>|<type>|<target>`. Same key = same logical issue
+across rescans. For findings without a target (rare) we fall back to title hash.
+"""
+from __future__ import annotations
+
+import logging
+from datetime import datetime, timezone
+from typing import Any
+
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from src.models import Finding
+
+logger = logging.getLogger("surface.dedup")
+
+
+def compute_dedup_key(scanner: str, type_: str, target: str) -> str:
+    return f"{(scanner or '?').lower()}|{(type_ or '?').lower()}|{(target or '').lower()}"
+
+
+async def insert_or_dedupe(db: AsyncSession, fd: dict[str, Any]) -> str:
+    """Insert a finding with deduplication. Returns the action taken:
+
+    'inserted'   — brand new finding
+    'refreshed'  — updated existing 'new' finding's content + last_seen_at
+    'reopened'   — existing was fixed/triaged-as-to-fix-then-completed; reopened as new
+    'silenced'   — existing is false_positive or has an active to_fix measure → no re-emission
+    """
+    key = compute_dedup_key(fd.get("scanner", ""), fd.get("type", ""), fd.get("target", "") or fd.get("title", ""))
+    now = datetime.now(timezone.utc)
+
+    result = await db.execute(
+        select(Finding).options(selectinload(Finding.measure)).where(Finding.dedup_key == key).limit(1)
+    )
+    existing = result.scalar_one_or_none()
+
+    if existing is None:
+        f = Finding(**fd, status="new", dedup_key=key, last_seen_at=now)
+        db.add(f)
+        return "inserted"
+
+    if existing.status == "false_positive":
+        existing.last_seen_at = now
+        return "silenced"
+
+    if existing.status == "to_fix":
+        if existing.measure and existing.measure.statut != "termine":
+            existing.last_seen_at = now
+            return "silenced"
+        # Measure is terminée OR no measure attached → reopen
+        existing.status = "new"
+        existing.title = fd.get("title", existing.title)
+        existing.description = (fd.get("description", "") or "") + "\n\n[Reouvert : detecte a nouveau apres remediation]"
+        existing.evidence = fd.get("evidence", {}) or {}
+        existing.severity = fd.get("severity", existing.severity)
+        existing.triaged_at = None
+        existing.triaged_by = None
+        existing.triage_notes = ""
+        existing.last_seen_at = now
+        return "reopened"
+
+    if existing.status == "fixed":
+        existing.status = "new"
+        existing.title = fd.get("title", existing.title)
+        existing.description = (fd.get("description", "") or "") + "\n\n[Reouvert : detecte a nouveau]"
+        existing.evidence = fd.get("evidence", {}) or {}
+        existing.severity = fd.get("severity", existing.severity)
+        existing.last_seen_at = now
+        return "reopened"
+
+    # status == 'new': refresh content
+    existing.title = fd.get("title", existing.title)
+    existing.description = fd.get("description", existing.description)
+    existing.evidence = fd.get("evidence", existing.evidence) or existing.evidence
+    existing.severity = fd.get("severity", existing.severity)
+    existing.last_seen_at = now
+    return "refreshed"
+
+
+async def insert_many(db: AsyncSession, finding_dicts: list[dict[str, Any]]) -> dict[str, Any]:
+    """Apply insert_or_dedupe on a batch and return per-action counts plus
+    the diff vs the previous state.
+
+    The result dict has the v0.1.x integer keys (`inserted`, `refreshed`,
+    `reopened`, `silenced`) and **also** v0.2 lists used by the Scans page:
+
+        added:       new findings inserted
+        reopened_l:  findings whose status went back to 'new'
+        gone:        dedup keys that exist in the DB for this scope but
+                     were NOT seen in the current scan — *informational*
+                     only, callers can use this for the "what's new"
+                     summary on the per-host timeline. Currently empty
+                     because the dedup helper does not know the scope.
+    """
+    counts: dict[str, Any] = {
+        "inserted": 0, "refreshed": 0, "reopened": 0, "silenced": 0,
+        "added": [], "reopened_l": [], "gone": [],
+    }
+    if not finding_dicts:
+        return counts
+
+    # Warm the SQLAlchemy identity map with one query for the whole batch.
+    keys = {
+        compute_dedup_key(
+            fd.get("scanner", ""),
+            fd.get("type", ""),
+            fd.get("target", "") or fd.get("title", ""),
+        )
+        for fd in finding_dicts
+    }
+    if keys:
+        await db.execute(
+            select(Finding)
+            .options(selectinload(Finding.measure))
+            .where(Finding.dedup_key.in_(keys))
+        )
+
+    for fd in finding_dicts:
+        try:
+            action = await insert_or_dedupe(db, fd)
+            await db.flush()
+            counts[action] = counts.get(action, 0) + 1
+            if action == "inserted":
+                counts["added"].append({
+                    "title": fd.get("title", "")[:140],
+                    "severity": fd.get("severity", ""),
+                    "scanner": fd.get("scanner", ""),
+                    "target": fd.get("target", ""),
+                })
+            elif action == "reopened":
+                counts["reopened_l"].append({
+                    "title": fd.get("title", "")[:140],
+                    "severity": fd.get("severity", ""),
+                    "scanner": fd.get("scanner", ""),
+                    "target": fd.get("target", ""),
+                })
+        except IntegrityError:
+            await db.rollback()
+            try:
+                action = await insert_or_dedupe(db, fd)
+                await db.flush()
+                counts[action] = counts.get(action, 0) + 1
+            except Exception:
+                logger.exception("dedup retry failed for %s", fd.get("title"))
+        except Exception:
+            logger.exception("dedup insert failed for %s", fd.get("title"))
+    return counts
+
+
+def make_thread_sink(db: AsyncSession, loop):
+    """Build a thread-safe incremental-persistence sink for a long scanner.
+
+    A scanner runs in a worker thread (asyncio.to_thread) and can't touch the
+    async DB. This returns `(sink, counts)`:
+      - `sink(batch)` — called FROM the scanner thread with a list of finding
+        dicts; it schedules `insert_many + commit` on the event loop and BLOCKS
+        until the batch is durably committed. So a scan that is later killed /
+        times out keeps everything persisted so far (no all-or-nothing loss).
+      - `counts` — accumulates per-action totals across all batches, mergeable
+        into the final counts for the job's diff_summary.
+
+    Safe because the caller is parked on `await to_thread(scanner, …, sink)`,
+    so the loop runs the persists sequentially and never touches `db`
+    concurrently with the scanner.
+    """
+    import asyncio
+    counts: dict[str, Any] = {
+        "inserted": 0, "refreshed": 0, "reopened": 0, "silenced": 0,
+        "added": [], "reopened_l": [], "gone": [],
+    }
+
+    async def _persist(batch: list[dict[str, Any]]) -> dict[str, Any]:
+        c = await insert_many(db, batch)
+        await db.commit()
+        return c
+
+    def sink(batch: list[dict[str, Any]]) -> None:
+        batch = [b for b in (batch or []) if b]
+        if not batch:
+            return
+        c = asyncio.run_coroutine_threadsafe(_persist(batch), loop).result()
+        for k, v in (c or {}).items():
+            if isinstance(v, int):
+                counts[k] = counts.get(k, 0) + v
+            elif isinstance(v, list):
+                counts.setdefault(k, []).extend(v)
+
+    return sink, counts
+
+
+def apply_scanner_state(asset: Any, findings: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
+    """Apply any `scanner_state` control records to the asset config and return
+    ``(findings_to_persist, state)`` with those records stripped.
+
+    A scanner may emit a status record of type ``scanner_state`` whose evidence
+    carries ``config_patch`` (dict merged into ``asset.config``), ``config_unset``
+    (keys removed), ``partial`` (bool), ``scanned`` (file count) and ``limit``
+    (``files``/``time``) — e.g. the SMB Rust worker's resume cursor
+    (``smb_resume_after``) plus whether the share was only partially covered this
+    run and how many files it got through. These are NOT real findings, so they
+    never reach the findings table; instead they persist scanner-side state on
+    the asset and let the caller mark a capped scan "partial" (with an "arrêté
+    après X fichiers" note) instead of "completed". Generic on purpose: any
+    future stateful scanner can reuse it.
+
+    ``state`` is the merged evidence dict of the scanner_state record, or None
+    when no scanner emitted one (e.g. host scans). The asset's JSON config is
+    reassigned (not mutated in place) so SQLAlchemy flags it dirty. No-op on the
+    config side when `asset` is None (ad-hoc scans with no asset).
+    """
+    out: list[dict[str, Any]] = []
+    cfg = dict(asset.config or {}) if asset is not None else {}
+    patched = False
+    state: dict[str, Any] | None = None
+    for f in findings or []:
+        if f.get("type") == "scanner_state":
+            ev = f.get("evidence") or {}
+            for k, v in (ev.get("config_patch") or {}).items():
+                cfg[k] = v
+            for k in (ev.get("config_unset") or []):
+                cfg.pop(k, None)
+            state = ev
+            patched = True
+            continue
+        out.append(f)
+    if patched and asset is not None:
+        asset.config = cfg
+    return out, state
+
+
+def merge_counts(base: dict[str, Any], extra: dict[str, Any]) -> dict[str, Any]:
+    """Merge two insert_many-style counts dicts (ints add, lists concat)."""
+    for k, v in (extra or {}).items():
+        if isinstance(v, int):
+            base[k] = base.get(k, 0) + v
+        elif isinstance(v, list):
+            base.setdefault(k, []).extend(v)
+    return base
+
+
+def diff_summary(counts: dict[str, Any]) -> dict[str, Any]:
+    """Compact ScanJob.diff value: counts only, plus the first 5 added titles
+    so the UI badge can show "+3 (XSS, sqli, …)" without re-querying."""
+    added = counts.get("added") or []
+    reopened = counts.get("reopened_l") or []
+    return {
+        "added": len(added),
+        "reopened": len(reopened),
+        "refreshed": counts.get("refreshed", 0),
+        "silenced": counts.get("silenced", 0),
+        "added_sample": added[:5],
+        "reopened_sample": reopened[:5],
+    }

@@ -1,0 +1,300 @@
+from __future__ import annotations
+
+import uuid
+from datetime import datetime, timezone
+from enum import Enum
+
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, text
+from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.orm import DeclarativeBase, relationship
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+# ── Status enums — kept as string enums for JSON serialization ─
+
+class FindingStatus(str, Enum):
+    NEW = "new"
+    FALSE_POSITIVE = "false_positive"
+    TO_FIX = "to_fix"
+    FIXED = "fixed"
+
+
+class ScanJobStatus(str, Enum):
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class MeasureStatus(str, Enum):
+    A_FAIRE = "a_faire"
+    EN_COURS = "en_cours"
+    TERMINE = "termine"
+
+
+# ── Auth & Settings ────────────────────────────────────────────
+
+class User(Base):
+    __tablename__ = "users"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()"))
+    email = Column(String(255), unique=True, nullable=False)
+    name = Column(String(255), nullable=True)
+    picture = Column(String(500), nullable=True)
+    provider = Column(String(50), nullable=False)
+    provider_id = Column(String(255), nullable=False)
+    role = Column(String(50), default="user", server_default=text("'user'"))
+    ai_enabled = Column(String(5), default="false", server_default=text("'false'"))
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), server_default=text("NOW()"))
+    last_login = Column(DateTime(timezone=True), nullable=True)
+
+
+class AppSettings(Base):
+    __tablename__ = "app_settings"
+    key = Column(String(100), primary_key=True)
+    value = Column(Text, nullable=False, default="")
+
+
+# ── Findings ───────────────────────────────────────────────────
+# A Finding is anything detected by the scanner: vulnerability, misconfig,
+# exposed asset, etc. The user triages it as false_positive or to_fix.
+# Triaging to_fix automatically creates a Measure.
+
+class Finding(Base):
+    __tablename__ = "findings"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()"))
+    # Source (which scanner produced it)
+    scanner = Column(String(100), nullable=False, default="manual")  # nuclei | semgrep | osv | manual | ...
+    # Type / category, e.g. "xss", "sqli", "outdated_dep", "open_port"
+    type = Column(String(100), nullable=False, default="other")
+    severity = Column(String(20), nullable=False, default="medium")  # info | low | medium | high | critical
+    title = Column(String(500), nullable=False)
+    description = Column(Text, nullable=True, default="")
+    target = Column(String(500), nullable=True, default="")  # URL / host / asset
+    evidence = Column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    # Triage status
+    status = Column(String(30), nullable=False, default="new", server_default=text("'new'"))
+    # new | false_positive | to_fix | fixed
+    triaged_at = Column(DateTime(timezone=True), nullable=True)
+    triaged_by = Column(String(255), nullable=True)
+    triage_notes = Column(Text, nullable=True, default="")
+    # Deduplication: same dedup_key across rescans means same finding.
+    # Format: "<scanner>|<type>|<target>" (computed at insert time).
+    dedup_key = Column(String(500), nullable=True, unique=True, index=True)
+    last_seen_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), server_default=text("NOW()"))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), server_default=text("NOW()"))
+
+    __table_args__ = (
+        Index("ix_findings_status_severity", "status", "severity"),
+        Index("ix_findings_scanner", "scanner"),
+        Index("ix_findings_target", "target"),
+        Index("ix_findings_created_at", "created_at"),
+    )
+
+    measure = relationship("Measure", back_populates="finding", uselist=False, cascade="all, delete-orphan")
+
+
+# ── Measures (auto-created from to_fix findings) ───────────────
+
+class Measure(Base):
+    __tablename__ = "measures"
+
+    id = Column(String(30), primary_key=True)  # short readable id like SRF-001
+    # Primary finding (kept for backwards compat with the 1:1 relationship
+    # on Finding). No longer unique or non-null since migration 006 —
+    # bulk triage groups findings under a single Measure via finding_ids.
+    finding_id = Column(UUID(as_uuid=True), ForeignKey("findings.id", ondelete="CASCADE"), nullable=True)
+    # All findings covered by this measure. Contains at least finding_id
+    # after the migration 006 backfill. Set by bulk triage "À corriger".
+    finding_ids = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+    sort_order = Column(Integer, nullable=False, default=0)
+    title = Column(String(500), nullable=False, default="")
+    description = Column(Text, nullable=True, default="")
+    statut = Column(String(50), nullable=False, default="a_faire")  # a_faire | en_cours | termine
+    responsable = Column(String(255), nullable=True, default="")
+    echeance = Column(String(20), nullable=True, default="")
+    progress_log = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), server_default=text("NOW()"))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), server_default=text("NOW()"))
+
+    finding = relationship("Finding", back_populates="measure")
+
+
+# ── Scan jobs (async heavy scans) ─────────────────────────────
+
+class ScanJob(Base):
+    __tablename__ = "scan_jobs"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()"))
+    target = Column(String(500), nullable=False)
+    profile = Column(String(50), nullable=False, default="quick")  # quick | standard | deep
+    scanner = Column(String(50), nullable=False, default="nmap")
+    status = Column(String(20), nullable=False, default="pending")  # pending | running | completed | failed
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    findings_count = Column(Integer, nullable=False, default=0)
+    error = Column(Text, nullable=True, default="")
+    raw_output = Column(Text, nullable=True, default="")
+    triggered_by = Column(String(255), nullable=True, default="")
+    # v0.2: scan-to-scan diff. Populated by findings_dedup.insert_many() so
+    # the Scans page can show "+3 / -1" badges and the per-host timeline can
+    # render a per-run summary without re-querying every finding.
+    diff = Column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), server_default=text("NOW()"))
+
+
+# ── Monitored assets (perimeter to scan) ──────────────────────
+
+class MonitoredAsset(Base):
+    __tablename__ = "monitored_assets"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()"))
+    kind = Column(String(20), nullable=False, default="domain")  # domain | ip | ip_range
+    value = Column(String(500), nullable=False)
+    label = Column(String(255), nullable=True, default="")
+    notes = Column(Text, nullable=True, default="")
+    enabled = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    scan_frequency_hours = Column(Integer, nullable=False, default=24, server_default=text("24"))
+    enabled_scanners = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+    # Generic, non-secret per-asset scanner options consumed by scanners that
+    # declare `wants_config` (e.g. the SMB add-on: custom regex, extensions,
+    # max file size). Secrets (SMB credentials) come from the environment.
+    config = Column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    # v0.2: free-form tags + business criticality so the operator can rank
+    # what to fix first. `tags` is a JSON array of short strings (e.g.
+    # ["production", "pci-scope", "customer-facing"]). `criticality` is the
+    # business value of the asset (low|medium|high|critical) used by the
+    # per-asset risk score.
+    tags = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+    criticality = Column(String(20), nullable=False, default="medium", server_default=text("'medium'"))
+    # v0.2: cached DNS resolution — the IP the hostname resolved to at the
+    # last scan. Used by the Hosts view to group aliases that point to the
+    # same machine. NULL until the first scan resolves successfully.
+    resolved_ip = Column(String(64), nullable=True)
+    # When True, sub-domains/hosts discovered during a scan of this asset
+    # (via CT logs, DNS brute, SAN, Shodan, ip_range sweep) are
+    # automatically enrolled as new MonitoredAsset rows. Default False so
+    # an operator who adds a single host only ever sees scans on that
+    # host — discovered names still appear in the scan findings/evidence,
+    # they're just not turned into tracked assets without consent.
+    auto_enroll_discoveries = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    # When True, scans of this asset run in "stealth" mode: nuclei drops
+    # to rate-limit=3 / concurrency=2 with a browser User-Agent and a
+    # 1-second delay between probes, nmap drops from -T4 to -T2.
+    # Scans take 5–10x longer but are much less likely to trip a WAF /
+    # anti-bot (Cloudflare, RocketCDN, OVH-managed) into blackholing
+    # the source IP — see the `scanner_blocked` finding emitted by
+    # nuclei when the error rate goes through the roof. Off by default
+    # so the normal fast scan stays the default.
+    stealth_mode = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    last_scan_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), server_default=text("NOW()"))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), server_default=text("NOW()"))
+
+
+# ── Scan blocklist ────────────────────────────────────────────────
+class ScanExclusion(Base):
+    """Blocklist of values that must NEVER be scanned or auto-enrolled.
+
+    A value is a hostname, an IP, a CIDR (``a.b.c.d/n``) or a domain. It is
+    matched — via :func:`is_excluded` — against a candidate asset's own value
+    AND its resolved IP, so excluding a discovered IP stops it being rescanned
+    even if it is later rediscovered under a different name.
+    """
+
+    __tablename__ = "scan_exclusions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()"))
+    value = Column(String(500), nullable=False, unique=True)
+    note = Column(String(255), nullable=True, default="")
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), server_default=text("NOW()"))
+
+
+def _ip_in_cidr(ip: str, cidr: str) -> bool:
+    """True if ``ip`` falls inside ``cidr`` (IPv4/IPv6). False on any parse error."""
+    import ipaddress
+
+    try:
+        net = ipaddress.ip_network(cidr, strict=False)
+        return ipaddress.ip_address(ip) in net
+    except ValueError:
+        return False
+
+
+def is_excluded(candidates: list[str], exclusions: list[str]) -> bool:
+    """Does any candidate string (a value and/or a resolved IP) hit the blocklist?
+
+    Matching rules, all case-insensitive:
+      * exact equality (host == host, ip == ip, domain == domain);
+      * subdomain: candidate ``x.example.com`` is excluded by ``example.com``;
+      * CIDR containment: candidate IP inside an excluded ``a.b.c.d/n``.
+    """
+    cands = [c.strip().lower() for c in candidates if c and c.strip()]
+    if not cands:
+        return False
+    for raw in exclusions:
+        ex = (raw or "").strip().lower()
+        if not ex:
+            continue
+        for c in cands:
+            if c == ex:
+                return True
+            if "/" in ex and _ip_in_cidr(c, ex):
+                return True
+            # subdomain of an excluded domain
+            if len(c) > len(ex) + 1 and c.endswith("." + ex):
+                return True
+    return False
+
+
+# ── Audit Log ─────────────────────────────────────────────────────
+class AuditLog(Base):
+    __tablename__ = "audit_log"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    logged_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    user_email = Column(String(255), nullable=False, default="")
+    user_name = Column(String(255), nullable=True, default="")
+    action = Column(String(100), nullable=False)
+    target = Column(String(500), nullable=True, default="")
+    details = Column(Text, nullable=True, default="")
+    ip_address = Column(String(64), nullable=True, default="")
+
+    __table_args__ = (
+        Index("ix_audit_log_logged_at", "logged_at"),
+        Index("ix_audit_log_user", "user_email"),
+        Index("ix_audit_log_action", "action"),
+    )
+
+
+class DigestRun(Base):
+    """FEAT-35 — notification send journal (shared suite pattern). Unique
+    (recipient, kind, period_key) makes the per-scan alert idempotent."""
+    __tablename__ = "digest_runs"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()"))
+    recipient = Column(String(320), nullable=False)
+    kind = Column(String(10), nullable=False)
+    period_key = Column(String(64), nullable=False)
+    sent_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    status = Column(String(20), nullable=False)
+    items_count = Column(Integer, default=0, server_default=text("0"))
+    error_message = Column(Text, default="", server_default=text("''"))
+    body_html = Column(Text, default="", server_default=text("''"))
+
+    __table_args__ = (
+        UniqueConstraint("recipient", "kind", "period_key", name="uq_surface_digest_runs"),
+    )
+
+
+class NotificationPrefs(Base):
+    """FEAT-35 — LOCAL per-user prefs (standalone); suite proxies Pilot."""
+    __tablename__ = "notification_prefs"
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    lang = Column(String(5), nullable=False, default="fr", server_default=text("'fr'"))
+    module_prefs = Column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    updated_at = Column(DateTime(timezone=True), nullable=False,
+                        default=lambda: datetime.now(timezone.utc),
+                        onupdate=lambda: datetime.now(timezone.utc))

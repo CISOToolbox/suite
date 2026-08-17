@@ -1,0 +1,824 @@
+{
+  "_meta": {
+    "version": "1.0",
+    "description": "Pilot KPI catalogue + multi-framework mappings. Seeded once at first boot. Re-seeding upserts on `code` and replaces the mappings for each KPI; user-modified target/threshold/active values are PRESERVED (the seed only refreshes the immutable parts: names, descriptions, category, source).",
+    "frameworks": {
+      "NIST_CSF_2": {
+        "label": "NIST Cybersecurity Framework 2.0",
+        "source": "https://www.nist.gov/cyberframework"
+      },
+      "ISO_27001_2022": {
+        "label": "ISO/IEC 27001:2022 Annex A",
+        "source": "https://www.iso.org/standard/27001"
+      },
+      "CIS_v8": {
+        "label": "CIS Critical Security Controls v8",
+        "source": "https://www.cisecurity.org/controls/v8"
+      },
+      "ISO_27004_2016": {
+        "label": "ISO/IEC 27004:2016 Annex B",
+        "source": "https://www.iso.org/standard/64120.html"
+      }
+    }
+  },
+  "kpis": [
+    {
+      "code": "gv_compliance_completion_rate",
+      "name_fr": "Taux de complétion conformité",
+      "name_en": "Compliance completion rate",
+      "description_fr": "Pourcentage de mesures de conformité complétées sur le périmètre actif du module Compliance.",
+      "description_en": "Percentage of compliance controls completed across the active scope of the Compliance module.",
+      "category_primary": "govern",
+      "unit": "%",
+      "direction": "higher_better",
+      "source_type": "auto",
+      "source_module": "compliance",
+      "source_metric": "$.posture.score",
+      "target": 80,
+      "threshold_amber": 60,
+      "threshold_red": 40,
+      "mappings": [
+        {
+          "framework": "NIST_CSF_2",
+          "ref": "GV.OC-03",
+          "label_fr": "Exigences légales, réglementaires et contractuelles",
+          "label_en": "Legal, regulatory, and contractual requirements"
+        },
+        {
+          "framework": "ISO_27001_2022",
+          "ref": "A.5.31",
+          "label_fr": "Exigences légales, statutaires, réglementaires et contractuelles",
+          "label_en": "Legal, statutory, regulatory and contractual requirements"
+        },
+        {
+          "framework": "ISO_27004_2016",
+          "ref": "B.2",
+          "label_fr": "Examen des politiques et contrôles ISMS",
+          "label_en": "ISMS policy and control review"
+        }
+      ]
+    },
+    {
+      "code": "gv_vendor_assessment_coverage",
+      "name_fr": "Couverture évaluation fournisseurs",
+      "name_en": "Vendor assessment coverage",
+      "description_fr": "Pourcentage de fournisseurs avec une évaluation TPRM valide et à jour (non périmée).",
+      "description_en": "Percentage of vendors with a valid, up-to-date TPRM assessment (not expired).",
+      "category_primary": "govern",
+      "unit": "%",
+      "direction": "higher_better",
+      "source_type": "auto",
+      "source_module": "vendor",
+      "source_metric": "$.posture.score",
+      "target": 90,
+      "threshold_amber": 70,
+      "threshold_red": 50,
+      "mappings": [
+        {
+          "framework": "NIST_CSF_2",
+          "ref": "GV.SC-07",
+          "label_fr": "Risques liés aux fournisseurs et tiers",
+          "label_en": "Risks posed by suppliers, products, and services"
+        },
+        {
+          "framework": "ISO_27001_2022",
+          "ref": "A.5.19",
+          "label_fr": "Sécurité de l'information dans les relations fournisseurs",
+          "label_en": "Information security in supplier relationships"
+        },
+        {
+          "framework": "CIS_v8",
+          "ref": "15.1",
+          "label_fr": "Inventaire des prestataires de service",
+          "label_en": "Establish and maintain an inventory of service providers"
+        },
+        {
+          "framework": "ISO_27004_2016",
+          "ref": "B.20",
+          "label_fr": "Accords avec les tiers — couverture",
+          "label_en": "Third-party agreements — coverage"
+        }
+      ]
+    },
+    {
+      "code": "id_asset_owner_coverage",
+      "name_fr": "Couverture propriétaire des actifs",
+      "name_en": "Asset owner coverage",
+      "description_fr": "Pourcentage des actifs inventoriés ayant un propriétaire métier désigné.",
+      "description_en": "Percentage of inventoried assets with a designated business owner.",
+      "category_primary": "identify",
+      "unit": "%",
+      "direction": "higher_better",
+      "source_type": "auto",
+      "source_module": "asset",
+      "source_metric": "$.posture.score",
+      "target": 95,
+      "threshold_amber": 80,
+      "threshold_red": 60,
+      "mappings": [
+        {
+          "framework": "NIST_CSF_2",
+          "ref": "ID.AM-01",
+          "label_fr": "Inventaire du matériel géré par l'organisation",
+          "label_en": "Inventories of hardware managed by the organization"
+        },
+        {
+          "framework": "ISO_27001_2022",
+          "ref": "A.5.9",
+          "label_fr": "Inventaire des informations et autres actifs associés",
+          "label_en": "Inventory of information and other associated assets"
+        },
+        {
+          "framework": "CIS_v8",
+          "ref": "1.1",
+          "label_fr": "Inventaire détaillé des actifs de l'entreprise",
+          "label_en": "Establish and maintain a detailed enterprise asset inventory"
+        },
+        {
+          "framework": "ISO_27004_2016",
+          "ref": "B.13",
+          "label_fr": "Gestion des actifs — couverture inventaire",
+          "label_en": "Asset management — inventory coverage"
+        }
+      ]
+    },
+    {
+      "code": "id_risk_treatment_progress",
+      "name_fr": "Avancement traitement des risques",
+      "name_en": "Risk treatment progress",
+      "description_fr": "Pourcentage de risques identifiés avec un plan de traitement engagé (planifié ou en cours).",
+      "description_en": "Percentage of identified risks with a treatment plan engaged (planned or in progress).",
+      "category_primary": "identify",
+      "unit": "%",
+      "direction": "higher_better",
+      "source_type": "auto",
+      "source_module": "risk",
+      "source_metric": "$.posture.score",
+      "target": 80,
+      "threshold_amber": 60,
+      "threshold_red": 40,
+      "mappings": [
+        {
+          "framework": "NIST_CSF_2",
+          "ref": "ID.RA-06",
+          "label_fr": "Réponses aux risques choisies, priorisées et suivies",
+          "label_en": "Risk responses are chosen, prioritized, planned, tracked, and communicated"
+        },
+        {
+          "framework": "ISO_27001_2022",
+          "ref": "A.5.4",
+          "label_fr": "Responsabilités de la direction",
+          "label_en": "Management responsibilities"
+        },
+        {
+          "framework": "ISO_27004_2016",
+          "ref": "B.4",
+          "label_fr": "Exposition au risque — efficacité du traitement",
+          "label_en": "Risk exposure — treatment effectiveness"
+        }
+      ]
+    },
+    {
+      "code": "pr_critical_measures_closed_30d",
+      "name_fr": "Mesures critiques clôturées sous 30 jours",
+      "name_en": "Critical measures closed within 30 days",
+      "description_fr": "Nombre de mesures de criticité haute / critique fermées au cours des 30 derniers jours, tous modules confondus.",
+      "description_en": "Number of high / critical severity measures closed in the last 30 days, across all modules.",
+      "category_primary": "protect",
+      "unit": "count",
+      "direction": "higher_better",
+      "source_type": "auto",
+      "source_module": "pilot",
+      "source_metric": "pilot:measures.critical_closed_30d",
+      "target": 10,
+      "threshold_amber": 5,
+      "threshold_red": 1,
+      "mappings": [
+        {
+          "framework": "NIST_CSF_2",
+          "ref": "PR.PS-02",
+          "label_fr": "Les logiciels sont maintenus, remplacés et retirés",
+          "label_en": "Software is maintained, replaced, and removed"
+        },
+        {
+          "framework": "ISO_27001_2022",
+          "ref": "A.5.37",
+          "label_fr": "Procédures opérationnelles documentées",
+          "label_en": "Documented operating procedures"
+        },
+        {
+          "framework": "ISO_27004_2016",
+          "ref": "B.6",
+          "label_fr": "Actions correctives — délai de remédiation",
+          "label_en": "Corrective actions — remediation timeliness"
+        }
+      ]
+    },
+    {
+      "code": "pr_mfa_coverage",
+      "name_fr": "Taux de couverture MFA",
+      "name_en": "MFA coverage rate",
+      "description_fr": "Pourcentage des comptes utilisateurs (humains + service) avec MFA activé. Cible alimentée plus tard par plugin (Entra ID, Okta, Google Workspace).",
+      "description_en": "Percentage of user accounts (human + service) with MFA enabled. To be fed by future plugin (Entra ID, Okta, Google Workspace).",
+      "category_primary": "protect",
+      "unit": "%",
+      "direction": "higher_better",
+      "source_type": "external",
+      "target": 95,
+      "threshold_amber": 85,
+      "threshold_red": 70,
+      "mappings": [
+        {
+          "framework": "NIST_CSF_2",
+          "ref": "PR.AA-03",
+          "label_fr": "Les utilisateurs, services et matériels sont authentifiés",
+          "label_en": "Users, services, and hardware are authenticated"
+        },
+        {
+          "framework": "ISO_27001_2022",
+          "ref": "A.5.17",
+          "label_fr": "Information d'authentification",
+          "label_en": "Authentication information"
+        },
+        {
+          "framework": "CIS_v8",
+          "ref": "6.5",
+          "label_fr": "MFA requis pour les accès administrateurs",
+          "label_en": "Require MFA for administrative access"
+        },
+        {
+          "framework": "ISO_27004_2016",
+          "ref": "B.12",
+          "label_fr": "Contrôle d'accès — robustesse de l'authentification",
+          "label_en": "Access control — authentication robustness"
+        }
+      ]
+    },
+    {
+      "code": "pr_patch_compliance_rate",
+      "name_fr": "Taux de conformité patching",
+      "name_en": "Patch compliance rate",
+      "description_fr": "Pourcentage de postes/serveurs patchés dans le SLA défini par la politique. Cible alimentée plus tard par plugin (Intune, BigFix, Tanium, WSUS).",
+      "description_en": "Percentage of endpoints/servers patched within the SLA defined by policy. To be fed by future plugin (Intune, BigFix, Tanium, WSUS).",
+      "category_primary": "protect",
+      "unit": "%",
+      "direction": "higher_better",
+      "source_type": "external",
+      "target": 95,
+      "threshold_amber": 85,
+      "threshold_red": 70,
+      "mappings": [
+        {
+          "framework": "NIST_CSF_2",
+          "ref": "PR.PS-02",
+          "label_fr": "Les logiciels sont maintenus, remplacés et retirés",
+          "label_en": "Software is maintained, replaced, and removed"
+        },
+        {
+          "framework": "ISO_27001_2022",
+          "ref": "A.8.8",
+          "label_fr": "Gestion des vulnérabilités techniques",
+          "label_en": "Management of technical vulnerabilities"
+        },
+        {
+          "framework": "CIS_v8",
+          "ref": "7.1",
+          "label_fr": "Processus de gestion des vulnérabilités",
+          "label_en": "Establish and maintain a vulnerability management process"
+        },
+        {
+          "framework": "ISO_27004_2016",
+          "ref": "B.11",
+          "label_fr": "Gestion des correctifs — taux de couverture",
+          "label_en": "Patch management — coverage rate"
+        }
+      ]
+    },
+    {
+      "code": "pr_training_completion_rate",
+      "name_fr": "Taux de formation cybersécurité",
+      "name_en": "Cyber training completion rate",
+      "description_fr": "Pourcentage du personnel ayant suivi la formation cybersécurité annuelle obligatoire. Cible alimentée plus tard par plugin LMS (Moodle, Cornerstone, KnowBe4).",
+      "description_en": "Percentage of staff who completed the mandatory annual cybersecurity training. To be fed by future LMS plugin (Moodle, Cornerstone, KnowBe4).",
+      "category_primary": "protect",
+      "unit": "%",
+      "direction": "higher_better",
+      "source_type": "external",
+      "target": 95,
+      "threshold_amber": 80,
+      "threshold_red": 60,
+      "mappings": [
+        {
+          "framework": "NIST_CSF_2",
+          "ref": "PR.AT-01",
+          "label_fr": "Sensibilisation et formation du personnel",
+          "label_en": "Personnel are provided with awareness and training"
+        },
+        {
+          "framework": "ISO_27001_2022",
+          "ref": "A.6.3",
+          "label_fr": "Sensibilisation, enseignement et formation à la sécurité",
+          "label_en": "Information security awareness, education and training"
+        },
+        {
+          "framework": "CIS_v8",
+          "ref": "14.1",
+          "label_fr": "Programme de sensibilisation à la sécurité",
+          "label_en": "Establish and maintain a security awareness program"
+        },
+        {
+          "framework": "ISO_27004_2016",
+          "ref": "B.7",
+          "label_fr": "Formation à la sécurité de l'information — taux de réalisation",
+          "label_en": "Information security training — completion rate"
+        }
+      ]
+    },
+    {
+      "code": "de_findings_p1_open",
+      "name_fr": "Findings P1 ouverts",
+      "name_en": "Open P1 findings",
+      "description_fr": "Nombre de findings de priorité 1 (critique) actuellement ouverts sur les surfaces d'exposition (Surface + AppSec).",
+      "description_en": "Number of priority-1 (critical) findings currently open across exposure surfaces (Surface + AppSec).",
+      "category_primary": "detect",
+      "unit": "count",
+      "direction": "lower_better",
+      "source_type": "auto",
+      "source_module": "pilot",
+      "source_metric": "pilot:findings.p1_open",
+      "target": 0,
+      "threshold_amber": 3,
+      "threshold_red": 10,
+      "mappings": [
+        {
+          "framework": "NIST_CSF_2",
+          "ref": "DE.CM-09",
+          "label_fr": "Surveillance des matériels et logiciels",
+          "label_en": "Computing hardware and software are monitored"
+        },
+        {
+          "framework": "ISO_27001_2022",
+          "ref": "A.8.16",
+          "label_fr": "Activités de surveillance",
+          "label_en": "Monitoring activities"
+        },
+        {
+          "framework": "CIS_v8",
+          "ref": "8.1",
+          "label_fr": "Processus de gestion des journaux d'audit",
+          "label_en": "Establish and maintain an audit log management process"
+        },
+        {
+          "framework": "ISO_27004_2016",
+          "ref": "B.10",
+          "label_fr": "Couverture des vulnérabilités — exposition résiduelle",
+          "label_en": "Vulnerability coverage — residual exposure"
+        }
+      ]
+    },
+    {
+      "code": "de_mttd_avg_days",
+      "name_fr": "MTTD moyen (jours)",
+      "name_en": "Mean Time To Detect (days)",
+      "description_fr": "Délai moyen, en jours, entre la survenue d'un événement de sécurité et sa détection. À alimenter manuellement ou par plugin SIEM/XDR.",
+      "description_en": "Average elapsed time, in days, between the occurrence of a security event and its detection. To be entered manually or fed by a SIEM/XDR plugin.",
+      "category_primary": "detect",
+      "unit": "days",
+      "direction": "lower_better",
+      "source_type": "external",
+      "target": 1,
+      "threshold_amber": 7,
+      "threshold_red": 30,
+      "mappings": [
+        {
+          "framework": "NIST_CSF_2",
+          "ref": "DE.AE-02",
+          "label_fr": "Analyse des événements potentiellement défavorables",
+          "label_en": "Potentially adverse events are analyzed"
+        },
+        {
+          "framework": "ISO_27001_2022",
+          "ref": "A.5.25",
+          "label_fr": "Évaluation et décision sur les événements de sécurité",
+          "label_en": "Assessment and decision on information security events"
+        },
+        {
+          "framework": "ISO_27004_2016",
+          "ref": "B.14",
+          "label_fr": "Efficacité de la détection des incidents",
+          "label_en": "Incident detection effectiveness"
+        }
+      ]
+    },
+    {
+      "code": "rs_mttr_avg_days",
+      "name_fr": "MTTR moyen (jours)",
+      "name_en": "Mean Time To Respond (days)",
+      "description_fr": "Délai moyen, en jours, entre la détection d'un incident et sa contention/remédiation. À alimenter manuellement ou par plugin ticketing/SOAR.",
+      "description_en": "Average elapsed time, in days, between incident detection and its containment/remediation. To be entered manually or fed by a ticketing/SOAR plugin.",
+      "category_primary": "respond",
+      "unit": "days",
+      "direction": "lower_better",
+      "source_type": "external",
+      "target": 2,
+      "threshold_amber": 10,
+      "threshold_red": 30,
+      "mappings": [
+        {
+          "framework": "NIST_CSF_2",
+          "ref": "RS.MA-01",
+          "label_fr": "Le plan de réponse aux incidents est exécuté",
+          "label_en": "Incident response plan is executed during or after an incident"
+        },
+        {
+          "framework": "ISO_27001_2022",
+          "ref": "A.5.26",
+          "label_fr": "Réponse aux incidents de sécurité de l'information",
+          "label_en": "Response to information security incidents"
+        },
+        {
+          "framework": "CIS_v8",
+          "ref": "17.4",
+          "label_fr": "Processus de réponse aux incidents",
+          "label_en": "Establish and maintain an incident response process"
+        },
+        {
+          "framework": "ISO_27004_2016",
+          "ref": "B.14",
+          "label_fr": "Efficacité de la réponse aux incidents",
+          "label_en": "Incident response effectiveness"
+        }
+      ]
+    },
+    {
+      "code": "rc_backup_success_rate",
+      "name_fr": "Taux de succès des sauvegardes",
+      "name_en": "Backup success rate",
+      "description_fr": "Pourcentage de tâches de sauvegarde réussies sur la fenêtre courante. À alimenter par plugin (Veeam, Commvault, Rubrik, Azure Backup).",
+      "description_en": "Percentage of backup jobs that succeeded over the current window. To be fed by a plugin (Veeam, Commvault, Rubrik, Azure Backup).",
+      "category_primary": "recover",
+      "unit": "%",
+      "direction": "higher_better",
+      "source_type": "external",
+      "target": 99,
+      "threshold_amber": 95,
+      "threshold_red": 90,
+      "mappings": [
+        {
+          "framework": "NIST_CSF_2",
+          "ref": "RC.RP-03",
+          "label_fr": "Sauvegarde des informations de l'organisation",
+          "label_en": "Backup of organization-wide information"
+        },
+        {
+          "framework": "ISO_27001_2022",
+          "ref": "A.8.13",
+          "label_fr": "Sauvegarde des informations",
+          "label_en": "Information backup"
+        },
+        {
+          "framework": "CIS_v8",
+          "ref": "11.4",
+          "label_fr": "Processus de sauvegarde de données",
+          "label_en": "Establish and maintain an isolated instance of recovery data"
+        },
+        {
+          "framework": "ISO_27004_2016",
+          "ref": "B.15",
+          "label_fr": "Sauvegarde et reprise — taux de succès",
+          "label_en": "Backup and recovery — success rate"
+        }
+      ]
+    },
+    {
+      "code": "pr_m365_secure_score",
+      "name_fr": "Microsoft 365 Secure Score",
+      "name_en": "Microsoft 365 Secure Score",
+      "description_fr": "Score de sécurité Microsoft 365 (0-100). Mesure agrégée par Microsoft sur la posture du tenant (identités, données, appareils, apps). Alimenté par le connecteur Graph (securescores).",
+      "description_en": "Microsoft 365 Secure Score (0-100). Microsoft's aggregate measure of tenant posture (identities, data, devices, apps). Fed by the Graph connector (securescores).",
+      "category_primary": "protect",
+      "unit": "%",
+      "direction": "higher_better",
+      "source_type": "auto",
+      "source_module": "connector",
+      "source_metric": "m365_secure_score",
+      "target": 80,
+      "threshold_amber": 65,
+      "threshold_red": 50,
+      "mappings": [
+        {
+          "framework": "NIST_CSF_2",
+          "ref": "PR.AA-01",
+          "label_fr": "Les identités et identifiants sont gérés",
+          "label_en": "Identities and credentials are managed"
+        },
+        {
+          "framework": "ISO_27001_2022",
+          "ref": "A.5.15",
+          "label_fr": "Contrôle d'accès",
+          "label_en": "Access control"
+        },
+        {
+          "framework": "CIS_v8",
+          "ref": "16.1",
+          "label_fr": "Processus de gestion sécurisée des configurations",
+          "label_en": "Establish and maintain a secure configuration process"
+        },
+        {
+          "framework": "ISO_27004_2016",
+          "ref": "B.12",
+          "label_fr": "Contrôle d'accès — robustesse de la posture",
+          "label_en": "Access control — posture robustness"
+        }
+      ]
+    },
+    {
+      "code": "de_defender_exposure_score",
+      "name_fr": "Defender Exposure Score",
+      "name_en": "Defender Exposure Score",
+      "description_fr": "Score d'exposition Microsoft Defender (0-100, plus c'est bas mieux c'est). Reflète le risque cumulé issu des vulnérabilités, mauvaises configurations et événements détectés sur le parc.",
+      "description_en": "Microsoft Defender exposure score (0-100, lower is better). Reflects the cumulative risk from vulnerabilities, misconfigurations, and detected events across the estate.",
+      "category_primary": "detect",
+      "unit": "score",
+      "direction": "lower_better",
+      "source_type": "auto",
+      "source_module": "connector",
+      "source_metric": "defender_exposure_score",
+      "target": 20,
+      "threshold_amber": 40,
+      "threshold_red": 60,
+      "mappings": [
+        {
+          "framework": "NIST_CSF_2",
+          "ref": "DE.CM-09",
+          "label_fr": "Surveillance des matériels et logiciels",
+          "label_en": "Computing hardware and software are monitored"
+        },
+        {
+          "framework": "ISO_27001_2022",
+          "ref": "A.8.8",
+          "label_fr": "Gestion des vulnérabilités techniques",
+          "label_en": "Management of technical vulnerabilities"
+        },
+        {
+          "framework": "CIS_v8",
+          "ref": "7.1",
+          "label_fr": "Processus de gestion des vulnérabilités",
+          "label_en": "Establish and maintain a vulnerability management process"
+        },
+        {
+          "framework": "ISO_27004_2016",
+          "ref": "B.10",
+          "label_fr": "Couverture des vulnérabilités — exposition résiduelle",
+          "label_en": "Vulnerability coverage — residual exposure"
+        }
+      ]
+    },
+    {
+      "code": "pr_intune_device_compliance",
+      "name_fr": "Conformité postes Intune",
+      "name_en": "Intune device compliance",
+      "description_fr": "Pourcentage des appareils gérés (managedDevices) en état 'compliant' dans Intune. Alimenté par le connecteur Graph (deviceManagement/managedDevices).",
+      "description_en": "Percentage of Intune managed devices in 'compliant' state. Fed by the Graph connector (deviceManagement/managedDevices).",
+      "category_primary": "protect",
+      "unit": "%",
+      "direction": "higher_better",
+      "source_type": "auto",
+      "source_module": "connector",
+      "source_metric": "intune_device_compliance",
+      "target": 95,
+      "threshold_amber": 85,
+      "threshold_red": 70,
+      "mappings": [
+        {
+          "framework": "NIST_CSF_2",
+          "ref": "PR.PS-01",
+          "label_fr": "Configuration des plateformes — pratiques de gestion",
+          "label_en": "Configuration management practices are established"
+        },
+        {
+          "framework": "ISO_27001_2022",
+          "ref": "A.8.1",
+          "label_fr": "Terminaux des utilisateurs",
+          "label_en": "User endpoint devices"
+        },
+        {
+          "framework": "CIS_v8",
+          "ref": "4.1",
+          "label_fr": "Processus de configuration sécurisée des actifs",
+          "label_en": "Establish and maintain a secure configuration process"
+        },
+        {
+          "framework": "ISO_27004_2016",
+          "ref": "B.11",
+          "label_fr": "Gestion des configurations — taux de conformité",
+          "label_en": "Configuration management — compliance rate"
+        }
+      ]
+    },
+    {
+      "code": "pr_entra_mfa_coverage",
+      "name_fr": "Couverture MFA Entra ID",
+      "name_en": "Entra ID MFA coverage",
+      "description_fr": "Pourcentage d'utilisateurs Entra ID actifs disposant d'au moins une méthode MFA forte enregistrée. Alimenté par le connecteur Graph (reports/authenticationMethods).",
+      "description_en": "Percentage of active Entra ID users with at least one strong MFA method registered. Fed by the Graph connector (reports/authenticationMethods).",
+      "category_primary": "protect",
+      "unit": "%",
+      "direction": "higher_better",
+      "source_type": "auto",
+      "source_module": "connector",
+      "source_metric": "entra_mfa_coverage",
+      "target": 100,
+      "threshold_amber": 95,
+      "threshold_red": 85,
+      "mappings": [
+        {
+          "framework": "NIST_CSF_2",
+          "ref": "PR.AA-03",
+          "label_fr": "Les utilisateurs, services et matériels sont authentifiés",
+          "label_en": "Users, services, and hardware are authenticated"
+        },
+        {
+          "framework": "ISO_27001_2022",
+          "ref": "A.5.17",
+          "label_fr": "Information d'authentification",
+          "label_en": "Authentication information"
+        },
+        {
+          "framework": "CIS_v8",
+          "ref": "6.5",
+          "label_fr": "MFA requis pour les accès administrateurs",
+          "label_en": "Require MFA for administrative access"
+        },
+        {
+          "framework": "ISO_27004_2016",
+          "ref": "B.12",
+          "label_fr": "Contrôle d'accès — robustesse de l'authentification",
+          "label_en": "Access control — authentication robustness"
+        }
+      ]
+    },
+    {
+      "code": "de_entra_risky_users",
+      "name_fr": "Utilisateurs Entra ID à risque",
+      "name_en": "Entra ID risky users",
+      "description_fr": "Nombre d'utilisateurs Entra ID actuellement en état 'atRisk' (Identity Protection). Alimenté par le connecteur Graph (identityProtection/riskyUsers).",
+      "description_en": "Number of Entra ID users currently in 'atRisk' state (Identity Protection). Fed by the Graph connector (identityProtection/riskyUsers).",
+      "category_primary": "detect",
+      "unit": "count",
+      "direction": "lower_better",
+      "source_type": "auto",
+      "source_module": "connector",
+      "source_metric": "entra_risky_users",
+      "target": 0,
+      "threshold_amber": 5,
+      "threshold_red": 20,
+      "mappings": [
+        {
+          "framework": "NIST_CSF_2",
+          "ref": "DE.CM-03",
+          "label_fr": "Activité du personnel et utilisations d'accès surveillées",
+          "label_en": "Personnel activity and technology usage are monitored"
+        },
+        {
+          "framework": "ISO_27001_2022",
+          "ref": "A.8.16",
+          "label_fr": "Activités de surveillance",
+          "label_en": "Monitoring activities"
+        },
+        {
+          "framework": "CIS_v8",
+          "ref": "6.7",
+          "label_fr": "Gestion centralisée des accès et authentification",
+          "label_en": "Centralize access control"
+        },
+        {
+          "framework": "ISO_27004_2016",
+          "ref": "B.14",
+          "label_fr": "Détection des incidents — comptes compromis",
+          "label_en": "Incident detection — compromised accounts"
+        }
+      ]
+    },
+    {
+      "code": "pr_aws_securityhub_critical",
+      "name_fr": "AWS Security Hub — findings critiques",
+      "name_en": "AWS Security Hub — critical findings",
+      "description_fr": "Nombre de findings CRITICAL actifs dans AWS Security Hub. Alimenté par le connecteur AWS.",
+      "description_en": "Number of active CRITICAL findings in AWS Security Hub. Fed by the AWS connector.",
+      "category_primary": "protect",
+      "unit": "nb",
+      "direction": "lower_better",
+      "source_type": "auto",
+      "source_module": "connector",
+      "source_metric": "aws_securityhub_critical",
+      "target": 0,
+      "threshold_amber": 3,
+      "threshold_red": 10,
+      "mappings": [
+        {
+          "framework": "NIST_CSF_2",
+          "ref": "PR.PS-01",
+          "label_fr": "Configuration sécurisée des plateformes",
+          "label_en": "Configuration management practices are established"
+        },
+        {
+          "framework": "CIS_v8",
+          "ref": "4.1",
+          "label_fr": "Processus de configuration sécurisée",
+          "label_en": "Establish and maintain a secure configuration process"
+        }
+      ]
+    },
+    {
+      "code": "de_aws_guardduty_high",
+      "name_fr": "AWS GuardDuty — menaces élevées",
+      "name_en": "AWS GuardDuty — high-severity threats",
+      "description_fr": "Findings GuardDuty de sévérité haute/critique (>=7.0) sur l'ensemble des détecteurs. Alimenté par le connecteur AWS.",
+      "description_en": "GuardDuty findings of high/critical severity (>=7.0) across detectors. Fed by the AWS connector.",
+      "category_primary": "detect",
+      "unit": "nb",
+      "direction": "lower_better",
+      "source_type": "auto",
+      "source_module": "connector",
+      "source_metric": "aws_guardduty_high",
+      "target": 0,
+      "threshold_amber": 3,
+      "threshold_red": 10,
+      "mappings": [
+        {
+          "framework": "NIST_CSF_2",
+          "ref": "DE.CM-01",
+          "label_fr": "Surveillance des réseaux et systèmes",
+          "label_en": "Networks and systems are monitored"
+        },
+        {
+          "framework": "ISO_27001_2022",
+          "ref": "A.8.16",
+          "label_fr": "Activités de surveillance",
+          "label_en": "Monitoring activities"
+        }
+      ]
+    },
+    {
+      "code": "pr_aws_iam_keys_old",
+      "name_fr": "AWS IAM — clés d'accès non renouvelées",
+      "name_en": "AWS IAM — stale access keys",
+      "description_fr": "Pourcentage de clés d'accès IAM actives de plus de 90 jours (hygiène de rotation). Alimenté par le connecteur AWS.",
+      "description_en": "Percentage of active IAM access keys older than 90 days (rotation hygiene). Fed by the AWS connector.",
+      "category_primary": "protect",
+      "unit": "%",
+      "direction": "lower_better",
+      "source_type": "auto",
+      "source_module": "connector",
+      "source_metric": "aws_iam_keys_old_pct",
+      "target": 0,
+      "threshold_amber": 15,
+      "threshold_red": 30,
+      "mappings": [
+        {
+          "framework": "NIST_CSF_2",
+          "ref": "PR.AA-01",
+          "label_fr": "Les identités et identifiants sont gérés",
+          "label_en": "Identities and credentials are managed"
+        },
+        {
+          "framework": "CIS_v8",
+          "ref": "5.3",
+          "label_fr": "Désactiver les comptes dormants",
+          "label_en": "Disable dormant accounts"
+        }
+      ]
+    },
+    {
+      "code": "pr_aws_s3_public_buckets",
+      "name_fr": "AWS S3 — buckets publics",
+      "name_en": "AWS S3 — public buckets",
+      "description_fr": "Nombre de buckets S3 exposés publiquement (ACL ou policy publique). Alimenté par le connecteur AWS.",
+      "description_en": "Number of S3 buckets publicly exposed (public ACL or policy). Fed by the AWS connector.",
+      "category_primary": "protect",
+      "unit": "nb",
+      "direction": "lower_better",
+      "source_type": "auto",
+      "source_module": "connector",
+      "source_metric": "aws_s3_public_buckets",
+      "target": 0,
+      "threshold_amber": 1,
+      "threshold_red": 3,
+      "mappings": [
+        {
+          "framework": "NIST_CSF_2",
+          "ref": "PR.DS-01",
+          "label_fr": "Confidentialité des données au repos",
+          "label_en": "The confidentiality of data-at-rest is protected"
+        },
+        {
+          "framework": "ISO_27001_2022",
+          "ref": "A.5.10",
+          "label_fr": "Utilisation acceptable de l'information",
+          "label_en": "Acceptable use of information"
+        }
+      ]
+    }
+  ]
+}

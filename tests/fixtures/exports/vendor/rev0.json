@@ -1,0 +1,25 @@
+{
+ "metadata": {
+  "organization": "Fixture"
+ },
+ "vendors": [
+  {
+   "id": "VND-001",
+   "name": "Fournisseur"
+  }
+ ],
+ "assessments": [
+  {
+   "id": "A1",
+   "vendor_id": "VND-001",
+   "status": "completed",
+   "responses": [
+    {
+     "question_id": "Q1",
+     "answer": "compliant",
+     "comment": "ok"
+    }
+   ]
+  }
+ ]
+}

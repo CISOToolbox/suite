@@ -1,0 +1,8 @@
+-r requirements.txt
+pytest>=8.0
+pytest-asyncio>=0.24
+anyio[trio]>=4.0
+httpx>=0.28
+aiosqlite>=0.20
+# pygments: transitive of pytest — 4 MODERATE fixed in 2.20.0
+pygments==2.20.0

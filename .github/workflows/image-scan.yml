@@ -1,0 +1,79 @@
+name: Image Vulnerability Scan
+
+# Companion to dependency-scan.yml: that one scans the dependency manifests in
+# the repo, this one scans the BUILT container images for OS-level and language
+# CVEs with Trivy. Referenced by dependency-scan.yml ("the weekly image scan").
+#
+#   Weekly (Mon 07:00 UTC) + on any change to docker-compose.yml + manual.
+#   Fails on HIGH/CRITICAL with a fix available (ignore-unfixed), so a red build
+#   means "an upgrade exists that you have not applied", not noise.
+#
+# NOTE: images not yet published to GHCR (e.g. ciso-postgres, ciso-backup-agent,
+# ciso-audit-suite at the time of writing) cannot be pulled and their matrix leg
+# is skipped with a warning — it does not fail the run. Once published they are
+# scanned automatically (the list is derived from docker-compose.yml).
+
+on:
+  schedule:
+    - cron: '0 7 * * 1'
+  push:
+    branches: [main]
+    paths: ['docker-compose.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+  security-events: write
+
+jobs:
+  # ── Derive the image list from the compose file (single source of truth) ──
+  discover:
+    name: List images from docker-compose.yml
+    runs-on: ubuntu-latest
+    outputs:
+      images: ${{ steps.list.outputs.images }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: list
+        run: |
+          images=$(grep -vE '^[[:space:]]*#' docker-compose.yml \
+            | grep -oE 'image:[[:space:]]*[^[:space:]]+' \
+            | sed -E 's/image:[[:space:]]*//' | sort -u \
+            | python3 -c 'import sys, json; print(json.dumps([l.strip() for l in sys.stdin if l.strip()]))')
+          echo "images=$images" >> "$GITHUB_OUTPUT"
+          echo "Discovered: $images"
+
+  scan:
+    name: Trivy ${{ matrix.image }}
+    needs: discover
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false          # scan every image even if one is vulnerable
+      matrix:
+        image: ${{ fromJson(needs.discover.outputs.images) }}
+    steps:
+      # Some images may not be published yet; a failed pull must warn, not fail
+      # the whole run. Probe first and skip the leg if it is not resolvable.
+      - name: Check image is pullable
+        id: probe
+        env:
+          IMAGE: ${{ matrix.image }}   # repo-derived, but never inline in run:
+        run: |
+          if docker manifest inspect "$IMAGE" >/dev/null 2>&1; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::$IMAGE is not in the registry yet — skipping"
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Trivy scan (HIGH/CRITICAL, fixable)
+        if: steps.probe.outputs.ok == 'true'
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ matrix.image }}
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'          # fail the leg on a fixable HIGH+
+          format: table

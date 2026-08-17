@@ -1,0 +1,324 @@
+/* Sur une teinte, l'encre est le grade -ink du MÊME ton. La couleur de base y
+   passe de justesse ou échoue selon le ton — medium tombe à 4,49:1 en clair — et
+   l'écart ne se voit qu'à la mesure. Règle uniforme plutôt que cas par cas. */
+
+/* Connector list cards — bordered + spaced so each connector is visually
+   self-contained (title groups with its own buttons, not the card above). */
+
+/* Reviews list filter chips */
+.review-filter-bar { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 4px; }
+.review-filter-chip { background: var(--ct-surface); border: 1px solid var(--ct-line); border-radius: 16px; padding: 4px 12px; font-size: 0.82em; cursor: pointer; color: var(--ct-ink-2); }
+.review-filter-chip:hover { border-color: var(--ct-accent); }
+.review-filter-chip.active { background: var(--ct-accent); border-color: var(--ct-ink); color: var(--ct-onaccent); }
+.review-filter-count { display: inline-block; margin-left: 4px; font-weight: 700; opacity: 0.85; }
+
+
+
+/* Interactive buttons stay neutral gray while the reviewer hasn't
+   decided. Only when .active (decision taken) do they switch to
+   green / red. */
+/* Read-only display (closed reviews) — still colored to show the
+   recorded decision. */
+
+.entry-row { padding: 8px 0; border-bottom: 1px solid var(--ct-line); }
+.entry-row:last-child { border-bottom: none; }
+
+.review-summary { display: flex; gap: 16px; margin-bottom: 16px; padding: 12px; background: var(--ct-canvas); border-radius: 8px; font-size: 0.85em; }
+.review-summary .count { font-weight: 700; }
+
+.progress-bar { height: 6px; background: var(--ct-line); border-radius: 3px; overflow: hidden; margin: 4px 0; }
+.progress-bar-fill { height: 100%; background: var(--ct-accent); border-radius: 3px; transition: width 0.3s; }
+
+
+/* Warnings on review entries */
+.entry-row.admin-flag td { background: var(--ct-medium-tint); }
+.entry-row.admin-flag:hover td { background: var(--ct-medium-tint); }
+.entry-row.critical-flag td { background: var(--ct-critical-tint); }
+.entry-row.critical-flag:hover td { background: var(--ct-critical-tint); }
+
+/* Modificateur de .ct-badge : le ton vient du socle, cette regle ne garde
+   que ce qu'il ne fournit pas — graisse, interlettrage et espacement. */
+.warn-badge { font-size: 0.68em; letter-spacing: 0.3px; margin-right: 3px; vertical-align: middle; }
+/* Declared service account — informational, neutral blue-gray */
+
+mark.admin-term {
+    background: var(--ct-medium-tint);
+    color: var(--ct-medium-ink);
+    padding: 0 2px;
+    border-radius: 2px;
+    font-weight: 600;
+}
+.review-summary .count.admin-count {
+    color: var(--ct-medium-ink);
+    background: var(--ct-medium-tint);
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 0.82em;
+}
+
+/* App detail enhanced view */
+.app-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.app-detail-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+    gap: 20px;
+    align-items: start;
+}
+.app-detail-col {
+    min-width: 0;
+}
+@media (max-width: 768px) {
+    .app-detail-grid { grid-template-columns: 1fr; }
+}
+
+.app-review-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px 12px;
+    background: var(--ct-surface);
+    border: 1px solid var(--ct-line);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: box-shadow 0.15s, border-color 0.15s;
+}
+.app-review-row:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    border-color: var(--ct-ink);
+}
+.app-review-row.closed { opacity: 0.75; }
+
+.app-review-del {
+    background: none;
+    border: none;
+    color: var(--ct-ink-2);
+    font-size: 1.3em;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 6px;
+    border-radius: 4px;
+    opacity: 0.5;
+    transition: all 0.15s;
+    align-self: center;
+}
+.app-review-del:hover { background: var(--ct-critical-tint); color: var(--ct-critical-ink); opacity: 1; }
+
+/* Application detail — left form */
+.app-section {
+    background: var(--ct-surface);
+    border: 1px solid var(--ct-line);
+    border-radius: 10px;
+    padding: 16px 18px;
+    margin-bottom: 14px;
+}
+.app-section-title {
+    font-size: 0.78em;
+    font-weight: 700;
+    color: var(--ct-ink-2);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--ct-line);
+}
+.app-field { margin-bottom: 12px; }
+.app-field:last-child { margin-bottom: 0; }
+.app-field-lbl {
+    display: block;
+    font-size: 0.78em;
+    font-weight: 600;
+    color: var(--ct-ink-2);
+    margin-bottom: 4px;
+}
+.app-field-input {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--ct-line);
+    border-radius: 6px;
+    font-size: 0.88em;
+    background: var(--ct-surface);
+    color: var(--ct-ink);
+    box-sizing: border-box;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+.app-field-input:focus {
+    outline: none;
+    border-color: var(--ct-ink);
+    box-shadow: var(--ct-focus-soft);
+}
+
+.app-empty-hint {
+    color: var(--ct-ink-2);
+    font-size: 0.85em;
+    font-style: italic;
+    padding: 8px 0;
+}
+
+.app-reviewer-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.app-reviewer-chip {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    background: var(--ct-surface-2);
+    border: 1px solid var(--ct-line);
+    border-radius: 8px;
+}
+.app-reviewer-avatar {
+    flex: 0 0 auto;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--ct-accent), var(--ct-accent));
+    color: var(--ct-onaccent);
+    font-size: 0.78em;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    letter-spacing: 0.3px;
+}
+.app-reviewer-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+.app-reviewer-name {
+    font-size: 0.85em;
+    font-weight: 600;
+    color: var(--ct-ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.app-reviewer-email {
+    font-size: 0.74em;
+    color: var(--ct-ink-2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ── User / detail form styles (ported from vendor TPRM.css) ─────── */
+.form-grid > .form-row { margin-bottom: 0; }
+.form-section {
+    font-size: 0.78em; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.5px; color: var(--ct-ink-2);
+    margin: 16px 0 8px; padding-top: 12px; border-top: 1px solid var(--ct-line);
+}
+/* Checkbox rows shouldn't force uppercase labels */
+.tprm-form .form-row > label[style*="inline-flex"] {
+    text-transform: none; font-weight: 500; color: inherit; letter-spacing: normal;
+}
+
+/* ── Review filter pills ─────────────────────────────── */
+.review-pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    color: var(--ct-ink);
+    transition: transform 0.1s, box-shadow 0.1s;
+}
+.review-pill.active { color: var(--ct-onsolid); }
+.review-pill:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+}
+.review-pill:active { transform: translateY(0); }
+
+/* ── Compliance proof cards (user detail) ────────────────────── */
+.proof-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 12px;
+    margin-top: 8px;
+}
+.proof-card {
+    background: var(--ct-surface-2);
+    border: 1px solid var(--ct-line);
+    border-radius: 8px;
+    padding: 10px 12px;
+    transition: border-color 0.15s, background 0.15s;
+}
+.proof-card--ok {
+    background: var(--ct-low-tint);
+    border-color: var(--ct-low-tint);
+}
+.proof-card__head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+}
+
+.proof-card__title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.proof-card__date {
+    flex: 0 0 auto;
+    padding: 4px 8px;
+    font-size: 0.82em;
+    border: 1px solid var(--ct-line);
+    border-radius: 4px;
+    background: var(--ct-surface);
+    color: var(--ct-ink);
+}
+.proof-card__justif {
+    width: 100%;
+    resize: vertical;
+    min-height: 48px;
+    padding: 6px 8px;
+    font-size: 0.85em;
+    font-family: inherit;
+    border: 1px solid var(--ct-line);
+    border-radius: 4px;
+    background: var(--ct-surface);
+    color: var(--ct-ink);
+    box-sizing: border-box;
+}
+.proof-card__justif:focus {
+    outline: 2px solid var(--ct-info);
+    outline-offset: -1px;
+    border-color: transparent;
+}
+
+/* ── Button variants (backgrounds were inline in Access_app.ts) ──── */
+/* Neutral secondary: Importer CSV, Historique des syncs */
+/* Destructive: Supprimer / delete row buttons
+   (named access-danger: cisotoolbox.css already owns .btn-danger) */
+/* Inline links: Modele CSV, app URL */
+.access-link { color: var(--ct-accent); }
+/* Service-account risk level badge (background set inline) */
+
+/* ── Dark mode ───────────────────────────────────────────────────── */
+/* Saturated fills (green .btn-add, accent chips, decision buttons,
+   warn badges on token colors) are LIGHT colors in dark mode, so the
+   text flips to near-black — same convention as
+   .ct-btn[data-variant="primary"] in cisotoolbox.css. */
+
+/* Neutral secondary button → surface + strong line + ink */
+:root[data-theme="dark"] .btn-add.btn-neutral {
+    background: var(--ct-surface);
+    border: 1px solid var(--ct-line-strong);
+    color: var(--ct-ink);
+}
+/* Destructive secondary button → danger tint + line + critical ink */
+/* Links: accent is too dim on canvas at small sizes → accent-ink */
+
+/* Vars consumed by inline styles in Access_app.ts; undefined in light
+   mode, where the inline fallback keeps the current rendering. */
+
+/* Extrait du balisage : la classe existait, son style vivait a cote. */
+.plg-type-card { padding:8px 10px; border:2px solid var(--ct-line); border-radius:6px; cursor:pointer; font-size:var(--ct-text-label); transition:border-color 0.15s; }

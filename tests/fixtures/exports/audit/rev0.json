@@ -1,0 +1,12 @@
+{
+ "meta": {
+  "societe": "Fixture",
+  "date_evaluation": "2025-01-01"
+ },
+ "findings": [
+  {
+   "id": "F1",
+   "titre": "Constat"
+  }
+ ]
+}

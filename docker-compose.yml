@@ -1,0 +1,1251 @@
+# ── CISO Toolbox — Full Stack Docker Compose ─────────────────
+# All modules + Traefik reverse proxy
+#
+# Usage:
+#   cp .env.example .env    # Edit with your settings
+#   docker compose up -d    # Start all services
+#
+# URLs (with default DOMAIN=localhost):
+#   https://localhost/           → Pilot (dashboard)
+#   https://localhost/risk/      → Risk (EBIOS RM)
+#   https://localhost/vendor/    → Vendor (TPRM)
+#   https://localhost/compliance/→ Compliance
+#
+# Or with a real domain (DOMAIN=ciso.example.com):
+#   https://ciso.example.com/
+#   https://ciso.example.com/risk/
+#   etc.
+
+# ─────────────────────────────────────────────────────────────
+# Shared env block — injected via YAML anchor into every module.
+# Keeps the 8 backend services in sync without hand-maintained copies.
+# ─────────────────────────────────────────────────────────────
+x-module-env: &module-env
+  JWT_SECRET: ${JWT_SECRET}
+  SERVICE_TOKEN: ${SERVICE_TOKEN:?SERVICE_TOKEN is required}
+  AUTH_MODE: ${AUTH_MODE:-pilot}
+  PILOT_URL: http://pilot-app:8080
+  ENTRA_CLIENT_ID: ${ENTRA_CLIENT_ID:-}
+  ENTRA_CLIENT_SECRET: ${ENTRA_CLIENT_SECRET:-}
+  ENTRA_TENANT_ID: ${ENTRA_TENANT_ID:-common}
+  GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+  GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+  OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
+  OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+  OIDC_ISSUER: ${OIDC_ISSUER:-}
+  OIDC_LABEL: ${OIDC_LABEL:-SSO}
+
+# Shared healthcheck block for app containers
+x-app-healthcheck: &app-healthcheck
+  test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/api/health')"]
+  interval: 30s
+  timeout: 10s
+  retries: 3
+
+# Shared healthcheck block for postgres containers — the CMD-SHELL uses the
+# POSTGRES_USER of each db, so it stays per-service.
+
+services:
+
+  # ════════════════════════════════════════════════════════════
+  # REVERSE PROXY — Nginx
+  # ════════════════════════════════════════════════════════════
+
+  proxy:
+    image: nginx:alpine@sha256:54f2a904c251d5a34adf545a72d32515a15e08418dae0266e23be2e18c66fefa
+    container_name: ciso-proxy
+    restart: unless-stopped
+    # Hardening (CNT-02) — same posture as the app containers. The master
+    # process still starts as root (official image) but with only the four
+    # capabilities nginx actually needs:
+    #   NET_BIND_SERVICE  bind :80/:443 inside the container
+    #   SETUID/SETGID     master drops privileges to the `nginx` worker user
+    #   CHOWN             master chowns the proxy temp dirs to the worker user
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+      - SETUID
+      - SETGID
+      - CHOWN
+    tmpfs:
+      # /tmp receives the rewritten nginx.conf from the startup command below.
+      - /tmp:noexec,nosuid,size=16m
+      # proxy/client body buffering temp dirs (compiled-in defaults).
+      - /var/cache/nginx:noexec,nosuid,size=64m
+      # nginx.pid — /var/run is a symlink to /run in alpine.
+      - /run:noexec,nosuid,size=16m
+    # nginx.conf hardcodes `resolver 127.0.0.11` (Docker's embedded DNS).
+    # Under Podman the DNS lives at the network gateway (e.g. 10.89.0.1),
+    # so we rewrite the resolver from the container's own /etc/resolv.conf
+    # at startup. No-op under Docker (nameserver IS 127.0.0.11); fixes the
+    # suite-wide 502 ("upstream could not be resolved") under Podman.
+    command:
+      - /bin/sh
+      - -c
+      - |
+        DNS=$$(awk '/^nameserver/{print $$2; exit}' /etc/resolv.conf)
+        echo "ciso-proxy: nginx resolver -> $$DNS"
+        sed "s/resolver 127.0.0.11/resolver $$DNS/" /etc/nginx/nginx.conf > /tmp/nginx.conf
+        exec nginx -c /tmp/nginx.conf -g 'daemon off;'
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+    depends_on:
+      pilot-app:
+        condition: service_healthy
+      risk-app:
+        condition: service_healthy
+      vendor-app:
+        condition: service_healthy
+      compliance-app:
+        condition: service_healthy
+      asset-app:
+        condition: service_healthy
+      audit-app:
+        condition: service_healthy
+      access-app:
+        condition: service_healthy
+      surface-app:
+        condition: service_healthy
+    networks:
+      - ciso-net
+
+  # ════════════════════════════════════════════════════════════
+  # PILOT — Governance Dashboard
+  # ════════════════════════════════════════════════════════════
+
+  # CNT-01 — the app images below are pinned by content digest
+  # (`:latest@sha256:…`): the tag stays readable, the digest is what Docker
+  # actually resolves, so a repointed `:latest` can't silently change what runs.
+  # Refresh the digests at release with `bash tools/pin-images.sh` (adopts each
+  # tag's current bytes after review); `tools/pin-images.sh --check` fails CI on
+  # any image left on a bare tag.
+  # Locally this is inert: docker-compose.override.yml rebuilds them as
+  # `ciso-*:local` with `pull_policy: never`, so nothing is pulled from ghcr.io.
+  # NOTE: `ciso-postgres:16`, `ciso-backup-agent:16` and `ciso-audit-suite` are
+  # not yet published to GHCR, so they stay on their tag — pin-images.sh pins
+  # them automatically once they are.
+  pilot-app:
+    image: ghcr.io/cisotoolbox/ciso-pilot-suite:latest@sha256:e3ea50b479ca481c9e9e7c0adf142db3b8c4dd8670f05b79005f9b634af5585a
+    container_name: ciso-pilot
+    restart: unless-stopped
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:noexec,nosuid,size=128m
+      - /home/appuser:size=32m,mode=1777
+    env_file: .env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://pilot:${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}@pilot-db:5432/pilot
+      - JWT_SECRET=${JWT_SECRET}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY is required (openssl rand -hex 32) — see .env.example}
+      - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-}
+      - SERVICE_TOKEN=${SERVICE_TOKEN}
+      # FEAT-30 phase 2 — static DSN target for /internal/export-recovery
+      - RECOVERY_DB_HOST=backup-agent
+      - RECOVERY_DB_PORT=5433
+      # FEAT-30 phase 2 — recovery orchestration (agent API)
+      - BACKUP_AGENT_URL=http://backup-agent:9090
+      - BACKUP_AGENT_TOKEN=${BACKUP_AGENT_TOKEN:?BACKUP_AGENT_TOKEN is required (recovery API), see .env.example}
+      - APP_URL=${APP_URL:-https://localhost}
+      # FEAT-31 — compose the suite à la carte: when set (e.g. "risk,compliance"),
+      # the registry (dashboard, backups, module menu) is restricted to this
+      # subset. Empty = all modules. Keep in sync with the deployed services.
+      - PILOT_MODULES=${PILOT_MODULES:-}
+      - RISK_URL=http://risk-app:8080
+      - VENDOR_URL=http://vendor-app:8080
+      - COMPLIANCE_URL=http://compliance-app:8080
+      # EXTERNAL_URL values are PATH-ONLY so the browser resolves them
+      # relative to the current origin — this way the port used to reach
+      # Pilot (e.g. 8443 in dev) is preserved on every module link.
+      - RISK_EXTERNAL_URL=/risk/
+      - VENDOR_EXTERNAL_URL=/vendor/
+      - COMPLIANCE_EXTERNAL_URL=/compliance/
+      - ASSET_URL=http://asset-app:8080
+      - ASSET_EXTERNAL_URL=/asset/
+      - ACCESS_URL=http://access-app:8080
+      - ACCESS_EXTERNAL_URL=/access/
+      - SURFACE_URL=http://surface-app:8080
+      - SURFACE_EXTERNAL_URL=/surface/
+      - APPSEC_URL=http://appsec-app:8080
+      - APPSEC_EXTERNAL_URL=/appsec/
+      - AUDIT_URL=http://audit-app:8080
+      - AUDIT_EXTERNAL_URL=/audit/
+      - ENTRA_CLIENT_ID=${ENTRA_CLIENT_ID}
+      - ENTRA_CLIENT_SECRET=${ENTRA_CLIENT_SECRET}
+      - ENTRA_TENANT_ID=${ENTRA_TENANT_ID:-common}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID}
+      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET}
+      - OIDC_ISSUER=${OIDC_ISSUER}
+      - OIDC_LABEL=${OIDC_LABEL:-SSO}
+    depends_on:
+      pilot-db:
+        condition: service_healthy
+      risk-app:
+        condition: service_healthy
+      vendor-app:
+        condition: service_healthy
+      compliance-app:
+        condition: service_healthy
+      asset-app:
+        condition: service_healthy
+      access-app:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8080/api/health\")'"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - ciso-net
+
+  pilot-db:
+    # ciso-postgres = same postgres:16-alpine base + pgBackRest (FEAT-30).
+    image: ghcr.io/cisotoolbox/ciso-postgres:16
+    # Continuous WAL archiving to the shared encrypted repository —
+    # the PITR window starts at the first full backup (backup-agent).
+    command: postgres -c wal_level=replica -c archive_mode=on
+      -c archive_command='pgbackrest --stanza=pilot archive-push %p'
+      -c archive_timeout=60
+    container_name: ciso-pilot-db
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    # CNT-03 — minimal capability set for the official postgres image:
+    # entrypoint chowns PGDATA (CHOWN/FOWNER/DAC_OVERRIDE) then steps down
+    # from root to the postgres user via gosu (SETUID/SETGID).
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    environment:
+      POSTGRES_DB: pilot
+      # PGDATA at /pg/pilot: the agent mounts the same volume at the same
+      # path, satisfying pgBackRest's data-directory identity check.
+      PGDATA: /pg/pilot
+      PGBACKREST_PG1_PATH: /pg/pilot
+      POSTGRES_USER: pilot
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}
+      PGBACKREST_REPO1_PATH: /var/lib/pgbackrest
+      PGBACKREST_REPO1_CIPHER_TYPE: aes-256-cbc
+      PGBACKREST_REPO1_CIPHER_PASS: ${BACKUP_CIPHER_PASS:?BACKUP_CIPHER_PASS is required (pgBackRest repo encryption), see .env.example}
+      PGBACKREST_LOG_LEVEL_CONSOLE: warn
+    volumes:
+      - pilot-pgdata:/pg/pilot
+      - backups-repo:/var/lib/pgbackrest
+      - pilot-pgsock:/var/run/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pilot"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ciso-net
+
+  # ════════════════════════════════════════════════════════════
+  # RISK — EBIOS RM
+  # ════════════════════════════════════════════════════════════
+
+  risk-app:
+    image: ghcr.io/cisotoolbox/ciso-risk-suite:latest@sha256:58926adb858b752b58863d7fb0ba32c838d64f2b8d31244c743b8e6564ebe3fe
+    container_name: ciso-risk
+    restart: unless-stopped
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:noexec,nosuid,size=128m
+      - /home/appuser:size=32m,mode=1777
+    env_file: .env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://risk:${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}@risk-db:5432/risk
+      - JWT_SECRET=${JWT_SECRET}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY is required (openssl rand -hex 32) — see .env.example}
+      - SERVICE_TOKEN=${SERVICE_TOKEN}
+      # FEAT-30 phase 2 — static DSN target for /internal/export-recovery
+      - RECOVERY_DB_HOST=backup-agent
+      - RECOVERY_DB_PORT=5433
+      - APP_URL=${APP_URL:-https://localhost}/risk
+      - AUTH_MODE=pilot
+      - MODULE_COOKIE=risk_token
+      - MODULE_NAME=risk
+      - PILOT_URL=http://pilot-app:8080
+      - AI_MANAGED_BY_PILOT=true
+      - ENTRA_CLIENT_ID=${ENTRA_CLIENT_ID}
+      - ENTRA_CLIENT_SECRET=${ENTRA_CLIENT_SECRET}
+      - ENTRA_TENANT_ID=${ENTRA_TENANT_ID:-common}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID}
+      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET}
+      - OIDC_ISSUER=${OIDC_ISSUER}
+      - OIDC_LABEL=${OIDC_LABEL:-SSO}
+      - VENDOR_URL=http://vendor-app:8080
+    depends_on:
+      risk-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8080/api/health\")'"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - ciso-net
+
+  risk-db:
+    # ciso-postgres = same postgres:16-alpine base + pgBackRest (FEAT-30).
+    image: ghcr.io/cisotoolbox/ciso-postgres:16
+    # Continuous WAL archiving to the shared encrypted repository —
+    # the PITR window starts at the first full backup (backup-agent).
+    command: postgres -c wal_level=replica -c archive_mode=on
+      -c archive_command='pgbackrest --stanza=risk archive-push %p'
+      -c archive_timeout=60
+    container_name: ciso-risk-db
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    # CNT-03 — minimal capability set for the official postgres image:
+    # entrypoint chowns PGDATA (CHOWN/FOWNER/DAC_OVERRIDE) then steps down
+    # from root to the postgres user via gosu (SETUID/SETGID).
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    environment:
+      POSTGRES_DB: risk
+      # PGDATA at /pg/risk: the agent mounts the same volume at the same
+      # path, satisfying pgBackRest's data-directory identity check.
+      PGDATA: /pg/risk
+      PGBACKREST_PG1_PATH: /pg/risk
+      POSTGRES_USER: risk
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}
+      PGBACKREST_REPO1_PATH: /var/lib/pgbackrest
+      PGBACKREST_REPO1_CIPHER_TYPE: aes-256-cbc
+      PGBACKREST_REPO1_CIPHER_PASS: ${BACKUP_CIPHER_PASS:?BACKUP_CIPHER_PASS is required (pgBackRest repo encryption), see .env.example}
+      PGBACKREST_LOG_LEVEL_CONSOLE: warn
+    volumes:
+      - risk-pgdata:/pg/risk
+      - backups-repo:/var/lib/pgbackrest
+      - risk-pgsock:/var/run/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U risk"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ciso-net
+
+  # ════════════════════════════════════════════════════════════
+  # VENDOR — TPRM
+  # ════════════════════════════════════════════════════════════
+
+  vendor-app:
+    image: ghcr.io/cisotoolbox/ciso-vendor-suite:latest@sha256:780a2a10c5658d4db20847d1295f2d31ffd45f6fcb1db684fb75efb490b75d3a
+    container_name: ciso-vendor
+    restart: unless-stopped
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:noexec,nosuid,size=128m
+      - /home/appuser:size=32m,mode=1777
+    env_file: .env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://vendor:${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}@vendor-db:5432/vendor
+      - JWT_SECRET=${JWT_SECRET}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY is required (openssl rand -hex 32) — see .env.example}
+      - SERVICE_TOKEN=${SERVICE_TOKEN}
+      # FEAT-30 phase 2 — static DSN target for /internal/export-recovery
+      - RECOVERY_DB_HOST=backup-agent
+      - RECOVERY_DB_PORT=5433
+      - APP_URL=${APP_URL:-https://localhost}/vendor
+      - AUTH_MODE=pilot
+      - MODULE_COOKIE=vendor_token
+      - MODULE_NAME=vendor
+      - AI_MANAGED_BY_PILOT=true
+      - PILOT_URL=http://pilot-app:8080
+      - ENTRA_CLIENT_ID=${ENTRA_CLIENT_ID}
+      - ENTRA_CLIENT_SECRET=${ENTRA_CLIENT_SECRET}
+      - ENTRA_TENANT_ID=${ENTRA_TENANT_ID:-common}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID}
+      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET}
+      - OIDC_ISSUER=${OIDC_ISSUER}
+      - OIDC_LABEL=${OIDC_LABEL:-SSO}
+    depends_on:
+      vendor-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8080/api/health\")'"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - ciso-net
+
+  vendor-db:
+    # ciso-postgres = same postgres:16-alpine base + pgBackRest (FEAT-30).
+    image: ghcr.io/cisotoolbox/ciso-postgres:16
+    # Continuous WAL archiving to the shared encrypted repository —
+    # the PITR window starts at the first full backup (backup-agent).
+    command: postgres -c wal_level=replica -c archive_mode=on
+      -c archive_command='pgbackrest --stanza=vendor archive-push %p'
+      -c archive_timeout=60
+    container_name: ciso-vendor-db
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    # CNT-03 — minimal capability set for the official postgres image:
+    # entrypoint chowns PGDATA (CHOWN/FOWNER/DAC_OVERRIDE) then steps down
+    # from root to the postgres user via gosu (SETUID/SETGID).
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    environment:
+      POSTGRES_DB: vendor
+      # PGDATA at /pg/vendor: the agent mounts the same volume at the same
+      # path, satisfying pgBackRest's data-directory identity check.
+      PGDATA: /pg/vendor
+      PGBACKREST_PG1_PATH: /pg/vendor
+      POSTGRES_USER: vendor
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}
+      PGBACKREST_REPO1_PATH: /var/lib/pgbackrest
+      PGBACKREST_REPO1_CIPHER_TYPE: aes-256-cbc
+      PGBACKREST_REPO1_CIPHER_PASS: ${BACKUP_CIPHER_PASS:?BACKUP_CIPHER_PASS is required (pgBackRest repo encryption), see .env.example}
+      PGBACKREST_LOG_LEVEL_CONSOLE: warn
+    volumes:
+      - vendor-pgdata:/pg/vendor
+      - backups-repo:/var/lib/pgbackrest
+      - vendor-pgsock:/var/run/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vendor"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ciso-net
+
+  # ════════════════════════════════════════════════════════════
+  # COMPLIANCE
+  # ════════════════════════════════════════════════════════════
+
+  compliance-app:
+    image: ghcr.io/cisotoolbox/ciso-compliance-suite:latest@sha256:083fa8673dab2daf3e4fb79edcee61db52d5dfb0eaebc6f91e5b8422f925c513
+    container_name: ciso-compliance
+    restart: unless-stopped
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:noexec,nosuid,size=128m
+      - /home/appuser:size=32m,mode=1777
+    env_file: .env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://compliance:${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}@compliance-db:5432/compliance
+      - JWT_SECRET=${JWT_SECRET}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY is required (openssl rand -hex 32) — see .env.example}
+      - SERVICE_TOKEN=${SERVICE_TOKEN}
+      # FEAT-30 phase 2 — static DSN target for /internal/export-recovery
+      - RECOVERY_DB_HOST=backup-agent
+      - RECOVERY_DB_PORT=5433
+      - APP_URL=${APP_URL:-https://localhost}/compliance
+      - AUTH_MODE=pilot
+      - MODULE_COOKIE=compliance_token
+      - MODULE_NAME=compliance
+      - AI_MANAGED_BY_PILOT=true
+      - PILOT_URL=http://pilot-app:8080
+      - ENTRA_CLIENT_ID=${ENTRA_CLIENT_ID}
+      - ENTRA_CLIENT_SECRET=${ENTRA_CLIENT_SECRET}
+      - ENTRA_TENANT_ID=${ENTRA_TENANT_ID:-common}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID}
+      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET}
+      - OIDC_ISSUER=${OIDC_ISSUER}
+      - OIDC_LABEL=${OIDC_LABEL:-SSO}
+    depends_on:
+      compliance-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8080/api/health\")'"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - ciso-net
+
+  compliance-db:
+    # ciso-postgres = same postgres:16-alpine base + pgBackRest (FEAT-30).
+    image: ghcr.io/cisotoolbox/ciso-postgres:16
+    # Continuous WAL archiving to the shared encrypted repository —
+    # the PITR window starts at the first full backup (backup-agent).
+    command: postgres -c wal_level=replica -c archive_mode=on
+      -c archive_command='pgbackrest --stanza=compliance archive-push %p'
+      -c archive_timeout=60
+    container_name: ciso-compliance-db
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    # CNT-03 — minimal capability set for the official postgres image:
+    # entrypoint chowns PGDATA (CHOWN/FOWNER/DAC_OVERRIDE) then steps down
+    # from root to the postgres user via gosu (SETUID/SETGID).
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    environment:
+      POSTGRES_DB: compliance
+      # PGDATA at /pg/compliance: the agent mounts the same volume at the same
+      # path, satisfying pgBackRest's data-directory identity check.
+      PGDATA: /pg/compliance
+      PGBACKREST_PG1_PATH: /pg/compliance
+      POSTGRES_USER: compliance
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}
+      PGBACKREST_REPO1_PATH: /var/lib/pgbackrest
+      PGBACKREST_REPO1_CIPHER_TYPE: aes-256-cbc
+      PGBACKREST_REPO1_CIPHER_PASS: ${BACKUP_CIPHER_PASS:?BACKUP_CIPHER_PASS is required (pgBackRest repo encryption), see .env.example}
+      PGBACKREST_LOG_LEVEL_CONSOLE: warn
+    volumes:
+      - compliance-pgdata:/pg/compliance
+      - backups-repo:/var/lib/pgbackrest
+      - compliance-pgsock:/var/run/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U compliance"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ciso-net
+
+  # ════════════════════════════════════════════════════════════
+  # ASSET — Asset Management
+  # ════════════════════════════════════════════════════════════
+
+  asset-app:
+    image: ghcr.io/cisotoolbox/ciso-asset-suite:latest@sha256:69db1f91db5f8dc139988874e13a77fb01d5320400e65065b608debd28cd27e3
+    container_name: ciso-asset
+    restart: unless-stopped
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:noexec,nosuid,size=128m
+      - /home/appuser:size=32m,mode=1777
+    env_file: .env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://asset:${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}@asset-db:5432/asset
+      - JWT_SECRET=${JWT_SECRET}
+      - SERVICE_TOKEN=${SERVICE_TOKEN}
+      # FEAT-30 phase 2 — static DSN target for /internal/export-recovery
+      - RECOVERY_DB_HOST=backup-agent
+      - RECOVERY_DB_PORT=5433
+      - APP_URL=${APP_URL:-https://localhost}/asset
+      - AUTH_MODE=pilot
+      - MODULE_COOKIE=asset_token
+      - MODULE_NAME=asset
+      - AI_MANAGED_BY_PILOT=true
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY is required (openssl rand -hex 32) — see .env.example}
+      - PILOT_URL=http://pilot-app:8080
+      - ENTRA_CLIENT_ID=${ENTRA_CLIENT_ID}
+      - ENTRA_CLIENT_SECRET=${ENTRA_CLIENT_SECRET}
+      - ENTRA_TENANT_ID=${ENTRA_TENANT_ID:-common}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID}
+      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET}
+      - OIDC_ISSUER=${OIDC_ISSUER}
+      - OIDC_LABEL=${OIDC_LABEL:-SSO}
+    depends_on:
+      asset-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8080/api/health\")'"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - ciso-net
+
+  asset-db:
+    # ciso-postgres = same postgres:16-alpine base + pgBackRest (FEAT-30).
+    image: ghcr.io/cisotoolbox/ciso-postgres:16
+    # Continuous WAL archiving to the shared encrypted repository —
+    # the PITR window starts at the first full backup (backup-agent).
+    command: postgres -c wal_level=replica -c archive_mode=on
+      -c archive_command='pgbackrest --stanza=asset archive-push %p'
+      -c archive_timeout=60
+    container_name: ciso-asset-db
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    # CNT-03 — minimal capability set for the official postgres image:
+    # entrypoint chowns PGDATA (CHOWN/FOWNER/DAC_OVERRIDE) then steps down
+    # from root to the postgres user via gosu (SETUID/SETGID).
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    environment:
+      POSTGRES_DB: asset
+      # PGDATA at /pg/asset: the agent mounts the same volume at the same
+      # path, satisfying pgBackRest's data-directory identity check.
+      PGDATA: /pg/asset
+      PGBACKREST_PG1_PATH: /pg/asset
+      POSTGRES_USER: asset
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}
+      PGBACKREST_REPO1_PATH: /var/lib/pgbackrest
+      PGBACKREST_REPO1_CIPHER_TYPE: aes-256-cbc
+      PGBACKREST_REPO1_CIPHER_PASS: ${BACKUP_CIPHER_PASS:?BACKUP_CIPHER_PASS is required (pgBackRest repo encryption), see .env.example}
+      PGBACKREST_LOG_LEVEL_CONSOLE: warn
+    volumes:
+      - asset-pgdata:/pg/asset
+      - backups-repo:/var/lib/pgbackrest
+      - asset-pgsock:/var/run/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U asset"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ciso-net
+
+  # ════════════════════════════════════════════════════════════
+  # AUDIT — stored audits (blob) + frontend-file import
+  # ════════════════════════════════════════════════════════════
+
+  audit-app:
+    image: ghcr.io/cisotoolbox/ciso-audit-suite:latest
+    container_name: ciso-audit
+    restart: unless-stopped
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:noexec,nosuid,size=128m
+      - /home/appuser:size=32m,mode=1777
+    env_file: .env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://audit:${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}@audit-db:5432/audit
+      - JWT_SECRET=${JWT_SECRET}
+      - SERVICE_TOKEN=${SERVICE_TOKEN}
+      # FEAT-30 phase 2 — static DSN target for /internal/export-recovery
+      - RECOVERY_DB_HOST=backup-agent
+      - RECOVERY_DB_PORT=5433
+      - APP_URL=${APP_URL:-https://localhost}/audit
+      - AUTH_MODE=pilot
+      - MODULE_COOKIE=audit_token
+      - MODULE_NAME=audit
+      - AI_MANAGED_BY_PILOT=true
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY is required (openssl rand -hex 32) — see .env.example}
+      - PILOT_URL=http://pilot-app:8080
+      - ENTRA_CLIENT_ID=${ENTRA_CLIENT_ID}
+      - ENTRA_CLIENT_SECRET=${ENTRA_CLIENT_SECRET}
+      - ENTRA_TENANT_ID=${ENTRA_TENANT_ID:-common}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID}
+      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET}
+      - OIDC_ISSUER=${OIDC_ISSUER}
+      - OIDC_LABEL=${OIDC_LABEL:-SSO}
+    depends_on:
+      audit-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8080/api/health\")'"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - ciso-net
+
+  audit-db:
+    # ciso-postgres = same postgres:16-alpine base + pgBackRest (FEAT-30).
+    image: ghcr.io/cisotoolbox/ciso-postgres:16
+    # Continuous WAL archiving to the shared encrypted repository —
+    # the PITR window starts at the first full backup (backup-agent).
+    command: postgres -c wal_level=replica -c archive_mode=on
+      -c archive_command='pgbackrest --stanza=audit archive-push %p'
+      -c archive_timeout=60
+    container_name: ciso-audit-db
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    # CNT-03 — minimal capability set for the official postgres image:
+    # entrypoint chowns PGDATA (CHOWN/FOWNER/DAC_OVERRIDE) then steps down
+    # from root to the postgres user via gosu (SETUID/SETGID).
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    environment:
+      POSTGRES_DB: audit
+      # PGDATA at /pg/audit: the agent mounts the same volume at the same
+      # path, satisfying pgBackRest's data-directory identity check.
+      PGDATA: /pg/audit
+      PGBACKREST_PG1_PATH: /pg/audit
+      POSTGRES_USER: audit
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}
+      PGBACKREST_REPO1_PATH: /var/lib/pgbackrest
+      PGBACKREST_REPO1_CIPHER_TYPE: aes-256-cbc
+      PGBACKREST_REPO1_CIPHER_PASS: ${BACKUP_CIPHER_PASS:?BACKUP_CIPHER_PASS is required (pgBackRest repo encryption), see .env.example}
+      PGBACKREST_LOG_LEVEL_CONSOLE: warn
+    volumes:
+      - audit-pgdata:/pg/audit
+      - backups-repo:/var/lib/pgbackrest
+      - audit-pgsock:/var/run/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U audit"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ciso-net
+
+  # ════════════════════════════════════════════════════════════
+  # ACCESS — Access Rights Review
+  # ════════════════════════════════════════════════════════════
+
+  access-app:
+    image: ghcr.io/cisotoolbox/ciso-access-suite:latest@sha256:efb0b4cd7b18ca398621b328489efd983337553a80a491ad6a0afad73d6e0777
+    container_name: ciso-access
+    restart: unless-stopped
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:noexec,nosuid,size=128m
+      - /home/appuser:size=32m,mode=1777
+    env_file: .env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://access:${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}@access-db:5432/access
+      - JWT_SECRET=${JWT_SECRET}
+      - SERVICE_TOKEN=${SERVICE_TOKEN}
+      # FEAT-30 phase 2 — static DSN target for /internal/export-recovery
+      - RECOVERY_DB_HOST=backup-agent
+      - RECOVERY_DB_PORT=5433
+      - APP_URL=${APP_URL:-https://localhost}/access
+      - AUTH_MODE=pilot
+      - MODULE_COOKIE=access_token
+      - MODULE_NAME=access
+      - AI_MANAGED_BY_PILOT=true
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY is required (openssl rand -hex 32) — see .env.example}
+      # Connector base URLs on RFC1918: opt-in, and only for a deployment
+      # that genuinely has on-prem connectors. Suite siblings and every
+      # metadata endpoint stay blocked either way (ssrf_guard).
+      - ALLOW_PRIVATE_CONNECTOR_URLS=${ALLOW_PRIVATE_CONNECTOR_URLS:-false}
+      - ASSET_URL=http://asset-app:8080
+      - PILOT_URL=http://pilot-app:8080
+      - ENTRA_CLIENT_ID=${ENTRA_CLIENT_ID}
+      - ENTRA_CLIENT_SECRET=${ENTRA_CLIENT_SECRET}
+      - ENTRA_TENANT_ID=${ENTRA_TENANT_ID:-common}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID}
+      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET}
+      - OIDC_ISSUER=${OIDC_ISSUER}
+      - OIDC_LABEL=${OIDC_LABEL:-SSO}
+    depends_on:
+      access-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8080/api/health\")'"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - ciso-net
+
+  access-db:
+    # ciso-postgres = same postgres:16-alpine base + pgBackRest (FEAT-30).
+    image: ghcr.io/cisotoolbox/ciso-postgres:16
+    # Continuous WAL archiving to the shared encrypted repository —
+    # the PITR window starts at the first full backup (backup-agent).
+    command: postgres -c wal_level=replica -c archive_mode=on
+      -c archive_command='pgbackrest --stanza=access archive-push %p'
+      -c archive_timeout=60
+    container_name: ciso-access-db
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    # CNT-03 — minimal capability set for the official postgres image:
+    # entrypoint chowns PGDATA (CHOWN/FOWNER/DAC_OVERRIDE) then steps down
+    # from root to the postgres user via gosu (SETUID/SETGID).
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    environment:
+      POSTGRES_DB: access
+      # PGDATA at /pg/access: the agent mounts the same volume at the same
+      # path, satisfying pgBackRest's data-directory identity check.
+      PGDATA: /pg/access
+      PGBACKREST_PG1_PATH: /pg/access
+      POSTGRES_USER: access
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}
+      PGBACKREST_REPO1_PATH: /var/lib/pgbackrest
+      PGBACKREST_REPO1_CIPHER_TYPE: aes-256-cbc
+      PGBACKREST_REPO1_CIPHER_PASS: ${BACKUP_CIPHER_PASS:?BACKUP_CIPHER_PASS is required (pgBackRest repo encryption), see .env.example}
+      PGBACKREST_LOG_LEVEL_CONSOLE: warn
+    volumes:
+      - access-pgdata:/pg/access
+      - backups-repo:/var/lib/pgbackrest
+      - access-pgsock:/var/run/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U access"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ciso-net
+
+  # ════════════════════════════════════════════════════════════
+  # SURFACE — Attack Surface Management
+  # ════════════════════════════════════════════════════════════
+
+  surface-app:
+    image: ghcr.io/cisotoolbox/ciso-surface-suite:latest@sha256:0e9240194968f307de54a4b94da5c3b33c206ba74e5226324d22a106580f04d0
+    container_name: ciso-surface
+    restart: unless-stopped
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_RAW           # nmap needs raw sockets for SYN scans
+    tmpfs:
+      - /tmp:noexec,nosuid,size=512m
+      - /home/surface:size=64m,mode=1777
+    env_file: .env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://surface:${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}@surface-db:5432/surface
+      - JWT_SECRET=${JWT_SECRET}
+      - SERVICE_TOKEN=${SERVICE_TOKEN}
+      # FEAT-30 phase 2 — static DSN target for /internal/export-recovery
+      - RECOVERY_DB_HOST=backup-agent
+      - RECOVERY_DB_PORT=5433
+      - APP_URL=${APP_URL:-https://localhost}/surface
+      - AUTH_MODE=pilot
+      - MODULE_COOKIE=surface_token
+      - MODULE_NAME=surface
+      - AI_MANAGED_BY_PILOT=true
+      - PILOT_URL=http://pilot-app:8080
+      - ENTRA_CLIENT_ID=${ENTRA_CLIENT_ID}
+      - ENTRA_CLIENT_SECRET=${ENTRA_CLIENT_SECRET}
+      - ENTRA_TENANT_ID=${ENTRA_TENANT_ID:-common}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID}
+      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET}
+      - OIDC_ISSUER=${OIDC_ISSUER}
+      - OIDC_LABEL=${OIDC_LABEL:-SSO}
+      # Nuclei tuning — override in .env if needed
+      - SURFACE_NUCLEI_RATE_LIMIT=${SURFACE_NUCLEI_RATE_LIMIT:-20}
+      - SURFACE_NUCLEI_CONCURRENCY=${SURFACE_NUCLEI_CONCURRENCY:-25}
+      - SURFACE_NUCLEI_BULK_SIZE=${SURFACE_NUCLEI_BULK_SIZE:-25}
+      - SURFACE_NUCLEI_TIMEOUT=${SURFACE_NUCLEI_TIMEOUT:-10}
+      - SURFACE_NUCLEI_RETRIES=${SURFACE_NUCLEI_RETRIES:-1}
+      # DNS brute-force tuning
+      - SURFACE_DNS_BRUTE_CONCURRENCY=${SURFACE_DNS_BRUTE_CONCURRENCY:-10}
+      - SURFACE_DNS_BRUTE_TIMEOUT=${SURFACE_DNS_BRUTE_TIMEOUT:-3}
+      - SURFACE_DNS_BRUTE_WORDLIST=${SURFACE_DNS_BRUTE_WORDLIST:-}
+      # Data-at-rest key for per-target SMB credentials saved from the UI
+      # (smb_scan add-on). SEC-01: required — no silent JWT_SECRET fallback.
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY is required (openssl rand -hex 32) — see .env.example}
+      # SMB file-share add-on (only used when the smb_scan add-on is in the
+      # image). Default service-account credentials — used when a target has
+      # no per-target credentials. Never stored in the DB.
+      - SURFACE_SMB_USERNAME=${SURFACE_SMB_USERNAME:-}
+      - SURFACE_SMB_PASSWORD=${SURFACE_SMB_PASSWORD:-}
+      - SURFACE_SMB_DOMAIN=${SURFACE_SMB_DOMAIN:-}
+    depends_on:
+      surface-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8080/api/health\")'"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - ciso-net
+
+  surface-db:
+    # ciso-postgres = same postgres:16-alpine base + pgBackRest (FEAT-30).
+    image: ghcr.io/cisotoolbox/ciso-postgres:16
+    # Continuous WAL archiving to the shared encrypted repository —
+    # the PITR window starts at the first full backup (backup-agent).
+    command: postgres -c wal_level=replica -c archive_mode=on
+      -c archive_command='pgbackrest --stanza=surface archive-push %p'
+      -c archive_timeout=60
+    container_name: ciso-surface-db
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    # CNT-03 — minimal capability set for the official postgres image:
+    # entrypoint chowns PGDATA (CHOWN/FOWNER/DAC_OVERRIDE) then steps down
+    # from root to the postgres user via gosu (SETUID/SETGID).
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    environment:
+      POSTGRES_DB: surface
+      # PGDATA at /pg/surface: the agent mounts the same volume at the same
+      # path, satisfying pgBackRest's data-directory identity check.
+      PGDATA: /pg/surface
+      PGBACKREST_PG1_PATH: /pg/surface
+      POSTGRES_USER: surface
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}
+      PGBACKREST_REPO1_PATH: /var/lib/pgbackrest
+      PGBACKREST_REPO1_CIPHER_TYPE: aes-256-cbc
+      PGBACKREST_REPO1_CIPHER_PASS: ${BACKUP_CIPHER_PASS:?BACKUP_CIPHER_PASS is required (pgBackRest repo encryption), see .env.example}
+      PGBACKREST_LOG_LEVEL_CONSOLE: warn
+    volumes:
+      - surface-pgdata:/pg/surface
+      - backups-repo:/var/lib/pgbackrest
+      - surface-pgsock:/var/run/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U surface"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ciso-net
+
+  # ════════════════════════════════════════════════════════════
+  # APPSEC — Application Security Scanner
+  # ════════════════════════════════════════════════════════════
+
+  appsec-app:
+    image: ghcr.io/cisotoolbox/ciso-appsec-suite:latest@sha256:406125690cb2fb5b922e75dc80960cd25e93993c36b29f39c1d8358b96f0a6fb
+    container_name: ciso-appsec
+    restart: unless-stopped
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      # CNT-04 — deliberate deviation from the other modules' `noexec,nosuid`:
+      # appsec clones the scanned repos under /tmp and runs trivy / semgrep /
+      # gitleaks against that workspace, and the toolchain is assumed to need
+      # an exec-capable workspace (not re-verified). 2g fits large repos +
+      # trivy artifacts. If a full scan run passes with `noexec`, align this
+      # line with the other modules.
+      - /tmp:nosuid,size=2g
+    volumes:
+      - appsec-cache:/home/appsec
+    env_file: .env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://appsec:${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}@appsec-db:5432/appsec
+      - JWT_SECRET=${JWT_SECRET}
+      - SERVICE_TOKEN=${SERVICE_TOKEN}
+      # FEAT-30 phase 2 — static DSN target for /internal/export-recovery
+      - RECOVERY_DB_HOST=backup-agent
+      - RECOVERY_DB_PORT=5433
+      - APP_URL=${APP_URL:-https://localhost}/appsec
+      - AUTH_MODE=pilot
+      - MODULE_COOKIE=appsec_token
+      - MODULE_NAME=appsec
+      - PILOT_URL=http://pilot-app:8080
+      - AI_MANAGED_BY_PILOT=true
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY is required (openssl rand -hex 32) — see .env.example}
+      - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-}
+      - ENTRA_CLIENT_ID=${ENTRA_CLIENT_ID}
+      - ENTRA_CLIENT_SECRET=${ENTRA_CLIENT_SECRET}
+      - ENTRA_TENANT_ID=${ENTRA_TENANT_ID:-common}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID}
+      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET}
+      - OIDC_ISSUER=${OIDC_ISSUER}
+      - OIDC_LABEL=${OIDC_LABEL:-SSO}
+    depends_on:
+      appsec-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8080/api/health\")'"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - ciso-net
+
+  appsec-db:
+    # ciso-postgres = same postgres:16-alpine base + pgBackRest (FEAT-30).
+    image: ghcr.io/cisotoolbox/ciso-postgres:16
+    # Continuous WAL archiving to the shared encrypted repository —
+    # the PITR window starts at the first full backup (backup-agent).
+    command: postgres -c wal_level=replica -c archive_mode=on
+      -c archive_command='pgbackrest --stanza=appsec archive-push %p'
+      -c archive_timeout=60
+    container_name: ciso-appsec-db
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    # CNT-03 — minimal capability set for the official postgres image:
+    # entrypoint chowns PGDATA (CHOWN/FOWNER/DAC_OVERRIDE) then steps down
+    # from root to the postgres user via gosu (SETUID/SETGID).
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    environment:
+      POSTGRES_DB: appsec
+      # PGDATA at /pg/appsec: the agent mounts the same volume at the same
+      # path, satisfying pgBackRest's data-directory identity check.
+      PGDATA: /pg/appsec
+      PGBACKREST_PG1_PATH: /pg/appsec
+      POSTGRES_USER: appsec
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}
+      PGBACKREST_REPO1_PATH: /var/lib/pgbackrest
+      PGBACKREST_REPO1_CIPHER_TYPE: aes-256-cbc
+      PGBACKREST_REPO1_CIPHER_PASS: ${BACKUP_CIPHER_PASS:?BACKUP_CIPHER_PASS is required (pgBackRest repo encryption), see .env.example}
+      PGBACKREST_LOG_LEVEL_CONSOLE: warn
+    volumes:
+      - appsec-pgdata:/pg/appsec
+      - backups-repo:/var/lib/pgbackrest
+      - appsec-pgsock:/var/run/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U appsec"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ciso-net
+
+  # ════════════════════════════════════════════════════════════
+  # WATCH — veille CVE / avis. Réactivé sur cette stack (le bloc avait été
+  # retiré au profit du standalone). Même contrat que les autres modules :
+  # auth déléguée à pilot, secret JWT dérivé par HKDF, chiffrement des
+  # réglages via ENCRYPTION_KEY.
+  watch-app:
+    image: ghcr.io/cisotoolbox/ciso-watch-suite:latest@sha256:ec8d50a07404768248858c3ad8e061a284866d67b77370bd9ce22cf6174e8409
+    container_name: ciso-watch
+    restart: unless-stopped
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:noexec,nosuid,size=64m
+    env_file: .env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://watch:${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}@watch-db:5432/watch
+      - JWT_SECRET=${JWT_SECRET}
+      - SERVICE_TOKEN=${SERVICE_TOKEN}
+      # FEAT-30 phase 2 — static DSN target for /internal/export-recovery
+      - RECOVERY_DB_HOST=backup-agent
+      - RECOVERY_DB_PORT=5433
+      - APP_URL=${APP_URL:-https://localhost}/watch
+      - AUTH_MODE=pilot
+      - MODULE_COOKIE=watch_token
+      - MODULE_NAME=watch
+      - PILOT_URL=http://pilot-app:8080
+      - APPSEC_URL=http://appsec-app:8080
+      - AI_MANAGED_BY_PILOT=true
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY is required (openssl rand -hex 32) — see .env.example}
+      - ENTRA_CLIENT_ID=${ENTRA_CLIENT_ID}
+      - ENTRA_CLIENT_SECRET=${ENTRA_CLIENT_SECRET}
+      - ENTRA_TENANT_ID=${ENTRA_TENANT_ID:-common}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID}
+      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET}
+      - OIDC_ISSUER=${OIDC_ISSUER}
+      - OIDC_LABEL=${OIDC_LABEL:-SSO}
+    depends_on:
+      watch-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8080/api/health\")'"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - ciso-net
+
+  watch-db:
+    # ciso-postgres = same postgres:16-alpine base + pgBackRest (FEAT-30).
+    image: ghcr.io/cisotoolbox/ciso-postgres:16
+    # Continuous WAL archiving to the shared encrypted repository —
+    # the PITR window starts at the first full backup (backup-agent).
+    command: postgres -c wal_level=replica -c archive_mode=on
+      -c archive_command='pgbackrest --stanza=watch archive-push %p'
+      -c archive_timeout=60
+    container_name: ciso-watch-db
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    environment:
+      POSTGRES_DB: watch
+      # PGDATA at /pg/watch: the agent mounts the same volume at the same
+      # path, satisfying pgBackRest's data-directory identity check.
+      PGDATA: /pg/watch
+      PGBACKREST_PG1_PATH: /pg/watch
+      POSTGRES_USER: watch
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}
+      PGBACKREST_REPO1_PATH: /var/lib/pgbackrest
+      PGBACKREST_REPO1_CIPHER_TYPE: aes-256-cbc
+      PGBACKREST_REPO1_CIPHER_PASS: ${BACKUP_CIPHER_PASS:?BACKUP_CIPHER_PASS is required (pgBackRest repo encryption), see .env.example}
+      PGBACKREST_LOG_LEVEL_CONSOLE: warn
+    volumes:
+      - watch-pgdata:/pg/watch
+      - backups-repo:/var/lib/pgbackrest
+      - watch-pgsock:/var/run/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U watch"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ciso-net
+
+  # ════════════════════════════════════════════════════════════
+  # BACKUP-AGENT — pgBackRest scheduler (FEAT-30 étage 1)
+  # ════════════════════════════════════════════════════════════
+  # Shared-volume topology: read-only PGDATA + unix socket per module,
+  # shared encrypted repository. Full backup weekly, diff daily,
+  # verify weekly. No docker socket, no TLS pair, no extra daemon in
+  # the DB containers. See backup-agent/agent.sh and the runbook.
+  backup-agent:
+    image: ghcr.io/cisotoolbox/ciso-backup-agent:16
+    container_name: ciso-backup-agent
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    environment:
+      PGBACKREST_REPO1_PATH: /var/lib/pgbackrest
+      PGBACKREST_REPO1_CIPHER_TYPE: aes-256-cbc
+      PGBACKREST_REPO1_CIPHER_PASS: ${BACKUP_CIPHER_PASS:?BACKUP_CIPHER_PASS is required (pgBackRest repo encryption), see .env.example}
+      PGBACKREST_REPO1_RETENTION_FULL: "2"
+      # Recovery API (FEAT-30 phase 2): token shared with Pilot only.
+      BACKUP_AGENT_TOKEN: ${BACKUP_AGENT_TOKEN:?BACKUP_AGENT_TOKEN is required (recovery API), see .env.example}
+    volumes:
+      - backups-repo:/var/lib/pgbackrest
+      - pilot-pgdata:/pg/pilot:ro
+      - pilot-pgsock:/sock/pilot
+      - risk-pgdata:/pg/risk:ro
+      - risk-pgsock:/sock/risk
+      - vendor-pgdata:/pg/vendor:ro
+      - vendor-pgsock:/sock/vendor
+      - compliance-pgdata:/pg/compliance:ro
+      - compliance-pgsock:/sock/compliance
+      - asset-pgdata:/pg/asset:ro
+      - asset-pgsock:/sock/asset
+      - audit-pgdata:/pg/audit:ro
+      - audit-pgsock:/sock/audit
+      - access-pgdata:/pg/access:ro
+      - access-pgsock:/sock/access
+      - surface-pgdata:/pg/surface:ro
+      - surface-pgsock:/sock/surface
+      - appsec-pgdata:/pg/appsec:ro
+      - appsec-pgsock:/sock/appsec
+      - watch-pgdata:/pg/watch:ro
+      - watch-pgsock:/sock/watch
+    networks:
+      - ciso-net
+
+networks:
+  ciso-net:
+    driver: bridge
+
+volumes:
+  backups-repo:   # pgBackRest repository (FEAT-30) — encrypted at rest
+  pilot-pgsock:
+  risk-pgsock:
+  vendor-pgsock:
+  compliance-pgsock:
+  asset-pgsock:
+  audit-pgsock:
+  access-pgsock:
+  surface-pgsock:
+  appsec-pgsock:
+  watch-pgsock:
+  pilot-pgdata:
+  risk-pgdata:
+  vendor-pgdata:
+  compliance-pgdata:
+  asset-pgdata:
+  audit-pgdata:
+  access-pgdata:
+  surface-pgdata:
+  appsec-pgdata:
+  watch-pgdata:
+  appsec-cache:   # Trivy DB + Semgrep cache — persisted across restarts

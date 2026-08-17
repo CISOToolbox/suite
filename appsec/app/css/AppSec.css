@@ -1,0 +1,329 @@
+/* Primitives partagées : NE PAS redéfinir ici.
+   Les feuilles de module se chargent après cisotoolbox.css, donc à spécificité
+   égale c'est celle-ci qui gagnait. Un composant partagé — ct_finding_view.js,
+   ct_modal.js — émet le même balisage partout et se peignait différemment selon
+   le module, sans erreur ni test rouge. Le focus d'un champ était rouge ici et
+   indigo ailleurs : un champ actif se lisait comme un champ en erreur.
+   Les besoins de géométrie passent par les attributs prévus (data-width). */
+/* AppSec-specific styles — uses shared cisotoolbox.css variables */
+
+/* ═════════════════════════════════════════════════════════
+   APP MODAL SECTIONS
+   ═════════════════════════════════════════════════════════ */
+fieldset.app-section {
+    border: 1px solid var(--ct-line);
+    border-radius: 6px;
+    padding: 12px 14px 8px;
+    margin: 12px 0 4px;
+}
+fieldset.app-section legend {
+    font-weight: 600;
+    font-size: .92em;
+    padding: 0 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* ═════════════════════════════════════════════════════════
+   SEVERITY & STATUS BADGES
+   ═════════════════════════════════════════════════════════ */
+
+
+/* Stats tiles migrated to shared socle component .ct-kpi / .ct-kpigrid */
+
+/* ═════════════════════════════════════════════════════════
+   FILTERS BAR
+   ═════════════════════════════════════════════════════════ */
+.appsec-filters {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+.appsec-filter {
+    padding: 6px 10px;
+    border: 1px solid var(--ct-line);
+    border-radius: 6px;
+    font-size: 0.85em;
+    background:var(--ct-surface);
+}
+
+/* ═════════════════════════════════════════════════════════
+   APPLICATION CARDS (same pattern as Surface host-card)
+   ═════════════════════════════════════════════════════════ */
+.app-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 12px;
+}
+.app-card {
+    background:var(--ct-surface);
+    border: 1px solid var(--ct-line);
+    border-radius: 6px;
+    padding: 12px 14px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.app-card:hover {
+    border-color: var(--ct-accent);
+    box-shadow: var(--ct-shadow-card);
+    transform: translateY(-1px);
+}
+.app-card-top {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 4px;
+}
+.app-card-name {
+    font-weight: 600;
+    font-size: 0.95em;
+    color: var(--ct-ink);
+    flex: 1;
+    min-width: 0;
+}
+.app-card-label {
+    font-size: 0.82em;
+    color: var(--ct-ink-2);
+    margin-bottom: 6px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.app-card-url {
+    font-family: monospace;
+    font-size: 0.78em;
+    color: var(--ct-ink-2);
+    word-break: break-all;
+    margin-bottom: 6px;
+}
+.app-card-meta {
+    font-size: 0.76em;
+    color: var(--ct-ink-2);
+    margin-bottom: 8px;
+}
+.app-card-findings {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+    padding-top: 8px;
+    border-top: 1px solid var(--ct-surface-2);
+}
+.app-card-findings.empty {
+    color: var(--ct-ink-2);
+    font-size: 0.78em;
+    font-style: italic;
+}
+.app-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--ct-line);
+    font-size: 0.78em;
+    color: var(--ct-ink-2);
+}
+/* Modificateur de .ct-badge : le ton vient du socle, cette regle ne garde que
+   la typographie propre aux pastilles d'application. */
+.app-badge { font-size: 0.68em; text-transform: uppercase; letter-spacing: 0.3px; }
+
+@keyframes ct-modal-in {
+    from { transform: translateY(-10px); opacity: 0; }
+    to   { transform: translateY(0);     opacity: 1; }
+}
+.appsec-field-lbl {
+    display: block;
+    font-size: 0.78em;
+    font-weight: 600;
+    color: var(--ct-ink-2);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    margin-bottom: 6px;
+}
+.appsec-field-help {
+    font-size: 0.78em;
+    color: var(--ct-ink-2);
+    margin-top: 6px;
+    font-style: italic;
+}
+/* Button variants use the shared data-variant convention
+   (.ct-btn[data-variant="primary|ghost|danger"]) — no local class overrides. */
+
+.scanner-check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--ct-surface-2);
+    font-size: 0.88em;
+    cursor: pointer;
+}
+.scanner-check input { margin: 0; }
+
+/* ═════════════════════════════════════════════════════════
+   FINDING DETAIL
+   ═════════════════════════════════════════════════════════ */
+
+/* ═════════════════════════════════════════════════════════
+   FILTER PILLS (same pattern as Surface)
+   ═════════════════════════════════════════════════════════ */
+.filter-pills-row { display: flex; gap: 4px; margin-bottom: 10px; flex-wrap: wrap; }
+.filter-pill {
+    padding: 4px 12px; border: 1px solid var(--ct-line); border-radius: 16px;
+    font-size: 0.78em; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px;
+    background:var(--ct-surface); color: var(--ct-ink-2); cursor: pointer; transition: all 0.15s;
+}
+.filter-pill:hover { border-color: var(--ct-ink-2); }
+.filter-pill.active { background: var(--ct-accent); color: var(--ct-onaccent); border-color: var(--ct-accent); }
+/* Actives de ton : paires tint/ink + bordure base — mêmes codes que les
+   sev-badges et que Surface, lisible dans les deux thèmes. */
+.filter-pill.active.pill-critical { background: var(--ct-critical-tint); color: var(--ct-critical-ink); border-color: var(--ct-critical-ink); }
+.filter-pill.active.pill-high { background: var(--ct-high-tint); color: var(--ct-high-ink); border-color: var(--ct-high-ink); }
+.filter-pill.active.pill-medium { background: var(--ct-medium-tint); color: var(--ct-medium-ink); border-color: var(--ct-medium-ink); }
+.filter-pill.active.pill-low { background: var(--ct-low-tint); color: var(--ct-low-ink); border-color: var(--ct-low-ink); }
+.filter-pill.active.pill-info { background: var(--ct-info-tint); color: var(--ct-info-ink); border-color: var(--ct-info-ink); }
+
+/* ═════════════════════════════════════════════════════════
+   SCANNER BADGES
+   ═════════════════════════════════════════════════════════ */
+
+/* ═════════════════════════════════════════════════════════
+   FINDING DETAIL (2-column layout)
+   ═════════════════════════════════════════════════════════ */
+
+.appsec-ai-result {
+    border: 1px solid var(--ct-line); border-radius: 8px; padding: 14px;
+    margin-top: 12px; background: var(--ct-surface-2);
+}
+.appsec-ai-result h4 { margin: 0 0 8px; display: flex; align-items: center; gap: 6px; }
+
+/* SBOM parent links */
+.sbom-parent-link {
+    color: var(--ct-accent);
+    text-decoration: none;
+    font-family: monospace;
+    font-size: 0.88em;
+}
+.sbom-parent-link:hover { text-decoration: underline; }
+
+.finding-row { cursor: pointer; transition: background 0.1s; }
+.finding-row:hover td { background: var(--ct-surface-2); }
+.finding-row.status-false_positive td { opacity: 0.6; }
+.finding-row.status-fixed td { opacity: 0.7; }
+
+/* ── Patch-availability badge (Trivy fixed_version) ────────────── */
+
+/* ── Finding detail card (shared style with Surface) ────────────
+   Same classes as Surface so ct_finding_view.js renders identically
+   in both modules. Don't rename — the JS hardcodes surface-row/lbl. */
+.surface-card {
+    background: var(--ct-surface);
+    border: 1px solid var(--ct-line);
+    border-radius: 10px;
+    padding: 16px 18px;
+    margin-bottom: 14px;
+}
+.surface-row {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    gap: 12px;
+    padding: 6px 0;
+    font-size: 0.88em;
+}
+.surface-lbl {
+    font-size: 0.78em;
+    font-weight: 600;
+    color: var(--ct-ink-2);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+/* ── Filter pill labels + status/scanner pill colors ──────────── */
+.filter-pills-lbl {
+    font-size: 0.78em;
+    font-weight: 600;
+    color: var(--ct-ink-2);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    padding: 4px 2px;
+    align-self: center;
+    margin-right: 2px;
+}
+.filter-pill.status-pill-new.active        { background: var(--ct-info-tint); color: var(--ct-info-ink); border-color: var(--ct-info-ink); }
+.filter-pill.status-pill-to_fix.active     { background: var(--ct-critical-tint); color: var(--ct-critical-ink); border-color: var(--ct-critical-ink); }
+.filter-pill.status-pill-false_positive.active { background: var(--ct-neutral-tint); color: var(--ct-neutral-ink); border-color: var(--ct-neutral-ink); }
+.filter-pill.status-pill-fixed.active      { background: var(--ct-low-tint); color: var(--ct-low-ink); border-color: var(--ct-low-ink); }
+.filter-pill.status-pill-all.active        { background: var(--ct-accent); border-color: var(--ct-accent); }
+/* No special color for scanner "Tous" — inherits the default blue.
+   Only individual scanners get a distinct color via data-driven class. */
+
+/* ── Help overlay (methodology + usage guide) ──────────────────── */
+
+/* ── Compact filter pills (.filter-pills-sm) ─────────────────── */
+.filter-pills-row.filter-pills-sm { margin-bottom: 4px; }
+.filter-pills-row.filter-pills-sm .filter-pill {
+    font-size: 0.7em;
+    padding: 2px 8px;
+}
+.filter-pills-row.filter-pills-sm .filter-pills-lbl {
+    font-size: 0.68em;
+    min-width: 55px;
+}
+/* Individual scanner pills get purple; "Tous" stays default blue */
+.filter-pill.scanner-pill-specific.active { background: var(--ct-accent-tint); color: var(--ct-accent-ink); border-color: var(--ct-accent-ink); }
+.filter-pill.patch-pill-yes.active  { background: var(--ct-low-tint); color: var(--ct-low-ink); border-color: var(--ct-low-ink); }
+.filter-pill.patch-pill-no.active   { background: var(--ct-critical-tint); color: var(--ct-critical-ink); border-color: var(--ct-critical-ink); }
+
+/* ═════════════════════════════════════════════════════════
+   DARK MODE OVERRIDES (light rendering unchanged)
+   ═════════════════════════════════════════════════════════ */
+
+/* SBOM parent links — --light-blue resolves to a light-mode blue on dark
+   surfaces (~1.6:1); use the dark accent ink instead. */
+
+/* Variant-less .ct-btn ("Configurer" and friends): pin label + icon to
+   --ct-ink so the label can't fall back to a light-mode link blue while
+   the currentColor icon stays light. */
+
+/* Green .btn-add family ("Ajouter une application", "Exporter CSV",
+   "Ajouter une regle"): saturated fill → near-black text in dark. */
+
+/* Solid red scan buttons ("Scanner tout" / "Scanner maintenant") — replaces
+   the former inline background:var(--ct-critical);color:#fff so the text
+   color can follow the theme. Declared last so the dark rule outranks the
+   .ct-btn:not([data-variant]) override above. */
+
+/* Bouton de fermeture des modales — local au module, PAS une primitive du socle.
+   Renommé hors du préfixe ct- : ce préfixe est réservé aux primitives partagées,
+   et un nom local qui l'emprunte finit par entrer en collision. L'encre suit
+   désormais le texte courant : elle était blanche ici parce que l'en-tête de
+   modale était violet plein, en-tête supprimé avec les collisions. */
+.appsec-modal-close {
+    background: none;
+    border: none;
+    color: var(--ct-ink-2);
+    font-size: 1.5em;
+    cursor: pointer;
+    line-height: 1;
+    padding: 0 4px;
+    opacity: 0.85;
+}
+.appsec-modal-close:hover { opacity: 1; }
+
+/* Extrait du balisage : la classe existait, son style vivait a cote. */
+.ir-app-cb { margin-right:6px; }
+.ir-crit-row { display:flex; gap:6px; align-items:center; margin-bottom:var(--ct-s1); }
+
+/* ── Triager = tier d'écriture en AppSec (viewer < triager < admin) ──
+   La règle générique de cisotoolbox.css masque [data-write] pour role-triager
+   (correct dans les modules où triager est un alias de viewer). Ici le backend
+   autorise le triager à créer/modifier une application, lancer un scan et
+   triager les findings (require_min_role "triager") : on ré-affiche les
+   contrôles data-write. Le :not(.admin-only) préserve le masquage des actions
+   admin-only (ignore rules, suppression) portées par la classe dans le markup. */
+body.role-triager [data-write]:not(.admin-only) { display: inline-flex !important; }

@@ -1,0 +1,17 @@
+{
+ "context": {
+  "societe": "Fixture"
+ },
+ "vm": [
+  {
+   "id": "VM1",
+   "nom": "Valeur"
+  }
+ ],
+ "measures": [
+  {
+   "id": "M-001",
+   "mesure": "Ancien id"
+  }
+ ]
+}

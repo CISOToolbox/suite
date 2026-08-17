@@ -1,0 +1,1000 @@
+{
+  "meta": {
+    "name": "MedSecure SAS",
+    "ref": "AUD-2026-001",
+    "date": "2026-03-15",
+    "auditor": "Cybersecurity Health Consulting Firm",
+    "scope": "ISMS covering the SaaS telehealth monitoring platform, connected IoMT devices and cloud infrastructure (AWS/Azure)",
+    "hds": "oui"
+  },
+  "findings": {
+    "4.1": {
+      "status": "c",
+      "preuve": "Document of'analyse du contexte stratégique v3.2 du 10/01/2026",
+      "constats": "Analysis PESTEL performed incluant le contexte réglementaire santé (HDS, NIS2, MDR). Enjeux internes et externes clearly identified.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "4.2": {
+      "status": "c",
+      "preuve": "Registry of interested parties v2.1, management review du 15/01/2026",
+      "constats": "Parties intéressées identifiées : patients, professionnels de santé, ANSSI, CNIL, ARS, hébergeur HDS, investisseurs. Exigences documenteds et revues annually.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "4.3": {
+      "status": "c",
+      "preuve": "Déclaration de périmètre SMSI v4.0 approved par la direction",
+      "constats": "Périmètre clairement défini couvrant la plateforme SaaS, les dispositifs IoMT, l'infrastructure AWS/Azure et les équipes R&D et opérations.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "4.4": {
+      "status": "c",
+      "preuve": "Manuel SMSI v3.0, procédures associées sur le wiki interne",
+      "constats": "SMSI documenté et structuré. Processus de management établis avec revues régulières.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "5.1": {
+      "status": "c",
+      "preuve": "PV du comité de direction du 05/01/2026, budget SSI 2026 approuvé",
+      "constats": "Engagement fort de la direction avec budget SSI dédié (8% du CA). Le CEO participe aux revues quarterlys SSI.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "5.2": {
+      "status": "c",
+      "preuve": "Politique SSI v5.1 approved le 10/01/2026, accessible sur l'intranet",
+      "constats": "Politique SSI formalized, signée par le CEO, diffusée à l'ensemble du personnel. Inclut les exigences HDS spécifiques.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "5.3": {
+      "status": "ncmin",
+      "preuve": "Organigramme SSI, fiches de poste",
+      "constats": "RSSI identifié mais cumule les fonctions de DPO. Certaines responsabilités SSI ne sont pas formellement attribuées dans les fiches de poste des développeurs.",
+      "ecart_critere": "§5.3 — Les rôles et responsabilités SSI doivent être attribués et communiqués",
+      "ecart_constat": "Le RSSI cumule les fonctions de DPO sans séparation formelle. 3 développeurs n'ont pas de responsabilités SSI dans leur fiche de poste.",
+      "ecart_cause": "Taille réduite de l'équipe (startup de 45 personnes), pas de budget pour un DPO dédié",
+      "ecart_action": "Formaliser la séparation des rôles RSSI/DPO d'ici Q2 2026. Mettre à jour les fiches de poste des développeurs."
+    },
+    "6.1": {
+      "status": "c",
+      "preuve": "Procedure for management of risques PR-RISK-01 v2.0",
+      "constats": "Processus documenté d'identification des risques et opportunités. Méthodologie EBIOS RM adoptée.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "6.1.2": {
+      "status": "ncmaj",
+      "preuve": "Registry of risques v1.8 du 15/06/2025",
+      "constats": "La dernière appréciation complète des risques date de juin 2025 (plus de 9 mois). Aucune revue formelle n'a été performed depuis, malgré l'ajout de 3 nouveaux dispositifs IoMT et la migration vers Azure IoT Hub.",
+      "ecart_critere": "§6.1.2 — Le processus d'appréciation des risques doit être réalisé à intervalles planifiés et lors de changements significatifs",
+      "ecart_constat": "Absence of revue formelle de l'appréciation des risques depuis 9 mois malgré des changements significatifs dans l'infrastructure (migration Azure IoT Hub, 3 nouveaux dispositifs IoMT).",
+      "ecart_cause": "Surcharge de l'équipe SSI lors de la migration Azure IoT Hub. No déclencheur automatique pour la revue des risques lors de changements.",
+      "ecart_action": "Réaliser une appréciation des risques complète d'ici le 30/04/2026. Mettre en place un processus de revue quarterly et des déclencheurs automatiques lors de changements majeurs."
+    },
+    "6.1.3": {
+      "status": "c",
+      "preuve": "SoA v4.2 du 20/01/2026, Plan de traitement des risques",
+      "constats": "Déclaration d'Applicabilité complète avec justifications d'inclusion/exclusion. Plan de traitement suivi mensuellement.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "6.2": {
+      "status": "c",
+      "preuve": "Objectifs SSI 2026 approuvés en management review",
+      "constats": "6 objectifs SSI mesurables définis pour 2026 dont : taux de conformité >90%, délai de correction vulnérabilités critiques <48h, taux de sensibilisation 100%.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "7.1": {
+      "status": "c",
+      "preuve": "Budget SSI 2026, organigramme équipe SSI",
+      "constats": "Budget SSI dédié. Équipe de 3 personnes (RSSI, ingénieur security, analyste SOC). Outillage adapté.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "7.2": {
+      "status": "c",
+      "preuve": "Matrice de compétences SSI, certificats CISSP et ISO 27001 LA",
+      "constats": "Compétences SSI bien couvertes. RSSI certifié CISSP, ingénieur security certifié CEH. Plan de formation annuel en place.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "7.3": {
+      "status": "c",
+      "preuve": "Programme de sensibilisation 2026, résultats des campagnes de phishing test",
+      "constats": "Sensibilisation quarterly obligatoire. Taux de participation de 97%. Campagnes de phishing test mensuelles avec taux de clic en baisse (3.2%).",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "7.4": {
+      "status": "c",
+      "preuve": "Procedure for communication SSI, canal Slack #security-alerts",
+      "constats": "Communication interne via Slack dédié et newsletters mensuelles. Communication externe définie pour les incidents majeurs.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "7.5": {
+      "status": "ps",
+      "preuve": "Wiki Confluence, registre documentaire SMSI",
+      "constats": "Gestion documentaire sur Confluence avec versionning. Certains documents techniques ne sont pas systématiquement revus selon la périodicité définie. Le registre documentaire mériterait une update plus rigoureuse.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "8.1": {
+      "status": "c",
+      "preuve": "Tableau de bord opérationnel SSI, KPIs mensuels",
+      "constats": "Processus opérationnels SSI planifiés et suivis via des KPIs mensuels. Revue opérationnelle mensuelle documented.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "8.2": {
+      "status": "ps",
+      "preuve": "Dernière appréciation des risques juin 2025",
+      "constats": "La fréquence d'appréciation des risques n'est pas respectée (annuelle prévue, dernière revue il y a 9 mois sans update formelle). Point lié à la NC majeure sur 6.1.2.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "8.3": {
+      "status": "c",
+      "preuve": "Plan de traitement des risques v3.1, suivi mensuel",
+      "constats": "Plan de traitement suivi mensuellement. 85% des actions du plan 2025 performeds dans les délais.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "9.1": {
+      "status": "c",
+      "preuve": "Tableau de bord SSI mensuel, rapport trimestriel à la direction",
+      "constats": "12 indicateurs SSI suivis mensuellement. Reporting trimestriel à la direction avec tendances et alertes.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "9.2": {
+      "status": "c",
+      "preuve": "Programme d'audit interne 2025-2026, rapport d'audit interne du 15/11/2025",
+      "constats": "Audit interne réalisé en novembre 2025 par un auditeur interne qualifié ISO 27001. 4 écarts mineurs identifiés et in progress de traitement.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "9.3": {
+      "status": "c",
+      "preuve": "CR de management review du 15/01/2026",
+      "constats": "Revue de direction annuelle performed avec tous les éléments d'entrée requis. Décisions et actions documenteds.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "10.1": {
+      "status": "c",
+      "preuve": "Registry of non-conformités, procédure d'actions correctives PR-AC-01",
+      "constats": "Processus documenté de management of NC. 12 NC traitées en 2025, toutes clôturées avec vérification d'efficacité.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "10.2": {
+      "status": "c",
+      "preuve": "Plan d'amélioration continue 2026, management review",
+      "constats": "Démarche d'amélioration continue active. Retours d'expérience des incidents et audits alimentent systématiquement le plan d'amélioration.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.5.1": {
+      "status": "c",
+      "preuve": "Politique SSI v5.1, politiques thématiques (accès, crypto, backup, etc.)",
+      "constats": "Corpus documentaire complet : politique cadre SSI + 8 politiques thématiques. Toutes approveds et revues annually.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.5.2": {
+      "status": "c",
+      "preuve": "Organigramme SSI, fiche de poste RSSI",
+      "constats": "RSSI rattaché au CEO, rôles documentés. Comité SSI trimestriel avec la direction.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.5.3": {
+      "status": "ncmin",
+      "preuve": "Matrice RACI SSI, audit des droits",
+      "constats": "La séparation des tâches est insufficiente dans certains processus critiques du fait de la taille de l'équipe.",
+      "ecart_critere": "A.5.3 — Les tâches et responsabilités conflictuelles doivent être séparées",
+      "ecart_constat": "Le même développeur peut valider et déployer du code en production. L'administrateur cloud AWS peut à la fois créer et approuver les règles de firewall. Le RSSI cumule les fonctions de DPO.",
+      "ecart_cause": "Startup de 45 personnes avec équipe technique réduite (12 développeurs, 3 DevOps). No workflow d'approbation croisée systématique.",
+      "ecart_action": "Implémenter des workflows d'approbation croisée dans le pipeline CI/CD d'ici Q2 2026. Documenter les controls compensatoires existants."
+    },
+    "A.5.4": {
+      "status": "c",
+      "preuve": "Charte informatique signée, rappels trimestriels de la direction",
+      "constats": "Direction impliquée. Charte signée par 100% du personnel. Rappels réguliers lors des all-hands.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.5.5": {
+      "status": "c",
+      "preuve": "Liste des contacts autorités : ANSSI, CNIL, ARS, CERT-FR, ANS",
+      "constats": "Contacts établis avec l'ANSSI, la CNIL, l'ARS et le CERT-FR. Procedure for notification en place.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.5.6": {
+      "status": "c",
+      "preuve": "Adhésion CESIN et InterCERT, participation aux groupes de travail ANS",
+      "constats": "Membre actif du CESIN et InterCERT. Participation aux groupes de travail cybersecurity santé de l'ANS.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.5.7": {
+      "status": "c",
+      "preuve": "Abonnement CERT-FR, flux TI intégrés au SIEM, veille ANS",
+      "constats": "Threat intelligence opérationnelle avec abonnement CERT-FR, flux STIX/TAXII intégrés au SIEM. Veille sectorielle santé via ANS.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.5.8": {
+      "status": "c",
+      "preuve": "Template d'analyse SSI projet, backlog Jira avec user stories security",
+      "constats": "SSI intégrée dans la gestion de projet. Analysis de risques SSI systématique pour tout nouveau projet. Security Champion désigné dans chaque squad.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.5.9": {
+      "status": "c",
+      "preuve": "CMDB ServiceNow, inventaire des dispositifs IoMT",
+      "constats": "Inventaire complet dans ServiceNow incluant les dispositifs IoMT. Propriétaires désignés pour chaque actif. Revue semestrielle documented.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.5.10": {
+      "status": "c",
+      "preuve": "Charte informatique, politique d'utilisation acceptable",
+      "constats": "Politique d'utilisation acceptable formalized et signée par tous les employés et prestataires.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.5.12": {
+      "status": "c",
+      "preuve": "Policy for classification v2.0, schéma de classification à 4 niveaux",
+      "constats": "Classification à 4 niveaux (Public, Interne, Confidentiel, Secret Médical). Adaptée aux données de santé avec niveau spécifique Secret Médical.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.5.14": {
+      "status": "c",
+      "preuve": "Policy for transfert, logs DLP email, configuration SFTP",
+      "constats": "Règles de transfert formalizeds. Chiffrement obligatoire pour les données de santé. SFTP et TLS systématiques pour les échanges avec les établissements de santé.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.5.15": {
+      "status": "c",
+      "preuve": "Policy for control d'accès v3.0, matrice d'habilitations",
+      "constats": "Policy for control d'accès complète basée sur le principe du moindre privilège. Matrice d'habilitations par rôle. Revue quarterly des droits.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.5.16": {
+      "status": "c",
+      "preuve": "Procédure IAM, Azure AD / AWS IAM, logs de provisionnement",
+      "constats": "Gestion des identités centralisée via Azure AD avec SSO. Provisionnement et déprovisionnement automatisés via SCIM. Comptes orphelins détectés automatiquement.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.5.17": {
+      "status": "c",
+      "preuve": "Policy for mots de passe, configuration Azure AD, MFA activé",
+      "constats": "Policy for mots de passe conforme aux recommandations ANSSI. MFA obligatoire pour tous les accès. Gestionnaire de secrets HashiCorp Vault pour les secrets applicatifs.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.5.18": {
+      "status": "c",
+      "preuve": "Rapports de revue des droits trimestriels, procédure de révocation",
+      "constats": "Revue quarterly des droits documented. Révocation automatique à J+0 du départ. Principe du moindre privilège appliqué.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.5.19": {
+      "status": "ps",
+      "preuve": "Politique fournisseurs v1.2, questionnaire d'évaluation SSI",
+      "constats": "Policy for security fournisseurs en place. Questionnaire d'évaluation SSI existant mais pas systématiquement appliqué aux fournisseurs non-IT (ex: fournisseur de composants IoMT). Point sensible à surveiller.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.5.20": {
+      "status": "c",
+      "preuve": "Modèle de clauses SSI, échantillon de contrats fournisseurs",
+      "constats": "Clauses SSI standardisées intégrées dans tous les contrats fournisseurs IT et hébergement. Couverture HDS assurée.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.5.21": {
+      "status": "ncmin",
+      "preuve": "Inventaire fournisseurs, analyse des risques supply chain partielle",
+      "constats": "La chaîne d'approvisionnement TIC n'est que partiellement évaluée, notamment pour les composants IoMT.",
+      "ecart_critere": "A.5.21 — La security dans la chaîne d'approvisionnement TIC doit être gérée",
+      "ecart_constat": "Absence d'évaluation formelle de la security de 2 fournisseurs de composants IoMT critiques (firmware, microcontrolurs). No SBOM (Software Bill of Materials) pour les composants tiers embarqués dans les dispositifs médicaux.",
+      "ecart_cause": "Fournisseurs de composants IoMT historiques (avant certification ISO 27001). Processus d'évaluation supply chain in progress de déploiement.",
+      "ecart_action": "Réaliser l'évaluation SSI des 2 fournisseurs IoMT d'ici Q2 2026. Exiger les SBOM pour tous les composants tiers embarqués. Intégrer la revue supply chain dans le processus d'achat."
+    },
+    "A.5.22": {
+      "status": "pp",
+      "preuve": "Revues annuelles des principaux fournisseurs cloud",
+      "constats": "Revues annuelles performeds pour AWS et Azure mais pas de suivi continu formalisé pour les autres fournisseurs. Piste de progrès : mettre en place un tableau de bord de suivi fournisseurs.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.5.23": {
+      "status": "c",
+      "preuve": "Inventaire services cloud, contrats AWS et Azure avec clauses SSI",
+      "constats": "Services cloud inventoriés et évalués. Contrats AWS et Azure avec clauses SSI et HDS. Configuration sécurisée selon les benchmarks CIS.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.5.24": {
+      "status": "c",
+      "preuve": "Procedure for management of incidents SSI v3.0, playbooks de réponse",
+      "constats": "Procédure complète avec classification par sévérité. Playbooks de réponse pour les scénarios IoMT et données de santé. Exercice de simulation réalisé en décembre 2025.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.5.25": {
+      "status": "c",
+      "preuve": "Grille de classification des incidents, logs SIEM",
+      "constats": "Grille de classification formalized avec 4 niveaux de sévérité. Critères adaptés au contexte santé (impact sur les patients, données de santé).",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.5.26": {
+      "status": "c",
+      "preuve": "Rapports d'incidents 2025, playbooks de réponse",
+      "constats": "8 incidents SSI traités en 2025, tous selon la procédure documented. Temps moyen de réponse : 2h pour les incidents critiques. Notification ANSSI/CNIL performed dans les délais pour 1 incident significatif.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.5.29": {
+      "status": "ps",
+      "preuve": "PCA v2.1, procédures de crise",
+      "constats": "Plan de continuité documenté intégrant les aspects SSI. Cependant, le volet spécifique aux dispositifs IoMT en cas de crise (mode dégradé des capteurs) mériterait d'être approfondi. Point sensible.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.5.30": {
+      "status": "ncmaj",
+      "preuve": "PCA v2.1, aucun rapport de test récent",
+      "constats": "Le PCA/DRP existe mais n'a pas été testé de manière complète depuis plus de 18 mois.",
+      "ecart_critere": "A.5.30 — La continuité TIC doit être préparée, mise en œuvre et testée",
+      "ecart_constat": "Le dernier test complet du PCA/DRP date de septembre 2024 (18 mois). Aucun test de bascule sur le site de reprise n'a été réalisé. Les RTO/RPO définis (4h/1h) n'ont pas été validés par un exercice récent.",
+      "ecart_cause": "Report du test planifié en mars 2025 en raison de la migration Azure IoT Hub. No replanification formelle.",
+      "ecart_action": "Planifier et réaliser un test complet du PCA/DRP incluant bascule site de reprise d'ici le 30/05/2026. Valider les RTO/RPO. Documenter les résultats et les actions correctives."
+    },
+    "A.5.31": {
+      "status": "c",
+      "preuve": "Registry of exigences légales, veille réglementaire",
+      "constats": "Registre complet incluant HDS, RGPD, NIS2, MDR (dispositifs médicaux), Code de la santé publique. Veille réglementaire quarterly.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.5.33": {
+      "status": "c",
+      "preuve": "Policy for rétention, configuration de l'archivage AWS S3 Glacier",
+      "constats": "Enregistrements protégés avec politique de rétention conforme aux exigences HDS (20 ans pour les données de santé). Intégrité garantie par encryption et control d'accès.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.5.34": {
+      "status": "c",
+      "preuve": "Registry of traitements RGPD, PIA télésurveillance, désignation DPO",
+      "constats": "Registry of traitements complet. PIA performed pour le traitement de télésurveillance. DPO désigné. Droits des personnes opérationnels.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.5.37": {
+      "status": "c",
+      "preuve": "Wiki Confluence, procédures d'exploitation documenteds",
+      "constats": "Procédures d'exploitation documenteds pour les opérations courantes : backup, monitoring, déploiement, management of incidents. Accessibles sur Confluence.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.6.1": {
+      "status": "c",
+      "preuve": "Procédure RH de vérification des antécédents",
+      "constats": "Vérification systématique des antécédents pour tous les postes avec accès aux données de santé. Casier judiciaire demandé.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.6.2": {
+      "status": "c",
+      "preuve": "Modèle de contrat de travail avec clauses SSI",
+      "constats": "Clauses de confidentialité et responsabilité SSI intégrées dans tous les contrats. Spécificités HDS incluses.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.6.3": {
+      "status": "c",
+      "preuve": "Programme de formation 2026, attestations de participation",
+      "constats": "Formation SSI obligatoire à l'embauche + recyclage annuel. Module spécifique données de santé. Taux de participation 97%.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.6.6": {
+      "status": "c",
+      "preuve": "Modèle NDA, registre des signatures",
+      "constats": "NDA signés par 100% du personnel et prestataires. Clauses spécifiques aux données de santé incluses. Validité post-contractuelle de 5 ans.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.6.7": {
+      "status": "c",
+      "preuve": "Policy for travail à distance, configuration VPN/MFA",
+      "constats": "Policy for télétravail formalized. VPN obligatoire avec MFA. Chiffrement des postes (BitLocker/FileVault). Formation spécifique télétravail sécurisé.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.7.1": {
+      "status": "na",
+      "preuve": "",
+      "constats": "Startup en coworking — pas de locaux propres avec périmètres de security physique dédiés. Infrastructure 100% cloud (AWS/Azure). Exclusion justifiée dans la SoA.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.7.2": {
+      "status": "na",
+      "preuve": "",
+      "constats": "Startup en coworking — control d'accès physique géré par l'opérateur du coworking. No salle serveurs sur site. Exclusion justifiée dans la SoA.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.7.3": {
+      "status": "ps",
+      "preuve": "Contrat coworking, visite des locaux",
+      "constats": "Locaux de coworking partagés. No control de MedSecure sur la security physique des espaces communs. Salles de réunion non verrouillables. Point sensible : risque de shoulder surfing et d'écoute lors de discussions confidentielles.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.7.4": {
+      "status": "na",
+      "preuve": "",
+      "constats": "Surveillance physique assurée par l'opérateur du coworking. No zone sensible propre à MedSecure. N/A justifié.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.7.7": {
+      "status": "ps",
+      "preuve": "Charte informatique, vérification lors de la visite",
+      "constats": "Policy for bureau propre et écran vide définie dans la charte mais application difficile à controlr en espace de coworking partagé. Verrouillage automatique des postes configuré à 5 minutes.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.7.9": {
+      "status": "c",
+      "preuve": "Policy for security des équipements mobiles, MDM configuré",
+      "constats": "Laptops et smartphones protégés par MDM (Microsoft Intune). Chiffrement obligatoire. Effacement à distance opérationnel.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.7.10": {
+      "status": "c",
+      "preuve": "Policy for management of supports, procédure d'effacement",
+      "constats": "Supports de stockage gérés avec effacement certifié (NIST 800-88). No supports amovibles autorisés (USB bloqués par GPO).",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.7.14": {
+      "status": "c",
+      "preuve": "Procedure for mise au rebut, certificats d'effacement",
+      "constats": "Procédure formalized avec effacement certifié et traçabilité. Prestataire de destruction certifié utilisé.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.8.1": {
+      "status": "c",
+      "preuve": "Configuration MDM Intune, politique de encryption",
+      "constats": "Postes de travail protégés par encryption intégral, antivirus, EDR CrowdStrike. Configuration durcie via MDM.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.8.2": {
+      "status": "c",
+      "preuve": "Inventaire des comptes à privilèges, politique PAM",
+      "constats": "Comptes à privilèges inventoriés et gérés via CyberArk. Access just-in-time pour les opérations AWS/Azure. Journalisation complète des sessions privilégiées.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.8.3": {
+      "status": "c",
+      "preuve": "Configuration RBAC Azure/AWS, matrice d'habilitations",
+      "constats": "Restrictions d'accès basées sur RBAC. Séparation stricte des accès aux données de santé. Principe du moindre privilège appliqué.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.8.4": {
+      "status": "c",
+      "preuve": "Configuration GitHub Enterprise, politique de branches",
+      "constats": "Code source sur GitHub Enterprise avec control d'accès par équipe. Branches protégées. Revue de code obligatoire avant merge.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.8.5": {
+      "status": "c",
+      "preuve": "Configuration Azure AD MFA, politique d'authentication",
+      "constats": "MFA obligatoire pour tous les accès (Azure AD avec authenticator app ou FIDO2). SSO déployé sur toutes les applications SaaS. Authentification sans mot de passe in progress de déploiement.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.8.7": {
+      "status": "c",
+      "preuve": "CrowdStrike EDR déployé, rapport de couverture",
+      "constats": "CrowdStrike Falcon déployé sur 100% des postes et serveurs. Protection temps réel et détection comportementale. Mises à jour automatiques.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.8.8": {
+      "status": "c",
+      "preuve": "Rapport Qualys du 01/03/2026, politique de patch management",
+      "constats": "Scans de vulnérabilités hebdomadaires (Qualys). Patch management : critiques <48h, hautes <7j, moyennes <30j. Taux de conformité patch : 96%.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.8.9": {
+      "status": "c",
+      "preuve": "Baselines CIS, Terraform/IaC, AWS Config Rules",
+      "constats": "Configurations sécurisées basées sur CIS Benchmarks. Infrastructure as Code (Terraform) garantissant la reproductibilité. AWS Config Rules et Azure Policy pour la détection de dérives.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.8.10": {
+      "status": "c",
+      "preuve": "Policy for rétention, configuration S3 lifecycle",
+      "constats": "Suppression sécurisée configurée avec politiques de cycle de vie S3. Données de santé soumises à la politique de rétention HDS (20 ans).",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.8.11": {
+      "status": "ncmin",
+      "preuve": "Policy for masquage v1.0, vérification des environnements de test",
+      "constats": "Le masquage des données de santé dans les environnements de test n'est pas systématique.",
+      "ecart_critere": "A.8.11 — Les données sensibles doivent être masquées selon la politique définie",
+      "ecart_constat": "L'environnement de staging utilise des données de santé partiellement anonymisées. 2 bases de données de test contiennent des données patients non masquées (noms, prénoms, identifiants de santé). La politique de masquage existe mais n'est pas appliquée systématiquement.",
+      "ecart_cause": "Absence d'outil de masquage automatisé intégré au pipeline de provisionnement des environnements de test. Les développeurs copient parfois des extraits de production pour le debug.",
+      "ecart_action": "Déployer un outil de masquage automatisé (ex: Delphix) dans le pipeline CI/CD d'ici Q2 2026. Purger les données non masquées des environnements de test. Former les développeurs."
+    },
+    "A.8.12": {
+      "status": "ncmin",
+      "preuve": "Configuration DLP email (Microsoft Purview), audit des canaux",
+      "constats": "La couverture DLP est incomplète sur plusieurs canaux.",
+      "ecart_critere": "A.8.12 — Des mesures DLP doivent être appliquées pour prévenir la divulgation non autorisée d'informations sensibles",
+      "ecart_constat": "Le DLP couvre uniquement les emails (Microsoft Purview) et le stockage cloud (S3). Aucune couverture DLP sur : les canaux Slack, les uploads via l'API de la plateforme, les endpoints USB (bloqués par GPO mais pas de DLP endpoint). Les règles DLP email ne couvrent pas les identifiants de santé spécifiques (INS, IPP).",
+      "ecart_cause": "Déploiement DLP réalisé en 2 phases — la phase 2 (endpoints et messagerie instantanée) a été reportée pour des raisons budgétaires.",
+      "ecart_action": "Étendre la couverture DLP aux canaux Slack et aux endpoints d'ici Q3 2026. Ajouter les patterns de détection pour les identifiants de santé (INS, IPP, NIP). Budget phase 2 à valider en management review."
+    },
+    "A.8.13": {
+      "status": "c",
+      "preuve": "Policy for backup, rapports de test de restauration",
+      "constats": "Sauvegardes quotidiennes chiffrées avec rétention conforme. Tests de restauration trimestriels. Sauvegardes multi-régions (AWS eu-west-1 et eu-central-1).",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.8.14": {
+      "status": "c",
+      "preuve": "Architecture multi-AZ AWS/Azure, configuration auto-scaling",
+      "constats": "Redondance multi-AZ pour tous les services critiques. Failover automatique configuré. SLA de disponibilité 99.95% respecté.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.8.15": {
+      "status": "c",
+      "preuve": "Configuration ELK/SIEM, politique de logging",
+      "constats": "Journalisation centralisée via ELK Stack + SIEM Splunk. Rétention 12 mois online, 5 ans archives. Tous les accès aux données de santé journalisés conformément aux exigences HDS.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.8.16": {
+      "status": "c",
+      "preuve": "Console SIEM Splunk, rapports de surveillance SOC",
+      "constats": "Surveillance 24/7 via SOC externalisé. SIEM avec règles de corrélation adaptées IoMT. Alertes automatiques sur les comportements anormaux des dispositifs médicaux.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.8.20": {
+      "status": "c",
+      "preuve": "Schéma d'architecture network AWS/Azure, configuration VPC/VNET",
+      "constats": "Architecture network segmentée avec VPC/VNET dédiés. Transit Gateway pour l'interconnexion. WAF et NACLs configurés. Réseau IoMT isolé.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.8.21": {
+      "status": "c",
+      "preuve": "Configuration DNS, DNSSEC, TLS, services network documentés",
+      "constats": "Services network sécurisés : DNS avec DNSSEC, TLS 1.3 systématique, SMTP avec DMARC/DKIM/SPF. Services documentés et configuration revue.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.8.22": {
+      "status": "c",
+      "preuve": "Architecture VPC multi-tiers, Security Groups, NACLs",
+      "constats": "Cloisonnement strict : tiers web, applicatif, données. Zone IoMT dédiée avec Azure IoT Hub. Règles de firewall revues mensuellement.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.8.24": {
+      "status": "c",
+      "preuve": "Politique cryptographique v2.0, inventaire des certificats",
+      "constats": "Politique cryptographique conforme aux recommandations ANSSI (RGS). AES-256 pour le encryption au repos, TLS 1.3 en transit. Gestion des clés via AWS KMS et Azure Key Vault. Certificats inventoriés et surveillés.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.8.25": {
+      "status": "c",
+      "preuve": "SSDLC documenté, formation OWASP des développeurs",
+      "constats": "Cycle de développement sécurisé formalisé intégrant Security by Design. Développeurs formés OWASP Top 10. Security Champions dans chaque squad.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.8.27": {
+      "status": "c",
+      "preuve": "Document of'architecture sécurisée, principes Defense in Depth",
+      "constats": "Principes d'architecture sécurisée documentés et appliqués : Defense in Depth, Zero Trust, Security by Design. Architecture revue lors de chaque changement majeur.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.8.28": {
+      "status": "c",
+      "preuve": "Standards de codage, rapports SonarQube, revue de code GitHub",
+      "constats": "Standards de codage sécurisé (OWASP) documentés. Analysis statique (SonarQube) intégrée au CI/CD. Revue de code obligatoire avec checklist security.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.8.29": {
+      "status": "ps",
+      "preuve": "Rapports DAST, dernier pentest externe de septembre 2025",
+      "constats": "Tests DAST automatisés dans le pipeline. Pentest externe annuel réalisé. Cependant le dernier pentest spécifique aux interfaces IoMT date de plus d'un an. Point sensible to be planned.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.8.31": {
+      "status": "c",
+      "preuve": "Architecture des environnements, configuration Terraform",
+      "constats": "Environnements dev/staging/prod strictement séparés via des comptes AWS et souscriptions Azure distincts. Pas d'accès direct de dev vers prod.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    },
+    "A.8.32": {
+      "status": "ncmin",
+      "preuve": "Procedure for management of changements, registre des changements",
+      "constats": "La documentation des changements est incomplète pour certaines modifications d'urgence.",
+      "ecart_critere": "A.8.32 — Les changements aux ressources de traitement doivent être contrôlés",
+      "ecart_constat": "Sur les 45 changements en production du dernier trimestre, 8 changements d'urgence (hotfix) n'ont pas suivi le processus complet de management of changements. 3 changements ne disposent pas de documentation de rollback. Le CAB (Change Advisory Board) n'a pas été consulté pour 5 changements urgents.",
+      "ecart_cause": "Pression opérationnelle lors des corrections de bugs critiques sur les dispositifs IoMT. Processus de changement d'urgence insuffisamment formalisé.",
+      "ecart_action": "Formaliser le processus de changement d'urgence avec documentation minimale obligatoire. Créer un template de hotfix incluant la documentation de rollback. Revue rétrospective obligatoire au CAB pour tous les changements d'urgence."
+    },
+    "A.8.34": {
+      "status": "c",
+      "preuve": "Procédure d'audit en production, plan de test approuvé",
+      "constats": "Tests d'audit en production planifiés avec approbation préalable. Access audit limités dans le temps et révoqués après usage. Impact sur la production évalué avant chaque test.",
+      "ecart_critere": "",
+      "ecart_constat": "",
+      "ecart_cause": "",
+      "ecart_action": ""
+    }
+  },
+  "doc_review": {
+    "D-01": {
+      "status": "recu",
+      "observations": "Politique SSI v5.1 complète et à jour. Approuvée par le CEO le 10/01/2026."
+    },
+    "D-02": {
+      "status": "recu",
+      "observations": "SoA v4.2 avec toutes les justifications d'inclusion/exclusion."
+    },
+    "D-03": {
+      "status": "recu",
+      "observations": "Registre des risques complet mais dernière revue en juin 2025."
+    },
+    "D-04": {
+      "status": "recu",
+      "observations": "Plan de traitement suivi mensuellement, 85% des actions réalisées."
+    },
+    "D-05": {
+      "status": "recu",
+      "observations": "CR de revue de direction du 15/01/2026 complet."
+    },
+    "D-06": {
+      "status": "recu",
+      "observations": "Rapport d'audit interne du 15/11/2025 avec plan d'actions."
+    },
+    "D-07": {
+      "status": "",
+      "observations": ""
+    },
+    "D-08": {
+      "status": "recu",
+      "observations": "Organigramme SSI à jour. Fiches de poste RSSI et ingénieur sécurité complètes."
+    },
+    "D-09": {
+      "status": "",
+      "observations": ""
+    },
+    "D-10": {
+      "status": "",
+      "observations": ""
+    },
+    "D-11": {
+      "status": "recu",
+      "observations": "Registre complet : HDS, RGPD, NIS2, MDR, Code de la santé publique."
+    },
+    "D-12": {
+      "status": "recu",
+      "observations": "Procédure v3.0 avec playbooks de réponse adaptés IoMT/santé."
+    },
+    "D-13": {
+      "status": "",
+      "observations": ""
+    },
+    "D-14": {
+      "status": "recu",
+      "observations": "CMDB ServiceNow complète incluant dispositifs IoMT."
+    },
+    "D-15": {
+      "status": "recu",
+      "observations": "4 niveaux de classification dont Secret Médical."
+    },
+    "D-16": {
+      "status": "recu",
+      "observations": "Politique complète basée sur le moindre privilège, RBAC Azure/AWS."
+    },
+    "D-17": {
+      "status": "recu",
+      "observations": "Dernière revue trimestrielle des droits documentée."
+    },
+    "D-18": {
+      "status": "",
+      "observations": ""
+    },
+    "D-19": {
+      "status": "na",
+      "observations": "Startup en coworking, pas de zones physiques propres. N/A justifié."
+    },
+    "D-20": {
+      "status": "",
+      "observations": ""
+    },
+    "D-21": {
+      "status": "recu",
+      "observations": "Schéma d'architecture AWS/Azure avec segmentation VPC/VNET."
+    },
+    "D-22": {
+      "status": "recu",
+      "observations": "Politique complète avec tests de restauration trimestriels documentés."
+    },
+    "D-23": {
+      "status": "incomplet",
+      "observations": "Rapport Qualys disponible mais le rapport de pentest externe date de septembre 2025. Pas de pentest récent sur les interfaces IoMT."
+    },
+    "D-24": {
+      "status": "",
+      "observations": ""
+    },
+    "D-25": {
+      "status": "",
+      "observations": ""
+    },
+    "D-26": {
+      "status": "recu",
+      "observations": "Politique de journalisation couvrant les accès aux données de santé."
+    },
+    "D-27": {
+      "status": "incomplet",
+      "observations": "PCA/DRP v2.1 existe mais sections sur le mode dégradé IoMT incomplètes. Dernier test complet datant de septembre 2024."
+    },
+    "D-28": {
+      "status": "manquant",
+      "observations": "Aucun rapport de test du PCA/DRP récent. Dernier test en septembre 2024 (18 mois)."
+    },
+    "D-29": {
+      "status": "incomplet",
+      "observations": "Politique fournisseurs existante mais ne couvre pas spécifiquement la chaîne d'approvisionnement IoMT."
+    },
+    "D-30": {
+      "status": "recu",
+      "observations": "Clauses SSI standardisées présentes dans les contrats IT et hébergement."
+    },
+    "D-31": {
+      "status": "recu",
+      "observations": "Certificat HDS de l'hébergeur valide jusqu'à décembre 2026."
+    },
+    "D-32": {
+      "status": "recu",
+      "observations": "Contrat d'hébergement HDS avec responsabilités clairement définies."
+    },
+    "D-33": {
+      "status": "",
+      "observations": ""
+    },
+    "D-34": {
+      "status": "manquant",
+      "observations": "PIA pour le nouveau service de télésurveillance IoMT v2 non encore réalisée. PIA v1 disponible mais ne couvre pas les nouveaux dispositifs."
+    }
+  },
+  "planning": {
+    "params": {
+      "start_date": "2026-03-15",
+      "days": 3,
+      "start_time": "09:00",
+      "slot_duration": 60,
+      "lunch_start": "12:30",
+      "lunch_duration": 60
+    },
+    "slots": []
+  },
+  "journal": [],
+  "timers": {}
+}

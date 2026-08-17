@@ -1,0 +1,1100 @@
+/* Primitives partagées : NE PAS redéfinir ici.
+   Les feuilles de module se chargent après cisotoolbox.css, donc à spécificité
+   égale c'est celle-ci qui gagnait. Un composant partagé — ct_finding_view.js,
+   ct_modal.js — émet le même balisage partout et se peignait différemment selon
+   le module, sans erreur ni test rouge. Le focus d'un champ était rouge ici et
+   indigo ailleurs : un champ actif se lisait comme un champ en erreur.
+   Les besoins de géométrie passent par les attributs prévus (data-width). */
+/* Surface-specific styles */
+
+/* Severity-aware stat tile values — match the chart and badge palette. */
+/* Legacy aliases kept for the dashboard summary tiles that still pass
+   "warning" / "critical" — they pre-date the per-severity palette. */
+
+.surface-filters {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+.surface-filter {
+    padding: 6px 10px;
+    border: 1px solid var(--ct-line);
+    border-radius: 6px;
+    font-size: 0.85em;
+    background: var(--ct-surface);
+}
+
+.finding-row { cursor: pointer; transition: background 0.1s; }
+.finding-row:hover td { background: var(--ct-surface-2); }
+.finding-row.status-false_positive td { opacity: 0.6; }
+.finding-row.status-fixed td { opacity: 0.7; }
+
+#findings-body-wrap {
+    width: 100%;
+    max-width: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+/* Severity colors are scoped to .sev-badge so they don't accidentally
+   paint any other element marked with sev-* (e.g. <tr class="finding-row sev-critical">
+   in the host detail view). The pill / count-tile rules below stay
+   scoped on their own selectors. */
+
+
+/* .btn-mini base now lives in shared cisotoolbox.css (theme-aware). Keep only tone modifiers. */
+
+.surface-card {
+    background: var(--ct-surface);
+    border: 1px solid var(--ct-line);
+    border-radius: 10px;
+    padding: 16px 18px;
+    margin-bottom: 14px;
+}
+.surface-row {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    gap: 12px;
+    padding: 6px 0;
+    font-size: 0.88em;
+}
+.surface-lbl {
+    font-size: 0.78em;
+    font-weight: 600;
+    color: var(--ct-ink-2);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+/* Monitored assets */
+
+/* Update kind badge for new "host" type */
+
+@keyframes ct-modal-in {
+    from { transform: translateY(-10px); opacity: 0; }
+    to   { transform: translateY(0);     opacity: 1; }
+}
+.surface-field-lbl {
+    display: block;
+    font-size: 0.78em;
+    font-weight: 600;
+    color: var(--ct-ink-2);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    margin-bottom: 6px;
+}
+.surface-field-help {
+    font-size: 0.78em;
+    color: var(--ct-ink-2);
+    margin-top: 6px;
+    font-style: italic;
+}
+.surface-radio-group {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.surface-radio {
+    flex: 1 1 110px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    border: 1px solid var(--ct-line);
+    border-radius: 6px;
+    cursor: pointer;
+    background: var(--ct-surface);
+    font-size: 0.85em;
+    transition: all 0.15s;
+}
+/* Sélection en indigo, comme partout ailleurs dans la suite : en rouge elle se
+   lisait comme une alerte. L'encre suit le grade -ink de sa teinte. */
+.surface-radio:has(input:checked) {
+    border-color: var(--ct-accent-ink);
+    background: var(--ct-accent-tint);
+    color: var(--ct-accent-ink);
+    font-weight: 600;
+}
+.surface-radio input { margin: 0; }
+
+.surface-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 0.88em;
+}
+
+.surface-error {
+    background: var(--ct-critical-tint);
+    color: var(--ct-critical-ink);
+    padding: 10px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--ct-critical-tint);
+    font-size: 0.85em;
+    margin-top: 8px;
+}
+
+/* Scan jobs */
+}
+
+.surface-radio small {
+    display: block;
+    color: var(--ct-ink-2);
+    font-weight: 400;
+    font-size: 0.8em;
+    margin-top: 2px;
+}
+
+/* Source badges (manual vs scheduled jobs) */
+
+/* Scanner type badges in the jobs panel */
+
+/* Scanner checklist in monitored asset modal */
+/* Liste de scanners — MISE EN PAGE, pas des badges. Ces règles ont été emportées
+   par la suppression des familles de badges : l'expression visait le préfixe
+   `.scanner-` sans distinguer une pastille colorée d'un conteneur flex. Sans
+   elles, la configuration des scans d'un hôte affichait tout le texte à la
+   suite, sans retour à la ligne. */
+.scanner-checklist {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px;
+    background: var(--ct-surface-2);
+    border: 1px solid var(--ct-line);
+    border-radius: var(--ct-r-md);
+}
+.scanner-check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 6px;
+    cursor: pointer;
+    font-size: 0.85em;
+    border-radius: var(--ct-r-sm);
+    transition: background 0.1s;
+}
+.scanner-mini {
+    display: inline-block;
+    padding: 1px 6px;
+    margin: 1px 2px 1px 0;
+    border-radius: var(--ct-r-sm);
+    font-size: 0.7em;
+    font-weight: 600;
+    background: var(--ct-accent-tint);
+    color: var(--ct-accent-ink);
+}
+.scanner-mini-none { background: var(--ct-surface-2); color: var(--ct-ink-2); font-style: italic; }
+.scanner-check:hover { background: var(--ct-surface); }
+.scanner-check input { margin: 0; }
+
+
+/* Filter pills (multi-select) */
+.filter-pills-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+.filter-pills-lbl {
+    font-size: 0.78em;
+    font-weight: 700;
+    color: var(--ct-ink-2);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    margin-right: 4px;
+}
+.filter-pills-hint {
+    font-size: 0.78em;
+    color: var(--ct-ink-2);
+    font-style: italic;
+    margin-left: 4px;
+}
+.filter-pill {
+    padding: 2px 9px;
+    border-radius: 11px;
+    border: 1px solid var(--ct-line);
+    background: var(--ct-surface);
+    color: var(--ct-ink-2);
+    font-size: 0.7em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    line-height: 1.6;
+}
+.filter-pill:hover {
+    background: var(--ct-surface-2);
+    border-color: var(--ct-ink-2);
+}
+.filter-pill.active {
+    background: var(--ct-accent);
+    color: var(--ct-onaccent);
+    border-color: var(--ct-accent);
+}
+/* Actives sévérité : mêmes paires que les sev-badges (tint/ink), sélection
+   marquée par la bordure couleur base — lisible dans les deux thèmes. */
+.filter-pill.sev-critical.active { background: var(--ct-critical-tint); color: var(--ct-critical-ink); border-color: var(--ct-critical-ink); }
+.filter-pill.sev-high.active     { background: var(--ct-high-tint);     color: var(--ct-high-ink);     border-color: var(--ct-high-ink); }
+.filter-pill.sev-medium.active   { background: var(--ct-medium-tint);   color: var(--ct-medium-ink);   border-color: var(--ct-medium-ink); }
+.filter-pill.sev-low.active      { background: var(--ct-low-tint);      color: var(--ct-low-ink);      border-color: var(--ct-low-ink); }
+.filter-pill.sev-info.active     { background: var(--ct-info-tint);     color: var(--ct-info-ink);     border-color: var(--ct-info-ink); }
+.filter-pill-clear {
+    background: transparent;
+    color: var(--ct-critical);
+    border-color: var(--ct-critical-tint);
+    text-transform: none;
+    font-weight: 500;
+}
+.filter-pill-clear:hover { background: var(--ct-critical-tint); }
+
+/* ═════════════════════════════════════════════════════════
+   HOSTS PANEL — card grid + search
+   ═════════════════════════════════════════════════════════ */
+.host-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 12px;
+}
+.host-card {
+    background: var(--ct-surface);
+    border: 1px solid var(--ct-line);
+    border-radius: 6px;
+    padding: 12px 14px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.host-card:hover {
+    border-color: var(--ct-critical);
+    box-shadow: var(--ct-shadow-card);
+    transform: translateY(-1px);
+}
+/* Scanning disabled: greyed out and grouped at the end of the grid. */
+.host-card-disabled {
+    opacity: 0.5;
+    border-style: dashed;
+    filter: grayscale(0.6);
+}
+.host-card-disabled:hover {
+    opacity: 0.8;
+    border-color: var(--ct-line);
+    box-shadow: none;
+    transform: none;
+}
+.host-cards-divider {
+    grid-column: 1 / -1;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--ct-line);
+    font-size: 0.8em;
+    color: var(--ct-ink-2);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.host-card-reactivate {
+    margin-top: 8px;
+}
+.host-card-top {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 4px;
+}
+.host-card-value {
+    font-family: monospace;
+    font-weight: 600;
+    font-size: 0.92em;
+    color: var(--ct-ink);
+    word-break: break-all;
+    flex: 1;
+    min-width: 0;
+}
+.host-card-thumb {
+    margin: 6px 0 8px;
+    border: 1px solid var(--ct-line);
+    border-radius: 4px;
+    overflow: hidden;
+    background: var(--ct-surface);
+    aspect-ratio: 16 / 9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.host-card-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: top;
+    display: block;
+}
+.host-card-label {
+    font-size: 0.82em;
+    color: var(--ct-ink-2);
+    margin-bottom: 6px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.host-card-meta {
+    font-size: 0.76em;
+    color: var(--ct-ink-2);
+    margin-bottom: 8px;
+}
+.host-card-findings {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+    padding-top: 8px;
+    border-top: 1px solid var(--ct-surface-2);
+}
+.host-card-findings.empty {
+    color: var(--ct-ink-2);
+    font-size: 0.78em;
+    font-style: italic;
+}
+.host-card-open {
+    margin-left: auto;
+    font-size: 0.72em;
+    color: var(--ct-critical);
+    font-weight: 600;
+}
+/* v0.2 — criticality badges + risk score chip on host cards */
+/* Score chips: -fill flat + -ink text (severity grade pairs, both themes). */
+.host-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--ct-line);
+    font-size: 0.78em;
+    color: var(--ct-ink-2);
+}
+.host-card-scancount {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+/* v0.3 — Settings panel accordion */
+.surface-settings-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin-top: 16px;
+}
+.surface-settings-accordion {
+    border-top: 1px solid var(--ct-line);
+    padding: 4px 0;
+}
+.surface-settings-accordion[open] {
+    padding-bottom: 12px;
+}
+.surface-settings-summary {
+    cursor: pointer;
+    list-style: none;
+    padding: 12px 4px;
+    font-size: 0.9em;
+    font-weight: 600;
+    color: var(--ct-ink);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    user-select: none;
+}
+.surface-settings-summary::-webkit-details-marker { display: none; }
+.surface-settings-summary::marker { content: ""; }
+.surface-settings-summary:hover { color: var(--ct-ink); }
+.surface-settings-chevron {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.15s;
+    color: var(--ct-ink-2);
+    font-size: 1.3em;
+    line-height: 1;
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+}
+.surface-settings-accordion[open] .surface-settings-chevron {
+    transform: rotate(90deg);
+    color: var(--ct-ink);
+}
+.surface-settings-body {
+    padding: 4px 4px 4px 20px;
+    font-size: 0.85em;
+}
+.surface-settings-inner {
+    font-size: inherit;
+}
+.surface-settings-muted {
+    color: var(--ct-ink-2);
+    font-style: italic;
+}
+.surface-settings-help {
+    font-size: 0.78em;
+    color: var(--ct-ink-2);
+    margin: 4px 0 8px;
+    line-height: 1.4;
+}
+.surface-settings-label {
+    display: block;
+    font-size: 0.78em;
+    color: var(--ct-ink-2);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    margin: 8px 0 3px;
+    font-weight: 600;
+}
+.surface-settings-input {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid var(--ct-line);
+    border-radius: 6px;
+    font-size: 0.85em;
+    font-family: inherit;
+    background: var(--ct-surface);
+    box-sizing: border-box;
+}
+.surface-settings-input:focus {
+    outline: none;
+    border-color: var(--ct-ink);
+    box-shadow: var(--ct-focus-soft);
+}
+.surface-settings-grid {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 6px 12px;
+    align-items: center;
+    margin-bottom: 10px;
+}
+.surface-settings-grid .surface-settings-label { margin: 0; }
+.surface-settings-check {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.85em;
+    cursor: pointer;
+    margin-top: 8px;
+}
+
+.host-card-ip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-family: monospace;
+    font-size: 0.78em;
+    color: var(--ct-ink-2);
+    margin: 2px 0;
+}
+.host-card-sharecount {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.76em;
+    font-weight: 600;
+    color: var(--ct-ink-2);
+    margin: 2px 0;
+}
+/* Per-share rows in the host detail (a file server hosting several shares) */
+.host-share-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 10px;
+    padding: 6px 0;
+    border-top: 1px solid var(--ct-line);
+}
+.host-share-row:first-child { border-top: none; }
+.host-share-path { flex: 1 1 240px; font-size: 0.85em; word-break: break-all; }
+.host-share-acts { display: inline-flex; gap: 4px; }
+.host-share-scanners { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 4px; }
+.host-share-meta { flex-basis: 100%; font-size: 0.74em; color: var(--ct-ink-2); }
+.host-card-aliases {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+    margin: 6px 0 0;
+}
+.host-card-aliases-lbl {
+    font-size: 0.72em;
+    color: var(--ct-ink-2);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    margin-right: 4px;
+}
+.host-alias-pill {
+    display: inline-block;
+    font-family: monospace;
+    font-size: 0.74em;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: var(--ct-surface-2);
+    color: var(--ct-ink-1);
+    border: 1px solid var(--ct-line);
+    cursor: pointer;
+    white-space: nowrap;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.host-alias-pill:hover { background: var(--ct-line); color: var(--ct-ink); }
+.host-card-tags {
+    display: flex; flex-wrap: wrap; gap: 4px;
+    margin: 4px 0 0;
+}
+.host-tag {
+    display: inline-block;
+    font-size: 0.7em;
+    padding: 1px 8px;
+    border-radius: 10px;
+    background: var(--ct-info-tint);
+    color: var(--ct-info);
+    font-weight: 500;
+}
+/* v0.2 — scan diff bubbles on jobs list + host timeline */
+.job-diff {
+    margin-top: 2px;
+    font-size: 0.72em;
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+}
+.job-diff-added    { color: var(--ct-low-ink); font-weight: 700; }
+.job-diff-reopened { color: var(--ct-high); font-weight: 700; }
+.job-diff-refreshed{ color: var(--ct-ink-2); }
+/* v0.2 — host detail per-host scan timeline */
+.host-timeline {
+    border-left: 2px solid var(--ct-line);
+    margin: 8px 0 16px 6px;
+    padding-left: 12px;
+}
+.host-timeline-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
+    font-size: 0.82em;
+    border-bottom: 1px dashed var(--ct-line);
+}
+.host-timeline-row:last-child { border-bottom: none; }
+.host-timeline-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--ct-accent);
+    margin-left: -17px;
+    box-shadow: 0 0 0 3px var(--ct-surface);
+}
+.host-timeline-date { color: var(--ct-ink-2); font-family: monospace; min-width: 110px; }
+.host-timeline-status { font-size: 0.85em; }
+.host-timeline-diff { margin-left: auto; display: flex; gap: 6px; }
+.host-timeline-err { color: var(--ct-critical); cursor: help; }
+
+/* ═════════════════════════════════════════════════════════
+   BULK ACTION BAR — findings bulk triage
+   ═════════════════════════════════════════════════════════ */
+.bulk-action-bar {
+    position: sticky;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    margin: 16px -16px -16px -16px;
+    background: var(--ct-surface-2);
+    color: var(--ct-surface-2);
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.15);
+    flex-wrap: wrap;
+    z-index: 10;
+}
+.bulk-action-bar .bulk-count {
+    font-weight: 600;
+    font-size: 0.88em;
+    margin-right: 8px;
+    padding: 4px 10px;
+    background: var(--ct-neutral-tint);
+    border-radius: 4px;
+}
+.bulk-action-bar .btn-add {
+    background: var(--ct-surface);
+    color: var(--ct-surface-2);
+    border: none;
+}
+
+.bulk-check {
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
+}
+#bulk-select-all {
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
+}
+
+/* ═════════════════════════════════════════════════════════
+   SVG ICONS — alignment + sidebar integration
+   ═════════════════════════════════════════════════════════ */
+.btn-icon {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    line-height: 1;
+}
+.btn-icon svg {
+    flex-shrink: 0;
+}
+.btn-mini svg {
+    display: block;
+    margin: 0 auto;
+}
+.sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.sidebar-item > span {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.surface-modal-close svg {
+    vertical-align: middle;
+}
+
+/* ═════════════════════════════════════════════════════════
+   HELP OVERLAY — methodology + usage panels
+   ═════════════════════════════════════════════════════════ */
+
+/* ═════════════════════════════════════════════════════════
+   DASHBOARD v2 — banner, timeline, cards, top offenders
+   ═════════════════════════════════════════════════════════ */
+
+.dash-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+.dash-header h2 { flex: 0 0 auto; }
+.dash-actions {
+    margin-left: auto;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+/* ── Alert counts grid ── */
+.dash-banner-counts {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+}
+
+/* ── Cards grid ── */
+.dash-card {
+    background: var(--ct-surface);
+    border: 1px solid var(--ct-line);
+    border-radius: 8px;
+    padding: 16px 18px;
+    flex: 1 1 260px;
+    min-width: 0;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+.dash-card-full { flex-basis: 100%; }
+.dash-card-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.82em;
+    font-weight: 600;
+    color: var(--ct-ink-1);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--ct-surface-2);
+}
+.dash-row {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+.dash-empty {
+    color: var(--ct-ink-2);
+    font-style: italic;
+    font-size: 0.85em;
+    padding: 12px 0;
+    text-align: center;
+}
+
+/* ── Top offenders list ── */
+.dash-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.dash-list-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 4px;
+    font-size: 0.85em;
+    cursor: pointer;
+    transition: background 0.1s;
+}
+.dash-list-row:hover { background: var(--ct-surface-2); }
+.dash-list-row[data-click=""] { cursor: default; }
+.dash-list-main {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.dash-list-main.mono { font-family: monospace; font-size: 0.9em; }
+.dash-list-count {
+    flex: 0 0 auto;
+    font-weight: 600;
+    color: var(--ct-critical-ink);
+    background: var(--ct-critical-tint);
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.82em;
+    min-width: 26px;
+    text-align: center;
+}
+
+/* ── Timeline SVG ── */
+.dash-timeline {
+    width: 100%;
+    height: auto;
+    max-height: 180px;
+    display: block;
+}
+.dash-timeline-legend {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+    font-size: 0.76em;
+    color: var(--ct-ink-2);
+}
+.dash-legend-item { display: inline-flex; align-items: center; gap: 4px; }
+.dash-legend-sq { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+
+/* ── Surface inventory bars ── */
+.dash-surface-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.dash-surface-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.82em;
+}
+.dash-surface-lbl { flex: 0 0 90px; color: var(--ct-ink-1); }
+.dash-bar-bg {
+    flex: 1;
+    height: 8px;
+    background: var(--ct-surface-2);
+    border-radius: 4px;
+    overflow: hidden;
+}
+.dash-bar-fill { height: 100%; transition: width 0.3s; }
+.dash-surface-count { flex: 0 0 auto; font-weight: 600; color: var(--ct-ink-1); min-width: 24px; text-align: right; }
+.dash-surface-sub {
+    font-size: 0.72em;
+    color: var(--ct-ink-2);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    margin: 14px 0 6px;
+    font-weight: 600;
+}
+
+/* ── Measures burndown ── */
+.dash-burndown { margin-bottom: 12px; }
+.dash-burndown-bar {
+    display: flex;
+    height: 14px;
+    border-radius: 7px;
+    overflow: hidden;
+    background: var(--ct-surface-2);
+    margin-bottom: 10px;
+}
+.dash-burndown-seg { height: 100%; transition: width 0.3s; }
+.dash-burndown-legend {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    font-size: 0.78em;
+    color: var(--ct-ink-2);
+}
+.dash-burndown-legend strong { color: var(--ct-ink-1); }
+.dash-measures-delta {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+    font-size: 0.78em;
+}
+.dash-measures-stat {
+    background: var(--ct-surface-2);
+    padding: 6px 10px;
+    border-radius: 4px;
+    color: var(--ct-ink-2);
+    flex: 1 1 auto;
+    text-align: center;
+}
+.dash-measures-stat strong { color: var(--ct-ink-1); font-size: 1.1em; display: block; }
+.dash-measures-stat.positive strong { color: var(--ct-low); }
+.dash-measures-stat.negative strong { color: var(--ct-critical); }
+.dash-measures-overdue {
+    background: var(--ct-critical-tint);
+    border: 1px solid var(--ct-critical-tint);
+    border-radius: 6px;
+    padding: 10px;
+    margin-top: 12px;
+}
+.dash-overdue-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--ct-critical);
+    font-weight: 600;
+    font-size: 0.82em;
+    margin-bottom: 6px;
+}
+.dash-overdue-row {
+    display: flex;
+    gap: 8px;
+    font-size: 0.78em;
+    padding: 4px 0;
+    align-items: center;
+}
+.dash-overdue-id { font-family: monospace; color: var(--ct-ink-2); }
+.dash-overdue-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ct-ink-1); }
+.dash-overdue-date { color: var(--ct-critical); font-weight: 600; }
+
+/* ── Scanner health ── */
+.dash-health-stats { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.dash-health-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    font-size: 0.85em;
+    border-bottom: 1px dashed var(--ct-surface-2);
+}
+.dash-health-row:last-child { border-bottom: none; }
+.dash-health-row span { color: var(--ct-ink-2); }
+.dash-health-row strong { color: var(--ct-ink-1); }
+.dash-health-row strong.positive { color: var(--ct-low); }
+.dash-health-row strong.warning  { color: var(--ct-medium); }
+.dash-health-row strong.negative { color: var(--ct-critical); }
+.dash-health-last, .dash-health-next {
+    font-size: 0.78em;
+    margin-top: 6px;
+    padding: 6px 0;
+    border-top: 1px solid var(--ct-surface-2);
+}
+.dash-health-last .mono, .dash-health-next .mono { font-family: monospace; }
+.dash-health-last .text-muted, .dash-health-next .text-muted { color: var(--ct-ink-2); }
+
+
+/* ═════════════════════════════════════════════════════════
+   DASHBOARD ALERT CARD — state-tinted background (left column)
+   ═════════════════════════════════════════════════════════ */
+.dash-card-alert {
+    border-width: 1px;
+}
+.dash-card-alert-critical {
+    background: linear-gradient(135deg, var(--ct-critical-tint), var(--ct-critical-tint));
+    border-color: var(--ct-critical-tint);
+}
+.dash-card-alert-critical .dash-card-head { color: var(--ct-critical); }
+
+.dash-card-alert-high {
+    background: linear-gradient(135deg, var(--ct-high-tint), var(--ct-high-tint));
+    border-color: var(--ct-high);
+}
+.dash-card-alert-high .dash-card-head { color: var(--ct-high); }
+
+.dash-card-alert-ok {
+    background: linear-gradient(135deg, var(--ct-low-tint), var(--ct-low-tint));
+    border-color: var(--ct-low-tint);
+}
+.dash-card-alert-ok .dash-card-head { color: var(--ct-low-ink); }
+
+.dash-card-alert .dash-card-head { border-bottom-color: rgba(0, 0, 0, 0.08); }
+.dash-card-alert .dash-banner-counts {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+}
+
+/* ═════════════════════════════════════════════════════════
+   BULK IMPORT MODAL — spec + sample + validation feedback
+   ═════════════════════════════════════════════════════════ */
+.bulk-import-spec {
+    background: var(--ct-surface-2);
+    border: 1px solid var(--ct-line);
+    border-radius: 6px;
+    padding: 8px 12px;
+    margin-bottom: 10px;
+    font-size: 0.82em;
+}
+.bulk-import-spec summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--ct-ink-1);
+    padding: 4px 0;
+}
+.bulk-import-spec[open] summary { margin-bottom: 8px; }
+.bulk-import-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82em;
+}
+.bulk-import-table th,
+.bulk-import-table td {
+    padding: 6px 8px;
+    text-align: left;
+    border-bottom: 1px solid var(--ct-line);
+    vertical-align: top;
+}
+.bulk-import-table th {
+    background: var(--ct-surface-2);
+    color: var(--ct-ink-1);
+    font-weight: 600;
+    font-size: 0.78em;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+.bulk-import-table td code {
+    background: var(--ct-info-tint);
+    color: var(--ct-accent-ink);
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 0.92em;
+}
+.bulk-import-sample {
+    background: var(--ct-code-bg);
+    color: var(--ct-line);
+    padding: 10px 12px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 0.76em;
+    line-height: 1.4;
+    max-height: 200px;
+    overflow-y: auto;
+    margin: 4px 0 0;
+}
+.bulk-import-feedback {
+    margin-top: 10px;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 0.82em;
+    line-height: 1.5;
+}
+.bulk-import-feedback-ok {
+    background: var(--ct-low-tint);
+    border: 1px solid var(--ct-low-tint);
+    color: var(--ct-low-ink);
+}
+.bulk-import-feedback-error {
+    background: var(--ct-critical-tint);
+    border: 1px solid var(--ct-critical-tint);
+    color: var(--ct-critical-ink);
+}
+
+/* ═════════════════════════════════════════════════════════
+   DARK MODE — overrides scoped to :root[data-theme="dark"]
+   (light rendering unchanged; tokens come from cisotoolbox.css)
+   ═════════════════════════════════════════════════════════ */
+
+/* Dashboard alert banner — count tiles used rgba(255,255,255,0.85):
+   near-white tiles inside the dark critical-tint banner. Re-theme with
+   severity -tint backgrounds and -ink values (dark badge convention). */
+:root[data-theme="dark"] .dash-card-alert .dash-card-head { border-bottom-color: var(--ct-line); }
+/* Hard-coded pastel borders (orange-300 / blue-300) on tiles and alert card */
+
+/* ct_table row action buttons (✓ / ✕ on findings rows) — .ct-action-btn has
+   no stylesheet rule anywhere, so UA-default buttons rendered light gray with
+   black icons on dark rows. ✓ (à corriger) → low tint/ink; ✕ (faux positif)
+   and any other action → neutral tint/ink. */
+:root[data-theme="dark"] .ct-action-btn {
+    background: var(--ct-neutral-tint);
+    color: var(--ct-neutral-ink);
+    border: 1px solid var(--ct-line-strong);
+    border-radius: var(--ct-r-sm);
+    cursor: pointer;
+}
+
+/* Jobs — "MANUEL" source badge was pastel #e0f2fe + dark blue text */
+/* Hosts — .host-tag used the same hard-coded pastel */
+
+/* Findings — "Nouveau" status text: base info color lacked contrast */
+
+/* Severity badges — base severity colors are light in dark, so white text
+   became unreadable. Dark badge convention: -tint background + -ink text. */
+
+/* Filled controls (active filter pills, risk score chips, tone buttons) —
+   saturated fills are light in dark, so filled controls take near-black text
+   per the design-system convention. */
+
+/* Bulk action bar — hard-coded #1f2937 bar whose text used --ct-surface-2
+   (dark-on-dark) and whose neutral button was dark text on dark surface. */
+:root[data-theme="dark"] .bulk-action-bar {
+    background: var(--ct-surface-2);
+    color: var(--ct-ink);
+    border-top: 1px solid var(--ct-line-strong);
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.45);
+}
+:root[data-theme="dark"] .bulk-action-bar .btn-add {
+    background: var(--ct-surface);
+    color: var(--ct-ink);
+    border: 1px solid var(--ct-line-strong);
+}
+
+/* Misc hard-coded light values */
+:root[data-theme="dark"] .bulk-import-sample    { color: var(--ct-ink-1); } /* --ct-line text turned dark-on-dark */
+
+/* Boutons destructifs : teinté au repos, rouge plein au survol (spec Supprimer). */
+
+/* Bouton de fermeture des modales — local au module, PAS une primitive du socle.
+   Renommé hors du préfixe ct- : ce préfixe est réservé aux primitives partagées,
+   et un nom local qui l'emprunte finit par entrer en collision. L'encre suit
+   désormais le texte courant : elle était blanche ici parce que l'en-tête de
+   modale était violet plein, en-tête supprimé avec les collisions. */
+.surface-modal-close {
+    background: none;
+    border: none;
+    color: var(--ct-ink-2);
+    font-size: 1.5em;
+    cursor: pointer;
+    line-height: 1;
+    padding: 0 4px;
+    opacity: 0.85;
+}
+.surface-modal-close:hover { opacity: 1; }
+
+/* Extrait du balisage : la classe existait, son style vivait a cote. */
+.appsec-filter { min-width:200px; }
