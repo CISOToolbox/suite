@@ -52,7 +52,11 @@ class Project(Base):
     name = Column(String(255), nullable=False, default="")
     organization = Column(String(255), nullable=True)
     audit_date = Column(String(50), nullable=True)
-    owner_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    owner_id = Column(UUID(as_uuid=True),
+                      # SET NULL, not the NO ACTION default: deleting a user must
+                      # not be blocked by the objects they happen to own. The
+                      # ownership idiom already tolerates a null owner.
+                      ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     data = Column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
     # FEAT-33 — bumped ONLY by server-initiated writers (Pilot write-back,
     # restore, schedulers). Guards the blob PUT against stale-tab overwrite.

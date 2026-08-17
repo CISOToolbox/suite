@@ -174,6 +174,26 @@ async def update_settings(body: SettingsUpdate, user: User = Depends(get_current
     return {"ok": True, "validation": validation, "push": push_report}
 
 
+@router.post("/resync")
+async def resync_modules(user: User = Depends(get_current_user),
+                         db: AsyncSession = Depends(get_db)):
+    """Re-push the current settings to every registered module.
+
+    Saving this page was the only thing that ever pushed, so a module added
+    to the deployment afterwards stayed unconfigured — no AI keys, no SMTP —
+    until someone happened to re-save. This makes the propagation an action
+    of its own, and the per-module report tells you which ones answered.
+    """
+    require_admin(user)
+    report = await _push_to_modules(db)
+    from src.audit import log_write
+    await log_write(db, user, None, "settings.resync",
+                    entity_type="settings", entity_id="pilot",
+                    details={"modules": sorted(report)})
+    await db.commit()
+    return {"ok": True, "push": report}
+
+
 # Opt-out for a lab/on-prem LLM reachable only over plain HTTP. Off by
 # default: this endpoint is called right after with the API key in an
 # Authorization header (see _validate_ai_key), and the URL is then pushed

@@ -78,19 +78,23 @@ services:
       - /var/cache/nginx:noexec,nosuid,size=64m
       # nginx.pid — /var/run is a symlink to /run in alpine.
       - /run:noexec,nosuid,size=16m
-    # nginx.conf hardcodes `resolver 127.0.0.11` (Docker's embedded DNS).
-    # Under Podman the DNS lives at the network gateway (e.g. 10.89.0.1),
-    # so we rewrite the resolver from the container's own /etc/resolv.conf
-    # at startup. No-op under Docker (nameserver IS 127.0.0.11); fixes the
-    # suite-wide 502 ("upstream could not be resolved") under Podman.
+    # nginx.conf `include`s /tmp/resolver.conf, generated here from the
+    # container's own /etc/resolv.conf: under Docker the DNS is 127.0.0.11,
+    # under Podman it sits at the network gateway (e.g. 10.89.0.1). Without
+    # it, every upstream is "could not be resolved" and the whole suite 502s.
+    #
+    # ONLY the resolver line is generated. nginx then runs on the MOUNTED
+    # /etc/nginx/nginx.conf, so `nginx -s reload` picks up an edit. The
+    # earlier version copied the whole config to /tmp and ran nginx on that
+    # copy — a reload replayed the stale snapshot and edits looked ignored.
     command:
       - /bin/sh
       - -c
       - |
         DNS=$$(awk '/^nameserver/{print $$2; exit}' /etc/resolv.conf)
         echo "ciso-proxy: nginx resolver -> $$DNS"
-        sed "s/resolver 127.0.0.11/resolver $$DNS/" /etc/nginx/nginx.conf > /tmp/nginx.conf
-        exec nginx -c /tmp/nginx.conf -g 'daemon off;'
+        echo "resolver $$DNS valid=10s ipv6=off;" > /tmp/resolver.conf
+        exec nginx -g 'daemon off;'
     ports:
       - "${HTTP_PORT:-80}:80"
       - "${HTTPS_PORT:-443}:443"
@@ -133,7 +137,7 @@ services:
   # not yet published to GHCR, so they stay on their tag — pin-images.sh pins
   # them automatically once they are.
   pilot-app:
-    image: ghcr.io/cisotoolbox/ciso-pilot-suite:latest@sha256:e3ea50b479ca481c9e9e7c0adf142db3b8c4dd8670f05b79005f9b634af5585a
+    image: ghcr.io/cisotoolbox/ciso-pilot-suite:v1.0.0@sha256:6dad274a18624c2e7a4fae5a8af29fad7b5f71c87561d5cb946313369921e092
     container_name: ciso-pilot
     restart: unless-stopped
     read_only: true
@@ -263,7 +267,7 @@ services:
   # ════════════════════════════════════════════════════════════
 
   risk-app:
-    image: ghcr.io/cisotoolbox/ciso-risk-suite:latest@sha256:58926adb858b752b58863d7fb0ba32c838d64f2b8d31244c743b8e6564ebe3fe
+    image: ghcr.io/cisotoolbox/ciso-risk-suite:v1.0.0@sha256:e54cfc5563494b02134a3f1c5002b888e8c5b79a15991d421d4f5b8b5d197e02
     container_name: ciso-risk
     restart: unless-stopped
     read_only: true
@@ -362,7 +366,7 @@ services:
   # ════════════════════════════════════════════════════════════
 
   vendor-app:
-    image: ghcr.io/cisotoolbox/ciso-vendor-suite:latest@sha256:780a2a10c5658d4db20847d1295f2d31ffd45f6fcb1db684fb75efb490b75d3a
+    image: ghcr.io/cisotoolbox/ciso-vendor-suite:v1.0.0@sha256:8ef8c5574b39c6277de192e149cc1a8d76e94f75d08876201466d0a81bde9a21
     container_name: ciso-vendor
     restart: unless-stopped
     read_only: true
@@ -460,7 +464,7 @@ services:
   # ════════════════════════════════════════════════════════════
 
   compliance-app:
-    image: ghcr.io/cisotoolbox/ciso-compliance-suite:latest@sha256:083fa8673dab2daf3e4fb79edcee61db52d5dfb0eaebc6f91e5b8422f925c513
+    image: ghcr.io/cisotoolbox/ciso-compliance-suite:v1.0.0@sha256:838b08831f7520f06cdf69bc369fab82e156a81b2e8855294702692d49584bc3
     container_name: ciso-compliance
     restart: unless-stopped
     read_only: true
@@ -558,7 +562,7 @@ services:
   # ════════════════════════════════════════════════════════════
 
   asset-app:
-    image: ghcr.io/cisotoolbox/ciso-asset-suite:latest@sha256:69db1f91db5f8dc139988874e13a77fb01d5320400e65065b608debd28cd27e3
+    image: ghcr.io/cisotoolbox/ciso-asset-suite:v1.0.0@sha256:f065a7085569b5783f73e625e35cde5f5496e51c8542caa7f881e88d11b3135a
     container_name: ciso-asset
     restart: unless-stopped
     read_only: true
@@ -656,7 +660,7 @@ services:
   # ════════════════════════════════════════════════════════════
 
   audit-app:
-    image: ghcr.io/cisotoolbox/ciso-audit-suite:latest
+    image: ghcr.io/cisotoolbox/ciso-audit-suite:v1.0.0@sha256:275d413dbebe07567ef33e0e380a0532c0304dc79359a039de66d746ed5b5510
     container_name: ciso-audit
     restart: unless-stopped
     read_only: true
@@ -754,7 +758,7 @@ services:
   # ════════════════════════════════════════════════════════════
 
   access-app:
-    image: ghcr.io/cisotoolbox/ciso-access-suite:latest@sha256:efb0b4cd7b18ca398621b328489efd983337553a80a491ad6a0afad73d6e0777
+    image: ghcr.io/cisotoolbox/ciso-access-suite:v1.0.0@sha256:e3c29926987b1c45c849eae665f1234348129e2668bd9cd501a49e45d9dce6a3
     container_name: ciso-access
     restart: unless-stopped
     read_only: true
@@ -857,7 +861,7 @@ services:
   # ════════════════════════════════════════════════════════════
 
   surface-app:
-    image: ghcr.io/cisotoolbox/ciso-surface-suite:latest@sha256:0e9240194968f307de54a4b94da5c3b33c206ba74e5226324d22a106580f04d0
+    image: ghcr.io/cisotoolbox/ciso-surface-suite:v1.0.0@sha256:417ac947f4aee33759c5e684ce9aad782b0de92da61bfeb79f1802a12d1a2d06
     container_name: ciso-surface
     restart: unless-stopped
     read_only: true
@@ -904,9 +908,9 @@ services:
       - SURFACE_DNS_BRUTE_TIMEOUT=${SURFACE_DNS_BRUTE_TIMEOUT:-3}
       - SURFACE_DNS_BRUTE_WORDLIST=${SURFACE_DNS_BRUTE_WORDLIST:-}
       # Data-at-rest key for per-target SMB credentials saved from the UI
-      # (smb_scan add-on). SEC-01: required — no silent JWT_SECRET fallback.
+      # (smb_scan_rs add-on). SEC-01: required — no silent JWT_SECRET fallback.
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY is required (openssl rand -hex 32) — see .env.example}
-      # SMB file-share add-on (only used when the smb_scan add-on is in the
+      # SMB file-share add-on (only used when the smb_scan_rs add-on is in the
       # image). Default service-account credentials — used when a target has
       # no per-target credentials. Never stored in the DB.
       - SURFACE_SMB_USERNAME=${SURFACE_SMB_USERNAME:-}
@@ -976,7 +980,7 @@ services:
   # ════════════════════════════════════════════════════════════
 
   appsec-app:
-    image: ghcr.io/cisotoolbox/ciso-appsec-suite:latest@sha256:406125690cb2fb5b922e75dc80960cd25e93993c36b29f39c1d8358b96f0a6fb
+    image: ghcr.io/cisotoolbox/ciso-appsec-suite:v1.0.0@sha256:1178c2fcc9230da5d6993513206b21e2edcf1de60d4cad5eafa02db6a48e1d52
     container_name: ciso-appsec
     restart: unless-stopped
     read_only: true
@@ -1084,7 +1088,7 @@ services:
   # auth déléguée à pilot, secret JWT dérivé par HKDF, chiffrement des
   # réglages via ENCRYPTION_KEY.
   watch-app:
-    image: ghcr.io/cisotoolbox/ciso-watch-suite:latest@sha256:ec8d50a07404768248858c3ad8e061a284866d67b77370bd9ce22cf6174e8409
+    image: ghcr.io/cisotoolbox/ciso-watch-suite:v1.0.0@sha256:0760b5aa0757fee0a68593c7c769d245faa26695c99210a5161fa0e7e85803c7
     container_name: ciso-watch
     restart: unless-stopped
     read_only: true

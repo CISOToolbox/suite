@@ -31,7 +31,7 @@
 # Examples:
 #   shared/build-client-image.sh acme
 #   shared/build-client-image.sh acme --addons custom/acme
-#   shared/build-client-image.sh acme-smb --module surface --addons generic/smb_scan
+#   shared/build-client-image.sh acme-smb --module surface --addons generic/smb_scan_rs
 #   shared/build-client-image.sh acme --base ghcr.io/cisotoolbox/ciso-access-suite:v0.3.6 \
 #       --skip-core --tag v0.1.0
 set -euo pipefail

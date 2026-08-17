@@ -653,6 +653,41 @@ async def restore_backup(backup_key: str, user: User = Depends(get_current_user)
     return {"ok": True, "module": module_id, "restored": restored, "errors": errors}
 
 
+@router.post("/delete-many")
+async def delete_backups(body: dict, user: User = Depends(get_current_user),
+                         db: AsyncSession = Depends(get_db)):
+    """Delete several backups in one transaction.
+
+    Deleting a selection one HTTP call at a time is not the same operation:
+    a failure halfway leaves the set half-removed, and the journal shows N
+    unrelated entries instead of one intentional cleanup. Every key is
+    validated BEFORE anything is deleted, so the request is all-or-nothing.
+    """
+    require_admin(user)
+    keys = body.get("keys") or []
+    if not isinstance(keys, list) or not keys:
+        raise HTTPException(status_code=422, detail="keys required")
+    if len(keys) > 200:
+        raise HTTPException(status_code=422, detail="too many keys (max 200)")
+    for k in keys:
+        _validate_backup_key(str(k))
+
+    rows = (await db.execute(
+        select(AppSettings).where(AppSettings.key.in_([str(k) for k in keys]))
+    )).scalars().all()
+    found = {r.key for r in rows}
+    missing = sorted(set(map(str, keys)) - found)
+
+    from src.audit import log_write
+    await log_write(db, user, None, "backup.delete_many",
+                    entity_type="backup", entity_id=f"{len(rows)} backup(s)",
+                    details={"keys": sorted(found), "missing": missing})
+    for r in rows:
+        await db.delete(r)
+    await db.commit()
+    return {"ok": True, "deleted": len(rows), "missing": missing}
+
+
 @router.delete("/{backup_key}")
 async def delete_backup(backup_key: str, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     require_admin(user)

@@ -57,7 +57,16 @@ from src.models import (
 
 logger = logging.getLogger("watch-digest")
 
-PUBLIC_URL = os.getenv("PUBLIC_URL", "")  # for "view in app" links
+def _public_base() -> str:
+    """Absolute base for the "view in app" links of the digest.
+
+    The suite-wide name is ``PUBLIC_BASE_URL`` — pilot, appsec and surface all
+    read that one. Watch shipped reading ``PUBLIC_URL`` only, so a deployment
+    configured the documented way produced a digest with no links at all while
+    every other module's mails were fine. ``PUBLIC_URL`` stays accepted as a
+    fallback so installs already relying on it keep working.
+    """
+    return (os.getenv("PUBLIC_BASE_URL", "") or os.getenv("PUBLIC_URL", "")).rstrip("/")
 
 # Look-back window when a recipient has never received a digest before.
 # Long enough to surface the recent ATH backlog, short enough not to
@@ -284,7 +293,8 @@ def _urgency_label_fr(u: str) -> str:
 
 
 def _alert_link(alert_id: uuid.UUID) -> str:
-    return f'{PUBLIC_URL.rstrip("/")}/watch/#alerts/{alert_id}' if PUBLIC_URL else ""
+    base = _public_base()
+    return f"{base}/watch/#alerts/{alert_id}" if base else ""
 
 
 def _render_group_card(

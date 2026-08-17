@@ -512,7 +512,6 @@ if (typeof _registerTranslations === "function") {
         "scanner.cve_lookup.label":       "CVE matching (NVD + EPSS + KEV)",
         "scanner.cloud_buckets.label":    "Cloud bucket enumeration (S3/Azure/GCS)",
         "scanner.screenshot.label":       "HTTP screenshot capture (optional)",
-        "scanner.smb_scan.label":         "SMB file-share content (secrets & sensitive data)",
         "scanner.smb_scan_rs.label":      "SMB file-share content — Rust worker (secrets & sensitive data)",
         "findings.bulk_import":       "Import JSON",
         "findings.search.placeholder": "Search title, target, description, scanner...",

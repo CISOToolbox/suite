@@ -37,49 +37,28 @@ from src.auth import auth_enabled, get_current_user
 from src.database import get_db
 from src.models import AppSettings, User
 from src.schemas import AICompleteRequest, AICompleteResponse, AIConfigResponse
+from src.ai_models_common import AI_PROVIDERS
+from src.settings_crypto import decrypt_setting, is_secret_key
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
 
-AI_PROVIDERS = {
-    "anthropic": {
-        "label": "Anthropic (Claude)",
-        "models": [
-            {"id": "claude-opus-4-8", "label": "Claude Opus 4.8"},
-            {"id": "claude-sonnet-4-6", "label": "Claude Sonnet 4.6"},
-            {"id": "claude-haiku-4-5-20251001", "label": "Claude Haiku 4.5"},
-            {"id": "claude-opus-4-6", "label": "Claude Opus 4.6"},
-        ],
-        "defaultModel": "claude-sonnet-4-6",
-        "endpoint": "https://api.anthropic.com/v1/messages",
-    },
-    "openai": {
-        "label": "OpenAI (GPT)",
-        "models": [
-            {"id": "gpt-5.5", "label": "GPT-5.5"},
-            {"id": "gpt-5.5-pro", "label": "GPT-5.5 Pro"},
-            {"id": "gpt-5.4-mini", "label": "GPT-5.4 mini"},
-            {"id": "gpt-4o", "label": "GPT-4o"},
-            {"id": "gpt-4o-mini", "label": "GPT-4o mini"},
-        ],
-        "defaultModel": "gpt-5.5",
-        "endpoint": "https://api.openai.com/v1/chat/completions",
-    },
-    "bedrock": {
-        "label": "AWS Bedrock",
-        "models": [
-            {"id": "anthropic.claude-sonnet-4-6-20250514-v1:0", "label": "Claude Sonnet 4.6 (Bedrock)"},
-            {"id": "anthropic.claude-haiku-4-5-20251001-v1:0", "label": "Claude Haiku 4.5 (Bedrock)"},
-        ],
-        "defaultModel": "anthropic.claude-sonnet-4-6-20250514-v1:0",
-        "endpoint": "https://bedrock-runtime.{region}.amazonaws.com",
-    },
-}
 
 
 async def _get_setting(key: str, db: AsyncSession) -> str:
+    """Read a setting, decrypting it when it is a secret.
+
+    `_set_setting` (routes/settings.py) encrypts every key `is_secret_key()`
+    recognises. Reading the column raw therefore hands the CIPHERTEXT to the
+    provider, which answers 401 — surfaced here as 503 "Invalid API key
+    configured on server", i.e. an accusation against a key that is perfectly
+    valid. The shared master used by the modules
+    (`shared/python/ai_proxy_common.py`) has always decrypted; Pilot keeps its
+    own copy of this route and never got the fix.
+    """
     r = await db.execute(select(AppSettings).where(AppSettings.key == key))
     s = r.scalar_one_or_none()
-    return (s.value if s and s.value else "") or ""
+    raw = (s.value if s and s.value else "") or ""
+    return decrypt_setting(raw) if raw and is_secret_key(key) else raw
 
 
 # An AWS region name is interpolated straight into the Bedrock hostname.
@@ -133,12 +112,33 @@ def _sign_v4(method, url, body, access_key, secret_key, region, service):
     return headers
 
 
+# Output cap sent to every provider. 4096 was too small for the grouping
+# assistants: the reply came back truncated and the UI blamed the model.
+AI_MAX_TOKENS = int(os.getenv("AI_MAX_TOKENS", "8192"))
+
+
+def _hit_output_cap(provider: str, data: dict) -> bool:
+    """Did the provider stop because it ran out of output budget?
+
+    Each vendor names it differently, and all three answer HTTP 200 while
+    doing it — the truncation is only visible in this field.
+    """
+    if provider in ("anthropic", "bedrock"):
+        return data.get("stop_reason") == "max_tokens"
+    if provider == "gemini":
+        cands = data.get("candidates") or [{}]
+        return (cands[0] or {}).get("finishReason") == "MAX_TOKENS"
+    choices = data.get("choices") or [{}]
+    return (choices[0] or {}).get("finish_reason") == "length"
+
+
 async def _get_api_key(provider: str, db: AsyncSession) -> str | None:
     key_name = f"ai_key_{provider}"
     result = await db.execute(select(AppSettings).where(AppSettings.key == key_name))
     setting = result.scalar_one_or_none()
     if setting and setting.value:
-        return setting.value
+        # Encrypted at rest by _set_setting — see _get_setting above.
+        return decrypt_setting(setting.value)
     if provider == "anthropic":
         return os.getenv("ANTHROPIC_API_KEY")
     if provider == "openai":
@@ -193,7 +193,7 @@ async def ai_complete(body: AICompleteRequest, user: User = Depends(get_current_
                     },
                     json={
                         "model": body.model,
-                        "max_tokens": 4096,
+                        "max_tokens": AI_MAX_TOKENS,
                         "system": body.system,
                         "messages": [{"role": "user", "content": body.user}],
                     },
@@ -208,12 +208,28 @@ async def ai_complete(body: AICompleteRequest, user: User = Depends(get_current_
                 b_url = f"https://bedrock-runtime.{region}.amazonaws.com/model/{quote(body.model, safe='')}/invoke"
                 b_body = json.dumps({
                     "anthropic_version": "bedrock-2023-05-31",
-                    "max_tokens": 4096,
+                    "max_tokens": AI_MAX_TOKENS,
                     "system": body.system,
                     "messages": [{"role": "user", "content": body.user}],
                 })
                 sig_headers = _sign_v4("POST", b_url, b_body, api_key, secret, region, "bedrock")
                 resp = await client.post(b_url, headers=sig_headers, content=b_body)
+            elif body.provider == "gemini":
+                # Pilot already managed a Gemini key (settings.py validates one
+                # and pushes it to the modules) but had no branch to spend it:
+                # a Gemini call fell through to the OpenAI shape and failed.
+                from urllib.parse import quote as _q
+                g_url = provider_conf["endpoint"].format(model=_q(body.model, safe=""))
+                resp = await client.post(
+                    g_url,
+                    headers={"Content-Type": "application/json",
+                             "x-goog-api-key": api_key},
+                    json={
+                        "systemInstruction": {"parts": [{"text": body.system}]},
+                        "contents": [{"role": "user", "parts": [{"text": body.user}]}],
+                        "generationConfig": {"maxOutputTokens": AI_MAX_TOKENS},
+                    },
+                )
             else:
                 resp = await client.post(
                     provider_conf["endpoint"],
@@ -223,7 +239,7 @@ async def ai_complete(body: AICompleteRequest, user: User = Depends(get_current_
                     },
                     json={
                         "model": body.model,
-                        "max_tokens": 4096,
+                        "max_tokens": AI_MAX_TOKENS,
                         "messages": [
                             {"role": "system", "content": body.system},
                             {"role": "user", "content": body.user},
@@ -243,8 +259,22 @@ async def ai_complete(body: AICompleteRequest, user: User = Depends(get_current_
     data = resp.json()
     if body.provider in ("anthropic", "bedrock"):
         text = data.get("content", [{}])[0].get("text", "")
+    elif body.provider == "gemini":
+        parts = (data.get("candidates", [{}])[0].get("content", {}) or {}).get("parts", [])
+        text = "".join(p.get("text", "") for p in parts)
     else:
         text = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+    if _hit_output_cap(body.provider, data):
+        # The provider answers 200 with a reply cut mid-sentence. Returning it
+        # as-is pushed the failure to the caller, which reported "invalid AI
+        # response" — blaming the model for a cap we set. Grouping a large
+        # action plan produces JSON well past 4096 tokens, so this fired on
+        # exactly the operations that matter.
+        raise HTTPException(
+            status_code=502,
+            detail=(f"AI reply truncated at the {AI_MAX_TOKENS}-token output cap. "
+                    "Narrow the request (fewer items at once) or raise "
+                    "AI_MAX_TOKENS."))
     return AICompleteResponse(text=text)
 
 

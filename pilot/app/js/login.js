@@ -14,9 +14,33 @@
  */
 (function () {
     "use strict";
+    /**
+     * Post-login target, restricted to a same-site path.
+     *
+     * `?redirect=` is attacker-supplied: a crafted login link would otherwise
+     * send the user to another site after signing in (open redirect), and
+     * `javascript:` in `location.href` executes IN THIS ORIGIN — an XSS on the
+     * login page, which is worse. The server already applies this rule to its
+     * own redirects (`_sanitize_redirect` in pilot/src/routes/auth.py); this is
+     * the same rule on the browser side, which had none.
+     *
+     * Accepts only "/path": rejects "//evil.com" (protocol-relative), "/\evil"
+     * (backslash, which several parsers fold to "/"), anything carrying a
+     * scheme, and any value not starting with a single slash.
+     */
+    function safeRedirect(raw) {
+        var v = raw || "/";
+        if (v.charAt(0) !== "/")
+            return "/";
+        if (v.charAt(1) === "/" || v.charAt(1) === "\\")
+            return "/";
+        if (v.indexOf("\\") >= 0 || v.indexOf("://") >= 0)
+            return "/";
+        return v;
+    }
     var params = new URLSearchParams(window.location.search);
     var error = params.get("error");
-    var redirectTo = params.get("redirect") || "/";
+    var redirectTo = safeRedirect(params.get("redirect"));
     if (error) {
         var el = document.getElementById("login-error");
         el.style.display = "block";

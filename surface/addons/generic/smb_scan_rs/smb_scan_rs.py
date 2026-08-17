@@ -194,9 +194,9 @@ _DOC = {
             'des documents <strong>Word (.docx), Excel (.xlsx), PowerPoint (.pptx)</strong>.</li>'
             '<li><strong>PDF</strong> : le corps n\'est <em>pas</em> extrait par le worker '
             'Rust (pas de bibliothèque équivalente à pdfminer) — les PDF restent flaggés '
-            'par leur nom. Pour l\'extraction PDF, utiliser l\'add-on Python <code>smb_scan</code>.</li>'
+            'par leur nom, sans lecture de leur contenu.</li>'
             '<li><strong>Ruleset, masquage, plafonds</strong> (max_files / budget temps) et '
-            'rattachement au host : identiques à <code>smb_scan</code>.</li>'
+            'rattachement au host.</li>'
             '</ul>',
         "usage":
             '<h2>Cible « Partage de fichiers » — worker Rust <em>(add-on SMB)</em></h2>'
@@ -216,10 +216,10 @@ _DOC = {
             '<li><strong>Covered</strong>: text / config / code, and the body of '
             '<strong>Word (.docx), Excel (.xlsx), PowerPoint (.pptx)</strong>.</li>'
             '<li><strong>PDF</strong>: bodies are <em>not</em> extracted by the Rust '
-            'worker (no pdfminer-grade crate) — PDFs are still flagged by name. Use the '
-            'Python <code>smb_scan</code> add-on for PDF body extraction.</li>'
+            'worker (no pdfminer-grade crate) — PDFs are still flagged by name, their '
+            'content is not read.</li>'
             '<li><strong>Ruleset, masking, caps</strong> (max_files / time budget) and '
-            'host roll-up are identical to <code>smb_scan</code>.</li>'
+            'host roll-up.</li>'
             '</ul>',
         "usage":
             '<h2>"File share" target — Rust worker <em>(SMB add-on)</em></h2>'

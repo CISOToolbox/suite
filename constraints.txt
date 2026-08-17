@@ -69,7 +69,7 @@ boto3==1.43.57                  # access, asset, pilot (+ add-on aws_iam)
 urllib3==2.7.0                  # via boto3/botocore — DEP-04, 6 HIGH fixed in 2.x
 setuptools==83.0.0              # appsec, watch
 ldap3==2.9.1                    # add-ons ldap_ad, ldap_generic
-openpyxl==3.1.5                 # add-ons acme, smb_scan
+openpyxl==3.1.5                 # vendor (dora_export), add-on acme
 
 # ── Single-module pins ───────────────────────────────────────────────────────
 # Listed so a second consumer starts from the same version instead of
@@ -84,11 +84,6 @@ python-dateutil==2.9.0.post0    # watch
 packaging==25.0                 # watch
 
 # ── Add-on pins ──────────────────────────────────────────────────────────────
-pillow==12.3.0                  # smb_scan — DEP-01, GHSA-3f63-hfp8-52jq (CRITICAL)
-smbprotocol==1.15.0             # smb_scan
-pdfminer.six==20240706          # smb_scan
-python-docx==1.1.2              # smb_scan
-python-pptx==1.0.2              # smb_scan
 playwright==1.51.0              # screenshot
 
 # ── Test-only ────────────────────────────────────────────────────────────────

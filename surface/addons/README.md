@@ -71,7 +71,7 @@ description, target, evidence`.
 > **Dedup identity** = `dedup_key = scanner|type|target` (see
 > `src/findings_dedup.py`). If one `target` can legitimately yield several
 > distinct findings (e.g. several secret rules matching the same file), vary
-> the `type` so they don't collapse. `smb_scan` sets `type` = rule name and
+> the `type` so they don't collapse. `smb_scan_rs` sets `type` = rule name and
 > keeps `target` = the file's UNC path for exactly this reason.
 
 ## 2. Runtime discovery
@@ -155,7 +155,7 @@ contain **zero** add-on doc text; the client image with the add-on serves it.
   absent from the lean base and from a client image that doesn't select them.
   Add-on packaging hooks (all optional, picked up automatically): `bin/<arch>`
   binaries, `apt-packages.txt`, `requirements.txt`, `install.sh`.
-- `shared/build-client-image.sh <client> --module surface --addons generic/smb_scan`
+- `shared/build-client-image.sh <client> --module surface --addons generic/smb_scan_rs`
   builds the core (with `addons/core` baked in) then overlays the selected
   optional add-ons → `ciso-surface-<client>:<tag>`.
 - **Suite vs client policy:**
@@ -173,7 +173,7 @@ contain **zero** add-on doc text; the client image with the add-on serves it.
 - **Slim client builds** — drop unwanted core scanners with `--exclude-core`:
   ```
   shared/build-client-image.sh acme --module surface \
-      --addons generic/smb_scan --exclude-core shodan,cloud_buckets --tag v0.1.2
+      --addons generic/smb_scan_rs --exclude-core shodan,cloud_buckets --tag v0.1.2
   ```
   → `ciso-surface-acme:v0.1.2` = all core scanners **except** `shodan` +
   `cloud_buckets`, **plus** the SMB add-on. Excluded scanners simply don't
@@ -208,7 +208,7 @@ addons/
 └── custom/<client>/<name>.py      ← client-specific scanners (opt-in)
 ```
 
-See `core/email_security/` for a minimal reference, and `generic/smb_scan/` for
+See `core/email_security/` for a minimal reference, and `generic/smb_scan_rs/` for
 a full-featured one (content scan with document body extraction, per-target
 encrypted credentials, incremental cache, host roll-up, conditional in-app
 help).

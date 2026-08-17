@@ -300,7 +300,7 @@ async def _maybe_send_weekly_digest() -> None:
     try:
         from src.routes.reports import (
             _aggregate_report, _build_digest_message, _load_smtp,
-            _smtp_send_blocking,
+            _smtp_send_blocking, _smtp_tls_on,
         )
     except Exception:
         return
@@ -308,7 +308,7 @@ async def _maybe_send_weekly_digest() -> None:
         from src.models import AppSettings
         from sqlalchemy import select as _sel
         cfg = await _load_smtp(db)
-        if not cfg.get("host") or not cfg.get("sender") or not cfg.get("recipients"):
+        if not cfg.get("host") or not cfg.get("from_addr") or not cfg.get("recipients"):
             return
         last_row = (await db.execute(
             _sel(AppSettings).where(AppSettings.key == "digest.last_sent_at")
@@ -330,11 +330,10 @@ async def _maybe_send_weekly_digest() -> None:
         try:
             port = int(cfg.get("port") or 587)
             host = cfg["host"]
-            use_tls = cfg.get("use_tls", "1") != "0"
             await asyncio.to_thread(
                 _smtp_send_blocking,
-                host, port, use_tls,
-                cfg.get("username", ""), cfg.get("password", ""),
+                host, port, _smtp_tls_on(cfg),
+                cfg.get("user", ""), cfg.get("password", ""),
                 sender, recipients, msg.as_string(),
             )
             if last_row is None:

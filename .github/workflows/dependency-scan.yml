@@ -60,7 +60,7 @@ jobs:
     name: Pin drift vs constraints.txt
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
 
       - name: Check dependency drift
         run: bash tests/check-deps-drift.sh
@@ -70,7 +70,7 @@ jobs:
   # about severity and about the advisories we cannot act on yet.
   scan:
     name: OSV-Scanner (SARIF)
-    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@v2.3.8
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@9a498708959aeaef5ef730655706c5a1df1edbc2  # v2.3.8
     permissions:
       contents: read
       security-events: write
@@ -87,12 +87,12 @@ jobs:
     name: Fail on HIGH+ advisories
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
 
       - name: Run OSV-Scanner (JSON)
         id: osv
         continue-on-error: true          # exit 1 just means "found something"
-        uses: google/osv-scanner-action/osv-scanner-action@v2.3.8
+        uses: google/osv-scanner-action/osv-scanner-action@9a498708959aeaef5ef730655706c5a1df1edbc2  # v2.3.8
         with:
           scan-args: |-
             --recursive
@@ -169,7 +169,7 @@ jobs:
     if: failure() && github.event_name == 'schedule'
     steps:
       - name: Create issue for dependency vulnerabilities
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b  # v7
         with:
           script: |
             const title = `🔒 Dependency vulnerabilities detected — ${new Date().toISOString().split('T')[0]}`;

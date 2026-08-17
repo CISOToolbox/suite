@@ -443,12 +443,16 @@
                     var gIdx = updateIdx++;
                     _globalUpdates.push(u);
                     var isOK = (u.status || "").toUpperCase() === "OK";
-                    var color = isOK ? "var(--ct-low)" : "var(--ct-critical)";
+                    // Tone as a CLASS, not a built style attribute. The value was already
+                    // a choice between two literals — no AI data ever reached the
+                    // attribute — but a scanner cannot see that through a
+                    // concatenated style=, and the project styles with classes.
+                    var toneCls = isOK ? "ct-text-low" : "ct-text-critical";
 
                     var cardH = '<div class="ai-card ct-p-2 ct-mb-1 ct-bordered ct-r-md" id="ai-global-card-' + gIdx + '">';
                     cardH += '<div class="ct-flex ct-gap-2 ct-items-center ct-mb-1">';
                     cardH += '<span class="ct-strong ct-minw-80">' + esc(u.ref || "") + '</span>';
-                    cardH += '<span style="color:' + color + ';font-weight:700;font-size:var(--ct-text-section)">' + esc(u.status || "") + '</span>';
+                    cardH += '<span class="ct-strong ct-text-section ' + toneCls + '">' + esc(u.status || "") + '</span>';
                     cardH += '<span class="ct-flex-1"></span>';
                     cardH += '<button class="ct-btn ai-btn-accept ct-py-1 ct-px-2 ct-text-label" data-variant="primary" data-gidx="' + gIdx + '">' + t("ai.accept") + '</button>';
                     cardH += '<button class="ct-btn ai-btn-ignore ct-py-1 ct-px-2 ct-text-label" data-gidx="' + gIdx + '">' + t("ai.ignore") + '</button>';
@@ -457,8 +461,8 @@
                     if (u.mesures && u.mesures.length) {
                         cardH += '<div class="fs-xs ct-mt-1">';
                         u.mesures.forEach(function(m) {
-                            var mColor = m.statut === "termine" ? "var(--ct-low)" : "var(--ct-high)";
-                            cardH += '<div class="ct-py-1 ct-flex ct-gap-1 ct-items-baseline"><span style="color:' + mColor + ';font-weight:600">' + (m.statut === "termine" ? "✓" : "○") + '</span><span>' + esc(m.description || "") + '</span></div>';
+                            var mToneCls = m.statut === "termine" ? "ct-text-low" : "ct-text-high";
+                            cardH += '<div class="ct-py-1 ct-flex ct-gap-1 ct-items-baseline"><span class="ct-strong ' + mToneCls + '">' + (m.statut === "termine" ? "✓" : "○") + '</span><span>' + esc(m.description || "") + '</span></div>';
                         });
                         cardH += '</div>';
                     }
@@ -647,12 +651,16 @@
                     var gIdx = updateIdx++;
                     _globalUpdates.push(u);
                     var isOK = (u.status || "").toUpperCase() === "OK";
-                    var color = isOK ? "var(--ct-low)" : "var(--ct-critical)";
+                    // Tone as a CLASS, not a built style attribute. The value was already
+                    // a choice between two literals — no AI data ever reached the
+                    // attribute — but a scanner cannot see that through a
+                    // concatenated style=, and the project styles with classes.
+                    var toneCls = isOK ? "ct-text-low" : "ct-text-critical";
 
                     var cardH = '<div class="ai-card ct-p-2 ct-mb-1 ct-bordered ct-r-md" id="ai-global-card-' + gIdx + '">';
                     cardH += '<div class="ct-flex ct-gap-2 ct-items-center ct-mb-1">';
                     cardH += '<span class="ct-strong ct-minw-80">' + esc(u.ref || "") + '</span>';
-                    cardH += '<span style="color:' + color + ';font-weight:700;font-size:var(--ct-text-section)">' + esc(u.status || "") + '</span>';
+                    cardH += '<span class="ct-strong ct-text-section ' + toneCls + '">' + esc(u.status || "") + '</span>';
                     cardH += '<span class="ct-flex-1"></span>';
                     cardH += '<button class="ct-btn ai-btn-accept ct-py-1 ct-px-2 ct-text-label" data-variant="primary" data-gidx="' + gIdx + '">' + t("ai.accept") + '</button>';
                     cardH += '<button class="ct-btn ai-btn-ignore ct-py-1 ct-px-2 ct-text-label" data-gidx="' + gIdx + '">' + t("ai.ignore") + '</button>';
@@ -661,8 +669,8 @@
                     if (u.mesures && u.mesures.length) {
                         cardH += '<div class="fs-xs ct-mt-1">';
                         u.mesures.forEach(function(m) {
-                            var mColor = m.statut === "termine" ? "var(--ct-low)" : "var(--ct-high)";
-                            cardH += '<div class="ct-py-1 ct-flex ct-gap-1 ct-items-baseline"><span style="color:' + mColor + ';font-weight:600">' + (m.statut === "termine" ? "✓" : "○") + '</span><span>' + esc(m.description || "") + '</span></div>';
+                            var mToneCls = m.statut === "termine" ? "ct-text-low" : "ct-text-high";
+                            cardH += '<div class="ct-py-1 ct-flex ct-gap-1 ct-items-baseline"><span class="ct-strong ' + mToneCls + '">' + (m.statut === "termine" ? "✓" : "○") + '</span><span>' + esc(m.description || "") + '</span></div>';
                         });
                         cardH += '</div>';
                     }

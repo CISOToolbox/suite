@@ -34,7 +34,7 @@ jobs:
     outputs:
       images: ${{ steps.list.outputs.images }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
       - id: list
         run: |
           images=$(grep -vE '^[[:space:]]*#' docker-compose.yml \
@@ -69,7 +69,7 @@ jobs:
 
       - name: Trivy scan (HIGH/CRITICAL, fixable)
         if: steps.probe.outputs.ok == 'true'
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
         with:
           image-ref: ${{ matrix.image }}
           scanners: vuln

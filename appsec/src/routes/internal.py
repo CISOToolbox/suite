@@ -238,6 +238,40 @@ async def sync_user(request: Request, db: AsyncSession = Depends(get_db)):
     return {"ok": True}
 
 
+
+@router.post("/internal/delete-user")
+async def delete_user(request: Request, db: AsyncSession = Depends(get_db)):
+    """De-provision a user deleted in Pilot.
+
+    Pilot owns the account directory, but each module keeps its own `users`
+    row (that is where the module role lives). Without this route a deleted
+    person kept a role here for ever: `/internal/sync-user` only creates and
+    updates, so nothing ever removed anything.
+
+    Objects the person owned are KEPT — `owner_id` is ON DELETE SET NULL —
+    only the account row and the role go.
+    """
+    _check_service_token(request)
+    from sqlalchemy import func as _func
+
+    from src.models import User as LocalUser
+    body = await request.json()
+    email = (body.get("email") or "").strip().lower()
+    if not email:
+        raise HTTPException(status_code=422, detail="email required")
+    target = (await db.execute(
+        select(LocalUser).where(_func.lower(LocalUser.email) == email)
+    )).scalar_one_or_none()
+    if target is None:
+        return {"ok": True, "deleted": False}
+    from src.audit import log_write
+    await log_write(db, None, request, "user.delete", actor="pilot",
+                    entity_type="user", entity_id=email,
+                    details={"role": target.role or ""})
+    await db.delete(target)
+    await db.commit()
+    return {"ok": True, "deleted": True}
+
 @router.put("/internal/ai-custom")
 async def set_ai_custom(request: Request):
     _check_service_token(request)

@@ -414,8 +414,10 @@
         if (!url)
             return;
         // Same-origin app deep-links (e.g. "/risk/#measures") navigate in place;
-        // reject protocol-relative "//host".
-        if (url.charAt(0) === "/" && url.charAt(1) !== "/") {
+        // reject protocol-relative "//host" AND "/\host": browsers fold that
+        // backslash to a slash, so it left this guard as a same-origin path and
+        // arrived at the network layer as "//host" — off-site navigation.
+        if (url.charAt(0) === "/" && url.charAt(1) !== "/" && url.charAt(1) !== "\\") {
             window.location.href = url;
             return;
         }
@@ -2257,7 +2259,7 @@
         h += '<div class="ct-scroll-x"><table class="ct-table">';
         h += '<thead><tr><th>' + t("pilot.users.col_user") + '</th><th>' + t("pilot.directory.col_email") + '</th><th>' + t("pilot.users.col_pilot_role") + '</th>';
         Object.keys(_MODULE_ROLES).forEach(function (m) { h += '<th class="ct-ta-c ct-text-label">' + esc(_MODULE_LABELS[m]) + '</th>'; });
-        h += '<th>' + t("pilot.users.col_ai") + '</th><th class="ct-text-label">' + t("pilot.users.col_login") + '</th></tr></thead><tbody>';
+        h += '<th>' + t("pilot.users.col_ai") + '</th><th class="ct-text-label">' + t("pilot.users.col_login") + '</th><th></th></tr></thead><tbody>';
         _users.forEach(function (u) {
             var perms = u.permissions || {};
             h += '<tr>';
@@ -2283,6 +2285,8 @@
             });
             h += '<td class="ct-ta-c"><input type="checkbox"' + (u.ai_enabled === "true" ? ' checked' : '') + ' data-change="_toggleAI" data-args=\'["' + u.id + '"]\' data-pass-el></td>';
             h += '<td class="ct-text-label ct-muted">' + (u.last_login ? u.last_login.split("T")[0] : "-") + '</td>';
+            h += '<td class="ct-ta-c"><button class="ct-btn" data-variant="ghost" title="' + t("pilot.users.delete") + '"'
+                + ' data-click="_deleteUser" data-args=\'["' + u.id + '","' + esc(u.email) + '"]\'>' + _icon("trash", 16) + '</button></td>';
             h += '</tr>';
         });
         h += '</tbody></table></div>';
@@ -2292,6 +2296,23 @@
         _fetch("/users/" + uid, { method: "PUT", body: { role: role } }).then(function () {
             showStatus(t("pilot.users.role_updated"));
             _loadUsers().then(function () { _renderPanel(); });
+        });
+    };
+    window._deleteUser = function (uid, email) {
+        if (!confirm(t("pilot.users.delete_confirm", { email: email })))
+            return;
+        showStatus(t("pilot.users.deleting"));
+        _fetch("/users/" + uid, { method: "DELETE" }).then(function (resp) {
+            // A module that did not answer keeps its row: say so rather than
+            // reporting a clean deletion.
+            var failed = (resp && resp.failed) || [];
+            showStatus(failed.length
+                ? t("pilot.users.deleted_partial", { modules: failed.join(", ") })
+                : t("pilot.users.deleted", { email: email }));
+            _loadUsers().then(function () { _renderPanel(); });
+        }).catch(function (e) {
+            var msg = e.message || "";
+            showStatus(t("pilot.common.error_msg", { msg: msg }));
         });
     };
     window._changeModPerm = function (uid, mod, role) {
@@ -2318,6 +2339,13 @@
     var _backupList = null;
     var _bkTab = "backups";
     var _bkFilter = "all";
+    // Keys ticked in the history table. Kept out of the DOM so a re-render
+    // (filter change, refresh after an action) does not silently drop a
+    // selection the user still sees on screen.
+    var _bkSelected = {};
+    function _bkSelectedKeys() {
+        return Object.keys(_bkSelected).filter(function (k) { return _bkSelected[k]; });
+    }
     function _bkFilterChanged(val) {
         _bkFilter = val;
         _renderPanel();
@@ -2345,7 +2373,12 @@
             _renderBackupsInner(inner);
     }
     function _renderBackupsInner(c) {
-        if (!_backupConfig) {
+        // Both caches, not just the config: every action that invalidates the
+        // history sets `_backupList = null` while leaving `_backupConfig` in
+        // place. Guarding on the config alone skipped the refetch and rendered a
+        // null list as "no backups" — the history vanished after a delete and
+        // only a full page reload brought it back.
+        if (!_backupConfig || !_backupList) {
             c.innerHTML = '<div class="ct-ta-c ct-p-8 ct-muted">' + t("pilot.common.loading") + '</div>';
             Promise.all([
                 _fetch("/backups/config").then(function (d) { _backupConfig = d; }),
@@ -2422,10 +2455,28 @@
             // Groupé par module (puis plus récent d'abord) — la clé backup_<mod>_<ts>
             // trie naturellement par date dans un même module.
             shown.sort(function (a, b2) { return a.module === b2.module ? (a.key < b2.key ? 1 : -1) : (a.module < b2.module ? -1 : 1); });
-            h += '<table class="ct-table"><thead><tr><th>' + t("pilot.col.module") + '</th><th>' + t("pilot.backups.col_date") + '</th><th>' + t("pilot.backups.col_items") + '</th><th>' + t("pilot.backups.col_size") + '</th><th></th></tr></thead><tbody>';
+            // Only what is on screen counts as "all": ticking the header while a
+            // module filter is active must not select rows the user cannot see.
+            var selectedShown = shown.filter(function (b) { return _bkSelected[b.key]; }).length;
+            var nSel = _bkSelectedKeys().length;
+            if (nSel) {
+                h += '<div class="ct-flex ct-gap-2 ct-mb-3" style="align-items:center">';
+                h += '<span class="ct-text-meta">' + t("pilot.backups.n_selected", { n: nSel }) + '</span>';
+                h += '<button class="ct-btn" data-variant="danger" data-size="xs" data-click="_deleteSelectedBackups">'
+                    + t("pilot.backups.delete_selected") + '</button>';
+                h += '<button class="ct-btn" data-size="xs" data-click="_bkClearSelection">'
+                    + t("pilot.backups.clear_selection") + '</button>';
+                h += '</div>';
+            }
+            h += '<table class="ct-table"><thead><tr>';
+            h += '<th class="ct-ta-c"><input type="checkbox" data-change="_bkToggleAll" data-pass-el'
+                + (shown.length && selectedShown === shown.length ? ' checked' : '') + '></th>';
+            h += '<th>' + t("pilot.col.module") + '</th><th>' + t("pilot.backups.col_date") + '</th><th>' + t("pilot.backups.col_items") + '</th><th>' + t("pilot.backups.col_size") + '</th><th></th></tr></thead><tbody>';
             shown.forEach(function (b) {
                 var date = b.timestamp ? new Date(b.timestamp).toLocaleString() : b.key;
                 h += '<tr>';
+                h += '<td class="ct-ta-c"><input type="checkbox" data-change="_bkToggleOne" data-args=\'' + _da(b.key) + '\' data-pass-el'
+                    + (_bkSelected[b.key] ? ' checked' : '') + '></td>';
                 h += '<td><span class="ct-ref" data-module="' + esc(b.module) + '">' + esc(b.module) + '</span></td>';
                 h += '<td class="ct-text-meta">' + esc(date)
                     + (b.manual ? ' <span class="ct-badge" data-tone="info" title="' + esc(b.created_by || "") + '">' + t("pilot.backups.badge_manual") + '</span>' : '')
@@ -2515,8 +2566,47 @@
         if (!confirm(t("pilot.backups.delete_confirm")))
             return;
         _fetch("/backups/" + encodeURIComponent(key), { method: "DELETE" }).then(function () {
+            delete _bkSelected[key];
             _backupList = null;
             _renderPanel();
+        });
+    };
+    window._bkToggleOne = function (key, el) {
+        if (el.checked)
+            _bkSelected[key] = true;
+        else
+            delete _bkSelected[key];
+        _renderPanel();
+    };
+    window._bkToggleAll = function (el) {
+        var list = _backupList || [];
+        list.filter(function (b) { return _bkFilter === "all" || b.module === _bkFilter; })
+            .forEach(function (b) {
+            if (el.checked)
+                _bkSelected[b.key] = true;
+            else
+                delete _bkSelected[b.key];
+        });
+        _renderPanel();
+    };
+    window._bkClearSelection = function () {
+        _bkSelected = {};
+        _renderPanel();
+    };
+    window._deleteSelectedBackups = function () {
+        var keys = _bkSelectedKeys();
+        if (!keys.length)
+            return;
+        if (!confirm(t("pilot.backups.delete_selected_confirm", { n: keys.length })))
+            return;
+        showStatus(t("pilot.backups.deleting"));
+        _fetch("/backups/delete-many", { method: "POST", body: { keys: keys } }).then(function (r) {
+            _bkSelected = {};
+            _backupList = null;
+            showStatus(t("pilot.backups.deleted_n", { n: (r && r.deleted) || keys.length }));
+            _renderPanel();
+        }).catch(function (e) {
+            showStatus(t("pilot.common.error_msg", { msg: e.message || "" }));
         });
     };
     // ═══════════════════════════════════════════════════════════════
@@ -2669,7 +2759,9 @@
         // Save + Push
         h += '<div class="ct-flex ct-gap-2">';
         h += '<button class="ct-btn" data-variant="primary" data-click="_saveSettings">' + t("pilot.settings.save_push") + '</button>';
+        h += '<button class="ct-btn" data-click="_resyncModules">' + t("pilot.settings.resync") + '</button>';
         h += '</div>';
+        h += '<p class="ct-hint">' + t("pilot.settings.resync_hint") + '</p>';
         c.innerHTML = h;
         wireLang();
         // Re-render provider fields when provider changes
@@ -2764,6 +2856,24 @@
                 catch (x) { }
             }
             showStatus(t("pilot.common.error_msg", { msg: msg }));
+        });
+    };
+    // Re-push the stored settings without editing them. Needed after adding a
+    // module to the deployment: the registry gains a row, but nothing was ever
+    // sent to it until someone re-saved this page.
+    window._resyncModules = function () {
+        showStatus(t("pilot.settings.resyncing"));
+        _fetch("/settings/resync", { method: "POST", body: {} }).then(function (resp) {
+            var push = resp.push || {};
+            var ko = [];
+            for (var m in push)
+                if (push[m] !== "ok")
+                    ko.push(m + " (" + push[m] + ")");
+            showStatus(ko.length
+                ? t("pilot.settings.resync_partial", { modules: ko.join(", ") })
+                : t("pilot.settings.resync_done", { count: String(Object.keys(push).length) }));
+        }).catch(function (e) {
+            showStatus(t("pilot.common.error_msg", { msg: e.message || "" }));
         });
     };
     // ═══════════════════════════════════════════════════════════════

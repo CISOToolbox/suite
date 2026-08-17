@@ -18,59 +18,11 @@ from src.auth import auth_enabled, get_current_user, require_admin
 from src.database import get_db
 from src.models import AppSettings, User
 from src.schemas import AICompleteRequest, AICompleteResponse, AIConfigResponse, AIRuntimeResponse
+from src.ai_models_common import AI_PROVIDERS
+from src.settings_crypto import decrypt_setting, encrypt_setting_or_plain, is_secret_key
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
 
-AI_PROVIDERS = {
-    "anthropic": {
-        "label": "Anthropic (Claude)",
-        "models": [
-            {"id": "claude-sonnet-5", "label": "Claude Sonnet 5"},
-            {"id": "claude-opus-5", "label": "Claude Opus 5"},
-            {"id": "claude-fable-5", "label": "Claude Fable 5"},
-            {"id": "claude-sonnet-4-6", "label": "Claude Sonnet 4.6"},
-            # Haiku 4.5 is the default for the threat-relevance scorer
-            # (M17) — cheap enough to score every match, ~90% of Sonnet
-            # capability on this constrained classification task.
-            {"id": "claude-haiku-4-5-20251001", "label": "Claude Haiku 4.5"},
-        ],
-        "defaultModel": "claude-sonnet-5",
-        "endpoint": "https://api.anthropic.com/v1/messages",
-    },
-    "openai": {
-        "label": "OpenAI (GPT)",
-        "models": [
-            {"id": "gpt-5.6", "label": "GPT-5.6"},
-            {"id": "gpt-5.6-terra", "label": "GPT-5.6 terra"},
-            {"id": "gpt-5.5", "label": "GPT-5.5"},
-            {"id": "gpt-5.4-mini", "label": "GPT-5.4 mini"},
-            {"id": "gpt-4o", "label": "GPT-4o"},
-        ],
-        "defaultModel": "gpt-5.6",
-        "endpoint": "https://api.openai.com/v1/chat/completions",
-    },
-    "gemini": {
-        "label": "Google (Gemini)",
-        "models": [
-            {"id": "gemini-3.6-flash", "label": "Gemini 3.6 Flash"},
-            {"id": "gemini-3.5-flash-lite", "label": "Gemini 3.5 Flash-Lite"},
-        ],
-        "defaultModel": "gemini-3.6-flash",
-        # {model} is interpolated (URL-quoted) at call time.
-        "endpoint": "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
-    },
-    "bedrock": {
-        "label": "AWS Bedrock",
-        "models": [
-            {"id": "anthropic.claude-sonnet-5", "label": "Claude Sonnet 5 (Bedrock)"},
-            {"id": "anthropic.claude-opus-5", "label": "Claude Opus 5 (Bedrock)"},
-            {"id": "anthropic.claude-sonnet-4-6-20250514-v1:0", "label": "Claude Sonnet 4.6 (Bedrock)"},
-            {"id": "anthropic.claude-haiku-4-5-20251001-v1:0", "label": "Claude Haiku 4.5 (Bedrock)"},
-        ],
-        "defaultModel": "anthropic.claude-sonnet-5",
-        "endpoint": "https://bedrock-runtime.{region}.amazonaws.com",
-    },
-}
 
 
 async def _get_custom_llm(db):
@@ -100,7 +52,8 @@ async def _get_api_key(provider: str, db: AsyncSession) -> str | None:
     result = await db.execute(select(AppSettings).where(AppSettings.key == key_name))
     setting = result.scalar_one_or_none()
     if setting and setting.value:
-        return setting.value
+        # Cleartext rows written before encryption pass through unchanged.
+        return decrypt_setting(setting.value)
     if provider == "anthropic":
         return os.getenv("ANTHROPIC_API_KEY")
     if provider == "openai":
@@ -113,7 +66,8 @@ async def _get_api_key(provider: str, db: AsyncSession) -> str | None:
 async def _get_setting(key: str, db: AsyncSession) -> str:
     r = await db.execute(select(AppSettings).where(AppSettings.key == key))
     s = r.scalar_one_or_none()
-    return (s.value if s and s.value else "") or ""
+    raw = (s.value if s and s.value else "") or ""
+    return decrypt_setting(raw) if raw and is_secret_key(key) else raw
 
 
 # An AWS region name is interpolated straight into the Bedrock hostname.
@@ -522,6 +476,12 @@ async def set_ai_keys(body: dict, request: Request, db: AsyncSession = Depends(g
             raise HTTPException(status_code=401, detail="Not authenticated")
         require_admin(user)
     async def _upsert(key: str, value: str) -> None:
+        # Encrypt credentials at rest, like every other module does through
+        # shared/python/ai_proxy_common.py. Watch carries its own copy of this
+        # route and stored the provider keys in cleartext: a stolen pg_dump
+        # handed them over as-is.
+        if value and is_secret_key(key):
+            value = encrypt_setting_or_plain(value)
         r = await db.execute(select(AppSettings).where(AppSettings.key == key))
         s = r.scalar_one_or_none()
         if s:

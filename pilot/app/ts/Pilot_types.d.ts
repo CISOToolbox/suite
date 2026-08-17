@@ -421,9 +421,15 @@ interface Window {
     _dirExportForAccess?: () => void;
     _changeRole?: (uid: string, role: string) => void;
     _changeModPerm?: (uid: string, mod: string, role: string) => void;
+    _deleteUser?: (uid: string, email: string) => void;
+    _resyncModules?: () => void;
     _toggleAI?: (uid: string, el: HTMLInputElement) => void;
     _saveBackupConfig?: () => void;
     _runBackup?: (mod: string) => void;
+    _bkToggleOne?: (key: string, el: HTMLInputElement) => void;
+    _bkToggleAll?: (el: HTMLInputElement) => void;
+    _bkClearSelection?: () => void;
+    _deleteSelectedBackups?: () => void;
     _runAllBackups?: () => void;
     _downloadBackup?: (key: string) => void;
     _restoreBackup?: (key: string, mod: string) => void;

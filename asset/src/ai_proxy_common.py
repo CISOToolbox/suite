@@ -43,56 +43,9 @@ from src.auth import auth_enabled, get_current_user, require_admin
 from src.database import get_db
 from src.models import AppSettings, User
 from src.settings_crypto import decrypt_setting, encrypt_setting, is_secret_key
+from src.ai_models_common import AI_PROVIDERS
 from src.schemas import AICompleteRequest, AICompleteResponse, AIConfigResponse, AIRuntimeResponse
 
-AI_PROVIDERS = {
-    "anthropic": {
-        "label": "Anthropic (Claude)",
-        "models": [
-            {"id": "claude-sonnet-5", "label": "Claude Sonnet 5"},
-            {"id": "claude-opus-5", "label": "Claude Opus 5"},
-            {"id": "claude-fable-5", "label": "Claude Fable 5"},
-            {"id": "claude-haiku-4-5-20251001", "label": "Claude Haiku 4.5"},
-            {"id": "claude-opus-4-8", "label": "Claude Opus 4.8"},
-            {"id": "claude-sonnet-4-6", "label": "Claude Sonnet 4.6"},
-        ],
-        "defaultModel": "claude-sonnet-5",
-        "endpoint": "https://api.anthropic.com/v1/messages",
-    },
-    "openai": {
-        "label": "OpenAI (GPT)",
-        "models": [
-            {"id": "gpt-5.6", "label": "GPT-5.6"},
-            {"id": "gpt-5.6-terra", "label": "GPT-5.6 terra"},
-            {"id": "gpt-5.5", "label": "GPT-5.5"},
-            {"id": "gpt-5.4-mini", "label": "GPT-5.4 mini"},
-            {"id": "gpt-4o", "label": "GPT-4o"},
-        ],
-        "defaultModel": "gpt-5.6",
-        "endpoint": "https://api.openai.com/v1/chat/completions",
-    },
-    "gemini": {
-        "label": "Google (Gemini)",
-        "models": [
-            {"id": "gemini-3.6-flash", "label": "Gemini 3.6 Flash"},
-            {"id": "gemini-3.5-flash-lite", "label": "Gemini 3.5 Flash-Lite"},
-        ],
-        "defaultModel": "gemini-3.6-flash",
-        # {model} is interpolated (URL-quoted) by call_llm.
-        "endpoint": "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
-    },
-    "bedrock": {
-        "label": "AWS Bedrock",
-        "models": [
-            {"id": "anthropic.claude-sonnet-5", "label": "Claude Sonnet 5 (Bedrock)"},
-            {"id": "anthropic.claude-opus-5", "label": "Claude Opus 5 (Bedrock)"},
-            {"id": "anthropic.claude-sonnet-4-6-20250514-v1:0", "label": "Claude Sonnet 4.6 (Bedrock)"},
-            {"id": "anthropic.claude-haiku-4-5-20251001-v1:0", "label": "Claude Haiku 4.5 (Bedrock)"},
-        ],
-        "defaultModel": "anthropic.claude-sonnet-5",
-        "endpoint": "https://bedrock-runtime.{region}.amazonaws.com",
-    },
-}
 
 
 async def _get_setting(key: str, db: AsyncSession) -> str:
@@ -208,8 +161,28 @@ def _check_ai_access(user: Optional[User]) -> None:
         raise HTTPException(status_code=403, detail="AI access not granted. Contact your administrator.")
 
 
+# Output cap sent to every provider. 4096 truncated the bulk assistants
+# (grouping, plan suggestions) mid-JSON; overridable per deployment.
+AI_MAX_TOKENS = int(os.getenv("AI_MAX_TOKENS", "8192"))
+
+
+def _hit_output_cap(provider: str, data: dict) -> bool:
+    """Did the provider stop because it ran out of output budget?
+
+    Each vendor names it differently, and all of them answer HTTP 200 while
+    doing it — the truncation shows up only in this field.
+    """
+    if provider in ("anthropic", "bedrock", "custom"):
+        return data.get("stop_reason") == "max_tokens"
+    if provider == "gemini":
+        cands = data.get("candidates") or [{}]
+        return (cands[0] or {}).get("finishReason") == "MAX_TOKENS"
+    choices = data.get("choices") or [{}]
+    return (choices[0] or {}).get("finish_reason") == "length"
+
+
 async def call_llm(db: AsyncSession, system: str, user_msg: str,
-                   provider: str, model: str, max_tokens: int = 4096) -> str:
+                   provider: str, model: str, max_tokens: int = AI_MAX_TOKENS) -> str:
     """Call the configured AI provider with a system + user prompt and return
     the raw text. Shared by POST /complete and the métier endpoints.
 
@@ -334,6 +307,15 @@ async def call_llm(db: AsyncSession, system: str, user_msg: str,
         raise HTTPException(status_code=502, detail=f"AI provider returned error {resp.status_code}")
 
     data = resp.json()
+    if _hit_output_cap(provider, data):
+        # 200 with a reply cut mid-sentence. Returning it as-is turned a cap
+        # WE set into "the AI returned invalid JSON", blaming the model and
+        # sending the operator hunting in the wrong place.
+        raise HTTPException(
+            status_code=502,
+            detail=(f"AI reply truncated at the {max_tokens}-token output cap. "
+                    "Narrow the request (fewer items at once) or raise "
+                    "AI_MAX_TOKENS."))
     if provider in ("anthropic", "bedrock"):
         return data.get("content", [{}])[0].get("text", "")
     if provider == "gemini":
@@ -361,7 +343,15 @@ def _parse_json_lax(text: str):
     s = (text or "").strip()
     m = re.search(r"[\[{][\s\S]*[\]}]", s)
     if not m:
-        raise HTTPException(status_code=502, detail="AI did not return JSON")
+        # Quote what actually came back. "AI did not return JSON" alone is
+        # undiagnosable: the reply is usually the model SAYING what is wrong
+        # (wrong model id, quota exhausted, prose refusal), and that sentence
+        # is the whole diagnosis. Bounded — a full reply in an error detail
+        # would end up in logs and in the UI.
+        excerpt = " ".join(s.split())[:200] or "(empty reply)"
+        raise HTTPException(
+            status_code=502,
+            detail=f"AI did not return JSON. Model replied: {excerpt}")
     try:
         return json.loads(m.group(0))
     except json.JSONDecodeError as exc:

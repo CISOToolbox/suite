@@ -47,7 +47,11 @@ class Project(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()"))
     name = Column(String(255), nullable=False, default="")
     organization = Column(String(255), nullable=True)
-    owner_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    owner_id = Column(UUID(as_uuid=True),
+                      # SET NULL, not the NO ACTION default: deleting a user must
+                      # not be blocked by the objects they happen to own. The
+                      # ownership idiom already tolerates a null owner.
+                      ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     shared_with = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
     # FEAT-33 — bumped ONLY by server-initiated writers (Pilot write-back,
     # restore, schedulers). Guards the blob PUT against stale-tab overwrite.

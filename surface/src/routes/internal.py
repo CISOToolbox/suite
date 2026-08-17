@@ -537,6 +537,40 @@ async def sync_user(request: Request, db: AsyncSession = Depends(get_db)):
 # compares two payloads of identical shape. The list call also brings the
 # scratch schema to head (alembic) when T predates a migration.
 
+
+@router.post("/internal/delete-user")
+async def delete_user(request: Request, db: AsyncSession = Depends(get_db)):
+    """De-provision a user deleted in Pilot.
+
+    Pilot owns the account directory, but each module keeps its own `users`
+    row (that is where the module role lives). Without this route a deleted
+    person kept a role here for ever: `/internal/sync-user` only creates and
+    updates, so nothing ever removed anything.
+
+    Objects the person owned are KEPT — `owner_id` is ON DELETE SET NULL —
+    only the account row and the role go.
+    """
+    _check_service_token(request)
+    from sqlalchemy import func as _func
+
+    from src.models import User as LocalUser
+    body = await request.json()
+    email = (body.get("email") or "").strip().lower()
+    if not email:
+        raise HTTPException(status_code=422, detail="email required")
+    target = (await db.execute(
+        select(LocalUser).where(_func.lower(LocalUser.email) == email)
+    )).scalar_one_or_none()
+    if target is None:
+        return {"ok": True, "deleted": False}
+    from src.audit import log_write
+    await log_write(db, None, request, "user.delete", actor="pilot",
+                    entity_type="user", entity_id=email,
+                    details={"role": target.role or ""})
+    await db.delete(target)
+    await db.commit()
+    return {"ok": True, "deleted": True}
+
 @router.get("/internal/export-recovery")
 async def internal_export_recovery_list(request: Request):
     _check_service_token(request)
@@ -583,41 +617,39 @@ async def internal_journal(request: Request, entity_id: str = "", limit: int = 3
 # ── SMTP pushed by Pilot (FEAT: suite-centralized SMTP) ─────────────────
 # Suite design rule: the SMTP SERVER config (host/auth/sender) is owned by
 # Pilot and pushed here; Surface keeps ownership of report RECIPIENTS and
-# scheduling only. Pilot payload keys (host, port, user, password,
-# from_addr, tls) map onto Surface's smtp.* app_settings rows.
+# scheduling only. Rows are `smtp.<field>` over the suite-wide field names
+# below — the same set every other module stores, so a given setting has one
+# name across the whole deployment.
+_SMTP_FIELDS = ("host", "port", "user", "password", "from_addr", "tls")
+
 
 @router.put("/internal/smtp")
 async def internal_smtp(request: Request, db: AsyncSession = Depends(get_db)):
     _check_service_token(request)
     body = await request.json()
-    mapping = {
-        "host": "smtp.host",
-        "port": "smtp.port",
-        "user": "smtp.username",
-        "password": "smtp.password",
-        "from_addr": "smtp.sender",
-    }
-    for src_key, dst_key in mapping.items():
-        if src_key in body and str(body[src_key] or "") != "":
-            stored = str(body[src_key])
-            if src_key == "password":
+    # A field cleared in Pilot arrives as "" — it must DELETE the row, not be
+    # skipped. Skipping is what let a stale smtp.user survive after the
+    # operator emptied it, making Surface attempt AUTH against a relay with no
+    # authentication while every other module sent fine.
+    incoming = {k: str(body[k]) for k in _SMTP_FIELDS
+                if k in body and body[k] not in (None, "")}
+    existing = {row.key: row for row in (await db.execute(
+        select(AppSettings).where(AppSettings.key.like("smtp.%"))
+    )).scalars().all()}
+    for field in _SMTP_FIELDS:
+        # Only the pushed fields are touched: smtp.recipients stays
+        # module-owned and must survive every push.
+        row = existing.get(f"smtp.{field}")
+        if field in incoming:
+            stored = incoming[field]
+            if field == "password":
                 stored = encrypt_setting_or_plain(stored)
-            row = (await db.execute(
-                select(AppSettings).where(AppSettings.key == dst_key)
-            )).scalar_one_or_none()
             if row is None:
-                db.add(AppSettings(key=dst_key, value=stored))
+                db.add(AppSettings(key=f"smtp.{field}", value=stored))
             else:
                 row.value = stored
-    if "tls" in body and str(body["tls"] or "") != "":
-        val = "1" if str(body["tls"]).lower() in ("1", "true", "yes") else "0"
-        row = (await db.execute(
-            select(AppSettings).where(AppSettings.key == "smtp.use_tls")
-        )).scalar_one_or_none()
-        if row is None:
-            db.add(AppSettings(key="smtp.use_tls", value=val))
-        else:
-            row.value = val
+        elif row is not None:
+            await db.delete(row)
     await db.commit()
     logger.info("smtp config received from pilot (host=%s)", body.get("host", ""))
     return {"ok": True}

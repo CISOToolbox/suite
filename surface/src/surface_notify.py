@@ -147,15 +147,22 @@ def _send_email(cfg: dict, recipient: str, subject: str, html: str) -> None:
     from src.mailer_common import smtp_deliver
     msg = MIMEMultipart("alternative")
     msg["Subject"] = Header(subject, "utf-8")
-    sender = cfg.get("sender") or cfg.get("username") or ""
+    from src.routes.reports import _smtp_tls_on, _validate_smtp_host
+    sender = cfg.get("from_addr") or cfg.get("user") or ""
     msg["From"] = formataddr(("CISO Toolbox Surface", sender))
     msg["To"] = recipient
     msg.attach(MIMEText(html, "html", "utf-8"))
     smtp_deliver(
         cfg.get("host", ""), int(cfg.get("port") or 587),
-        use_tls=str(cfg.get("use_tls") or "1").lower() in ("1", "true", "yes"),
-        username=cfg.get("username") or "", password=cfg.get("password") or "",
+        use_tls=_smtp_tls_on(cfg),
+        username=cfg.get("user") or "", password=cfg.get("password") or "",
         sender=sender, recipients=[recipient], raw_message=msg.as_string(),
+        # Same guard as the report path (reports.py): loopback, link-local,
+        # cloud metadata and sibling service names are never a mail relay
+        # from inside this container. LAN relays (RFC1918) are allowed.
+        # Applying it on one send path and not the other meant the same
+        # config could pass or fail depending on which mail was going out.
+        host_validator=_validate_smtp_host,
     )
 
 
