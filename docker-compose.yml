@@ -980,7 +980,7 @@ services:
   # ════════════════════════════════════════════════════════════
 
   appsec-app:
-    image: ghcr.io/cisotoolbox/ciso-appsec-suite:v1.0.1@sha256:3f1623c7d615d80c48d9bc6b6a063fc552e49ec545e1f05513b2eb9e0ef619d2
+    image: ghcr.io/cisotoolbox/ciso-appsec-suite:v1.1.0@sha256:6c7cf7af36dc97bc3057dbcc553aecec8090e222ba25840fe0a24240f69d55b5
     container_name: ciso-appsec
     restart: unless-stopped
     read_only: true

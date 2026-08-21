@@ -151,22 +151,32 @@ async def _run_single_scanner(
             all_findings: list[dict] = []
             sbom_data: list[dict] = []
 
+            # Did the scanner actually inspect something? An empty result is
+            # meaningful ("nothing vulnerable left") ONLY if it ran. Without
+            # this flag, an application with no docker image configured would
+            # look like "every image finding is gone" and close the backlog.
+            scanner_ran = False
+            scan_started = datetime.now(timezone.utc)
+
             if scanner_name == "trivy_fs" and repo_dir:
                 findings, sbom_data = await asyncio.to_thread(
                     run_trivy_fs, repo_dir, str(app_id), scan_paths)
                 all_findings.extend(findings)
+                scanner_ran = True
             elif scanner_name == "trivy_image":
                 for image in docker_images:
                     img_findings, img_sbom = await asyncio.to_thread(
                         run_trivy_image, image, str(app_id), image_token_encrypted)
                     all_findings.extend(img_findings)
                     sbom_data.extend(img_sbom)
+                    scanner_ran = True
             elif scanner_name in ("gitleaks", "semgrep") and repo_dir:
                 func = SCANNERS.get(scanner_name)
                 if func:
                     findings = await asyncio.to_thread(
                         func, repo_dir, str(app_id), scan_paths)
                     all_findings.extend(findings)
+                    scanner_ran = True
 
             # Apply ignore rules before upsert.
             from src.ignore_engine import load_rules, apply_ignore_rules
@@ -179,6 +189,9 @@ async def _run_single_scanner(
             stats = await upsert_findings(db, app_id, all_findings)
             if sbom_data:
                 await _upsert_sbom(db, app_id, sbom_data)
+            if scanner_ran:
+                stats["closed"] = await _close_unseen_findings(
+                    db, app_id, scanner_name, scan_started)
 
             job.status = "completed"
             job.findings_count = len(all_findings)
@@ -381,6 +394,45 @@ async def _do_scan_locked(app_id: uuid.UUID, force: bool, triggered_by: str) -> 
         finally:
             if repo_dir:
                 _cleanup(repo_dir)
+
+
+async def _close_unseen_findings(db: AsyncSession, app_id: uuid.UUID,
+                                 scanner_name: str, scan_started) -> int:
+    """Close the findings this scanner no longer reports.
+
+    The SBOM has always dropped packages that disappeared
+    (``_upsert_sbom`` deletes on ``last_seen_at < now``); findings never
+    had the equivalent, so a vulnerability that was resolved — typically a
+    dependency upgraded past it — stayed on the board for ever, in whatever
+    status it carried. A triage list then mixes today's facts with fossils:
+    the operator re-triages the same package release after release and the
+    verdict never sticks, which is what this looked like from the UI.
+
+    Marked ``fixed``, not deleted: the history and the linked measure are
+    worth keeping, ``upsert_findings`` already reopens a ``fixed`` finding
+    if it comes back, and the retention pass purges them later.
+
+    Scoped to ONE scanner: a semgrep run must not close SCA findings. Only
+    ever called on the success path, and only when the scanner actually
+    inspected something.
+
+    A verdict that must survive a version change belongs in an ignore rule
+    (criterion `package`, e.g. `lodash@*`), not in per-finding triage —
+    a finding is about one package AT one version.
+    """
+    from sqlalchemy import update as sa_update
+    result = await db.execute(
+        sa_update(Finding)
+        .where(Finding.application_id == app_id,
+               Finding.scanner == scanner_name,
+               Finding.status != "fixed",
+               Finding.last_seen_at < scan_started)
+        .values(status="fixed", updated_at=datetime.now(timezone.utc))
+    )
+    if result.rowcount:
+        logger.info("Closed %d finding(s) no longer reported by %s for app %s",
+                    result.rowcount, scanner_name, app_id)
+    return result.rowcount or 0
 
 
 async def _upsert_sbom(db: AsyncSession, app_id: uuid.UUID, entries: list[dict]) -> None:

@@ -1,6 +1,6 @@
 {
   "$comment": "Files replicated from a private upstream repository. Do NOT edit them here: the next propagation overwrites them and CI rejects local edits. See CONTRIBUTING.md, section 'Shared code'.",
-  "generated": "2026-08-21T10:22:11Z",
+  "generated": "2026-08-21T19:27:50Z",
   "checker": "check-replicated-files.py (run it in CI)",
   "files": {
     "access/app/css/cisotoolbox.css": "sha256:5b29ca39f8b53a118c449c786e1095bd97d7f0aef123b193fe6fd8dd14360943",
@@ -91,6 +91,7 @@
     "appsec/app/js/ct_modal.js": "sha256:762de20ff2c510e4cba7af665ebc0517e97c69c35d1780742e1232579b5873a4",
     "appsec/app/js/ct_modules.js": "sha256:54bcaaf4762d05055b11e403935c0847fb75174babfc61ae163433f8cb73d002",
     "appsec/app/js/ct_notifprefs.js": "sha256:e6e3a571104848955cdbe1e4b46666722fed128e7966041899a93ae9f1bf9407",
+    "appsec/app/js/ct_refselect.js": "sha256:3ab126564cfe37ab6bd59aa7dd3eb5f45f9d50994afe24b443e04b7218f1fc45",
     "appsec/app/js/ct_settings.js": "sha256:cf67b92a1579bd8033dbb991ece1e7bd3ef5bb618e6dfc574b10bfd3b439c6ab",
     "appsec/app/js/ct_table.js": "sha256:8fbfdf4b0b815e5b6d05956346e934fac3f846de4a09430ce2dbda8d82b6fd44",
     "appsec/app/js/ct_userpicker.js": "sha256:47ed3ce1880d8e3aeeaa0f3363045b181f4e6488abd023b01ec94f5845e99575",
@@ -112,6 +113,7 @@
     "appsec/app/ts/types/ct_modal.d.ts": "sha256:f08c4446d23e9f873ff33ed055fd65894e24ea576b7fc2889c1d387e02176a7d",
     "appsec/app/ts/types/ct_modules.d.ts": "sha256:1a6086c2673509dac6c72638da340e404b0967c30c3cc6b4e529f196dde1a8b2",
     "appsec/app/ts/types/ct_notifprefs.d.ts": "sha256:a297694a4884ce9c4a1e84c55c6bd54300a2b69e899b51b710c4c901d9a446ff",
+    "appsec/app/ts/types/ct_refselect.d.ts": "sha256:af85266fe2155a58e3577b7f9a0d02eb40ec4e402164f1077f07ad1029d71fac",
     "appsec/app/ts/types/ct_settings.d.ts": "sha256:3a2b699104b7271a228c22e4445d41464a2cd70be80ed46ef097a1dd716f2e96",
     "appsec/app/ts/types/ct_table.d.ts": "sha256:a7c5dfe15dace8b6a885fa3fb3f1484760d9c73c0c3213994cf50bed8d163d04",
     "appsec/app/ts/types/ct_userpicker.d.ts": "sha256:bbd669e76be91ae6e4d2be8985010b6ffe5738c2c0663e0907b663b6ff310df4",

@@ -245,6 +245,9 @@ declare function _backToFindings(): void;
 interface Window {
     ct_notifprefs?: { open: (opts: Record<string, unknown>) => void };
     _openNotifPrefs?: () => void;
+    /* Applications page: tile/table toggle + text filter */
+    _appsSetView?: (view: string) => void;
+    _appsSearch?: (value: string) => void;
     /* appsec_api.ts */
     _currentUser?: AppSecUser;
     _moduleRole?: string;

@@ -13,6 +13,8 @@ window.CT_CONFIG = {
 
 var _ICON_PATHS: Record<string, string> = {
     plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
+    grid: '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>',
+    list: '<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>',
     x: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
     edit: '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>',
     trash: '<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
@@ -48,6 +50,40 @@ var _selectedFinding: string | null = null;
 var _selectedApp: string | null = null;
 var _findingsFilter: AppSecFindingsFilter = { app_id: "", severity: "", scanner: "", status: "new", q: "", patch: "" };
 var _sbomFilter: AppSecSbomFilter = { app_id: "", ecosystem: "", q: "", vulnerable_only: false };
+
+// Applications page: tiles or table, and a text filter. The view is a
+// per-user habit, not application data — it lives in localStorage so it
+// survives a reload without travelling to the server.
+var _appsView: string = (function() {
+    try { return localStorage.getItem("appsec.appsView") || "cards"; } catch (e) { return "cards"; }
+})();
+var _appsQuery: string = "";
+
+function _appsMatching(): AppSecApp[] {
+    var q = _appsQuery.trim().toLowerCase();
+    if (!q) return _apps;
+    return _apps.filter(function(a) {
+        return (a.name || "").toLowerCase().indexOf(q) >= 0
+            || (a.description || "").toLowerCase().indexOf(q) >= 0
+            || (a.repo_url || "").toLowerCase().indexOf(q) >= 0;
+    });
+}
+
+window._appsSetView = function(view: string) {
+    _appsView = view === "table" ? "table" : "cards";
+    try { localStorage.setItem("appsec.appsView", _appsView); } catch (e) {}
+    renderPanel();
+};
+
+window._appsSearch = function(value: string) {
+    _appsQuery = value || "";
+    // Re-render only the list: rebuilding the toolbar would steal the focus
+    // and drop the caret at every keystroke.
+    var box = document.getElementById("apps-list");
+    if (box) box.innerHTML = _appsListHtml();
+    var count = document.getElementById("apps-count");
+    if (count) count.textContent = "(" + _appsMatching().length + ")";
+};
 
 // ═══════════════════════════════════════════════════════════════
 // HELPERS
@@ -300,18 +336,73 @@ function _renderDashboard(c: HTMLElement): void {
 
 function _renderApplications(c: HTMLElement): void {
     var h = '<div class="ct-row ct-row-wrap ct-mb-3">';
-    h += '<h2 class="ct-m-0">' + t("apps.title") + ' <span class="text-muted fs-sm">(' + _apps.length + ')</span></h2>';
+    h += '<h2 class="ct-m-0">' + t("apps.title") + ' <span class="text-muted fs-sm" id="apps-count">(' + _appsMatching().length + ')</span></h2>';
     h += '<span class="ct-flex-1"></span>';
+    h += '<input type="search" id="apps-search" class="ct-input ct-minw-220" placeholder="' + t("apps.search") + '"'
+       + ' value="' + esc(_appsQuery) + '" data-input="_appsSearch" data-pass-value>';
+    h += '<div class="ct-btngroup">';
+    h += '<button class="ct-btn"' + (_appsView === "cards" ? ' data-variant="primary"' : '')
+       + ' data-click="_appsSetView" data-args=\'' + _da("cards") + '\' title="' + t("apps.view_cards") + '" data-icon>' + _icon("grid", 14) + '</button>';
+    h += '<button class="ct-btn"' + (_appsView === "table" ? ' data-variant="primary"' : '')
+       + ' data-click="_appsSetView" data-args=\'' + _da("table") + '\' title="' + t("apps.view_table") + '" data-icon>' + _icon("list", 14) + '</button>';
+    h += '</div>';
     h += '<button class="ct-btn mt-8" data-write data-click="_scanAllApps">' + _icon("refresh", 14) + ' ' + t("apps.scan_all") + '</button>';
     h += '<button class="ct-btn mt-8" data-write data-variant="primary" data-click="showAddApp">' + _icon("plus", 14) + ' ' + t("apps.add") + '</button>';
     h += '</div>';
+    h += '<div id="apps-list">' + _appsListHtml() + '</div>';
+    c.innerHTML = h;
+}
 
-    if (_apps.length === 0) {
-        h += '<p class="text-muted">' + t("apps.no_apps") + '</p>';
-    } else {
+/** The list itself — re-rendered alone on every keystroke of the filter. */
+function _appsListHtml(): string {
+    var apps = _appsMatching();
+    if (_apps.length === 0) return '<p class="text-muted">' + t("apps.no_apps") + '</p>';
+    if (apps.length === 0) return '<p class="text-muted">' + t("apps.no_match") + '</p>';
+    return _appsView === "table" ? _appsTableHtml(apps) : _appsCardsHtml(apps);
+}
+
+function _appsTableHtml(apps: AppSecApp[]): string {
+    var h = '<div class="ct-scroll-x"><table class="ct-table"><thead><tr>';
+    h += '<th>' + t("apps.col_name") + '</th>';
+    h += '<th>' + t("apps.col_criticality") + '</th>';
+    h += '<th>' + t("apps.col_findings") + '</th>';
+    h += '<th class="ct-ta-c">' + t("apps.col_scanners") + '</th>';
+    h += '<th>' + t("apps.last_scan") + '</th>';
+    h += '<th></th></tr></thead><tbody>';
+    apps.forEach(function(a) {
+        var hasFindings = a.findings_critical || a.findings_high || a.findings_medium || a.findings_low;
+        h += '<tr data-click="_openAppFindings" data-args=\'' + _da(a.id) + '\' class="ct-clickable">';
+        h += '<td><span class="ct-strong">' + esc(a.name) + '</span>';
+        if (!a.enabled) h += ' <span class="ct-badge" data-tone="neutral">OFF</span>';
+        if (a.repo_url) h += '<div class="ct-text-meta ct-muted">' + esc(a.repo_url) + '</div>';
+        h += '</td>';
+        h += '<td><span class="ct-badge" data-tone="' + _appsecTone(a.criticality || "medium") + '">' + esc(a.criticality || "medium") + '</span></td>';
+        h += '<td>';
+        if (hasFindings) {
+            if (a.findings_critical) h += badgeTone(a.findings_critical + ' C', 'critical');
+            if (a.findings_high) h += badgeTone(a.findings_high + ' H', 'high');
+            if (a.findings_medium) h += badgeTone(a.findings_medium + ' M', 'medium');
+            if (a.findings_low) h += badgeTone(a.findings_low + ' L', 'low');
+        } else {
+            h += '<span class="ct-muted ct-text-meta">' + t("findings.no_findings") + '</span>';
+        }
+        h += '</td>';
+        h += '<td class="ct-ta-c">' + (a.enabled_scanners || []).length + '</td>';
+        h += '<td class="ct-text-meta ct-muted">' + _timeAgo(a.last_scan_at) + '</td>';
+        h += '<td><div class="ct-flex ct-gap-1">';
+        h += '<button class="ct-btn" data-variant="primary" data-size="sm" data-click="_triggerScan" data-args=\'' + _da(a.id) + '\' data-stop title="' + t("apps.scan_now") + '" data-icon>' + _icon("play", 14) + '</button>';
+        h += '<button class="ct-btn" data-size="sm" data-click="_editAppDialog" data-args=\'' + _da(a.id) + '\' data-stop title="' + t("apps.configure") + '" data-icon>' + _icon("edit", 14) + '</button>';
+        h += '</div></td></tr>';
+    });
+    return h + '</tbody></table></div>';
+}
+
+function _appsCardsHtml(apps: AppSecApp[]): string {
+    var h = '';
+    {
         h += '<div class="app-cards-grid">';
-        for (var i = 0; i < _apps.length; i++) {
-            var a = _apps[i];
+        for (var i = 0; i < apps.length; i++) {
+            var a = apps[i];
             var hasFindings = a.findings_critical || a.findings_high || a.findings_medium || a.findings_low;
             var scanners = (a.enabled_scanners || []).length;
             h += '<div class="app-card" data-click="_openAppFindings" data-args=\'' + _da(a.id) + '\'>';
@@ -342,7 +433,7 @@ function _renderApplications(c: HTMLElement): void {
         }
         h += '</div>';
     }
-    c.innerHTML = h;
+    return h;
 }
 
 function _openAppFindings(id: string | number): void {
@@ -765,9 +856,18 @@ function _renderFindings(c: HTMLElement): void {
 
     // App + Search row
     h += '<div class="appsec-filters">';
-    h += '<select class="appsec-filter" data-change="_setFApp" data-pass-value><option value="">' + t("findings.all_apps") + '</option>';
-    _apps.forEach(function(a) { h += '<option value="' + a.id + '"' + (f.app_id === String(a.id) ? " selected" : "") + '>' + esc(a.name) + '</option>'; });
-    h += '</select>';
+    // Type-to-filter single select (shared ct_refselect) rather than a plain
+    // <select>: with dozens of applications, scrolling a native dropdown to
+    // find one by name is the slow part of the triage loop.
+    h += '<div class="appsec-filter ct-minw-220">'
+       + (window.ctRefSelect
+            ? window.ctRefSelect("f-app", f.app_id || "",
+                _apps.map(function(a) { return { id: String(a.id), label: a.name }; }),
+                { single: true, hideId: true,
+                  placeholder: t("findings.search_app"),
+                  emptyText: t("findings.all_apps") })
+            : "")
+       + '</div>';
     h += '<input type="search" class="appsec-filter ct-minw-200" placeholder="' + t("findings.search") + '" value="' + esc(f.q || "") + '" data-input="_setFSearch" data-pass-value>';
     h += '</div>';
 
@@ -983,6 +1083,25 @@ window._setFScanner = function(v: string) { _findingsFilter.scanner = v; renderP
 window._setFStatus = function(v: string) { _findingsFilter.status = v; renderPanel(); };
 // Dropdown/input filters only need to refresh the table body.
 window._setFApp = function(v: string) { _findingsFilter.app_id = v; _refreshFindingsBody(); };
+
+// The shared selector reports its selection through a registered config, not
+// a data-change attribute. Registered once at load: re-registering on every
+// render would stack closures over a component that outlives the markup.
+if (window.ctRefRegister) {
+    window.ctRefRegister("f-app", {
+        single: true,
+        hideId: true,
+        labelFor: function(id) {
+            for (var i = 0; i < _apps.length; i++) {
+                if (String(_apps[i].id) === String(id)) return _apps[i].name;
+            }
+            return id;
+        },
+        onToggle: function(_uid, ids) {
+            (window as any)._setFApp(ids && ids.length ? ids[0] : "");
+        },
+    });
+}
 window._setFSearch = function(v: string) { _findingsFilter.q = v; _refreshFindingsBody(); };
 window._setFPatch = function(v: string) { _findingsFilter.patch = v; renderPanel(); };
 
@@ -1308,9 +1427,17 @@ function _renderSBOM(c: HTMLElement): void {
 
     h += '<div class="appsec-filters">';
     // App filter
-    h += '<select class="appsec-filter" data-change="_setSApp" data-pass-value><option value="">' + t("findings.all_apps") + '</option>';
-    _apps.forEach(function(a) { h += '<option value="' + a.id + '"' + (f.app_id === String(a.id) ? " selected" : "") + '>' + esc(a.name) + '</option>'; });
-    h += '</select>';
+    // Same type-to-filter selector as the Findings page (shared ct_refselect),
+    // under its own uid so the two pages keep independent selections.
+    h += '<div class="appsec-filter ct-minw-220">'
+       + (window.ctRefSelect
+            ? window.ctRefSelect("s-app", f.app_id || "",
+                _apps.map(function(a) { return { id: String(a.id), label: a.name }; }),
+                { single: true, hideId: true,
+                  placeholder: t("findings.search_app"),
+                  emptyText: t("findings.all_apps") })
+            : "")
+       + '</div>';
     // Dynamic ecosystem filter (populated from API response)
     h += '<select class="appsec-filter" id="sbom-eco-select" data-change="_setSEco" data-pass-value><option value="">' + t("sbom.all_ecosystems") + '</option>';
     _sbomEcosystems.forEach(function(e) { h += '<option value="' + esc(e) + '"' + (f.ecosystem === e ? " selected" : "") + '>' + esc(e) + '</option>'; });
@@ -1407,6 +1534,22 @@ async function _refreshSBOMBody(): Promise<void> {
 }
 
 window._setSApp = function(v: string) { _sbomFilter.app_id = v; _refreshSBOMBody(); };
+
+if (window.ctRefRegister) {
+    window.ctRefRegister("s-app", {
+        single: true,
+        hideId: true,
+        labelFor: function(id) {
+            for (var i = 0; i < _apps.length; i++) {
+                if (String(_apps[i].id) === String(id)) return _apps[i].name;
+            }
+            return id;
+        },
+        onToggle: function(_uid, ids) {
+            (window as any)._setSApp(ids && ids.length ? ids[0] : "");
+        },
+    });
+}
 window._setSEco = function(v: string) { _sbomFilter.ecosystem = v; _refreshSBOMBody(); };
 window._setSSearch = function(v: string) { _sbomFilter.q = v; _refreshSBOMBody(); };
 window._setSVuln = function(el: HTMLInputElement) { _sbomFilter.vulnerable_only = !!el.checked; _refreshSBOMBody(); };
