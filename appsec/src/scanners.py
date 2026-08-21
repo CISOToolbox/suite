@@ -1,6 +1,7 @@
 """Scanner engine: clone repo, run tools, parse output, return normalized findings."""
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -10,6 +11,36 @@ import tempfile
 import uuid
 
 from src.crypto import decrypt_token
+
+
+def _code_id(*parts: str) -> str:
+    """Short digest of the matched code, used as a finding's identity.
+
+    Code findings used to be keyed on `file:line`. Inserting or deleting a
+    line above a finding changed its key, so the finding lost its identity:
+    a triage decision (false positive, accepted risk) stopped applying and
+    the same issue came back as new on the next scan. The line is where the
+    problem is, not what the problem IS.
+
+    Hashing the matched snippet keeps the identity stable while the code
+    around it moves, and — deliberately — breaks it when the code itself
+    changes, which is exactly when a past false-positive verdict should be
+    reconsidered.
+    """
+    raw = "\x1f".join((p or "").strip() for p in parts)
+    return hashlib.sha256(raw.encode("utf-8", "replace")).hexdigest()[:12]
+
+
+def _dedup_index(seen: dict[str, int], key: str) -> str:
+    """Suffix for the Nth identical (file, rule, snippet) triplet.
+
+    Two identical matches in one file would otherwise collapse into a single
+    finding. The suffix is assigned in scanner output order, which is stable
+    (both scanners emit in file/line order).
+    """
+    n = seen.get(key, 0)
+    seen[key] = n + 1
+    return "" if n == 0 else f"#{n}"
 
 logger = logging.getLogger("appsec-scanners")
 
@@ -550,12 +581,15 @@ def run_gitleaks(repo_dir: str, app_id: str, scan_paths: list[str] | None = None
             os.remove(report_file)
 
     findings = []
+    _seen: dict[str, int] = {}
     for leak in data if isinstance(data, list) else []:
         rule = leak.get("RuleID", "unknown")
         filepath = leak.get("File", "")
         if filepath.startswith(repo_dir):
             filepath = filepath[len(repo_dir):].lstrip("/")
         line = leak.get("StartLine", 0)
+        sid = _code_id(leak.get("Secret", "") or leak.get("Match", ""))
+        occ = _dedup_index(_seen, f"{filepath}|{rule}|{sid}")
         findings.append({
             "scanner": "gitleaks",
             "type": "secret",
@@ -567,10 +601,13 @@ def run_gitleaks(repo_dir: str, app_id: str, scan_paths: list[str] | None = None
                 "rule": rule,
                 "file": filepath,
                 "line": line,
+                # Digest of the secret, never the secret: it identifies the
+                # finding across line moves without storing the value.
+                "secret_id": sid,
                 "commit": leak.get("Commit", ""),
                 "author": leak.get("Author", ""),
             },
-            "dedup_key": f"gitleaks|secret|{filepath}:{line}|{rule}".lower(),
+            "dedup_key": f"gitleaks|secret|{filepath}|{rule}|{sid}{occ}".lower(),
         })
     return findings
 
@@ -609,32 +646,48 @@ def run_semgrep(repo_dir: str, app_id: str, scan_paths: list[str] | None = None)
         raise RuntimeError(f"semgrep error: {e}")
 
     findings = []
-    sev_map = {"ERROR": "high", "WARNING": "medium", "INFO": "low"}
+    _seen: dict[str, int] = {}
     for match in data.get("results", []):
         rule_id = match.get("check_id", "unknown")
         filepath = match.get("path", "")
         if filepath.startswith(repo_dir):
             filepath = filepath[len(repo_dir):].lstrip("/")
         line = match.get("start", {}).get("line", 0)
-        severity = sev_map.get(match.get("extra", {}).get("severity", ""), "medium")
-        msg = match.get("extra", {}).get("message", "")
-        findings.append({
-            "scanner": "semgrep",
-            "type": "sast",
-            "severity": severity,
-            "title": f"{rule_id}",
-            "description": msg[:3000],
-            "target": f"{filepath}:{line}",
-            "evidence": {
-                "rule_id": rule_id,
-                "file": filepath,
-                "line": line,
-                "lines": match.get("extra", {}).get("lines", "")[:500],
-                "metadata": match.get("extra", {}).get("metadata", {}),
-            },
-            "dedup_key": f"semgrep|sast|{filepath}:{line}|{rule_id}".lower(),
-        })
+        findings.append(semgrep_finding(match, filepath, rule_id, line, _seen))
     return findings
+
+
+SEMGREP_SEVERITY = {"ERROR": "high", "WARNING": "medium", "INFO": "low"}
+
+
+def semgrep_finding(match: dict, filepath: str, rule_id: str, line: int,
+                    seen: dict[str, int]) -> dict:
+    """Normalize one semgrep match. Pure — the identity tests call this."""
+    extra = match.get("extra", {}) or {}
+    snippet = extra.get("lines", "") or ""
+    # Semgrep ships its own syntactic fingerprint, built for exactly this
+    # (stable across line moves). Fall back to hashing the matched lines
+    # when the field is absent (older semgrep, or a rule that omits it).
+    sid = extra.get("fingerprint", "") or _code_id(rule_id, snippet)
+    occ = _dedup_index(seen, f"{filepath}|{rule_id}|{sid}")
+    return {
+        "scanner": "semgrep",
+        "type": "sast",
+        "severity": SEMGREP_SEVERITY.get(extra.get("severity", ""), "medium"),
+        "title": f"{rule_id}",
+        "description": (extra.get("message", "") or "")[:3000],
+        # The line is WHERE to look — kept in target and evidence, refreshed on
+        # every scan — but it is deliberately absent from the identity below.
+        "target": f"{filepath}:{line}",
+        "evidence": {
+            "rule_id": rule_id,
+            "file": filepath,
+            "line": line,
+            "lines": snippet[:500],
+            "metadata": extra.get("metadata", {}),
+        },
+        "dedup_key": f"semgrep|sast|{filepath}|{rule_id}|{sid}{occ}".lower(),
+    }
 
 
 # ═══════════════════════════════════════════════════════════════

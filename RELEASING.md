@@ -25,6 +25,16 @@ not renumber modules that did not change.
   `schema_rev` with its migration: old exports still load).
 - **PATCH** — a fix with no contract change.
 
+**Removing an add-on: MAJOR or MINOR?** It depends on who could depend on
+it, not on how much code disappears. A `core/` scanner, or any capability
+of the **public standalone build**, is something an outside user may have
+built on: removing it is a **MAJOR**. A `generic/` or `custom/` add-on that
+only ever shipped in the suite or in a client image has no external
+consumer, so removing it is a **MINOR** — this is what was decided when
+`generic/smb_scan` (Python) was dropped in favour of `generic/smb_scan_rs`.
+Note the capability delta in the release notes either way: that removal
+cost PDF *body* extraction on file shares, which matters to whoever ran it.
+
 The number is the **same in both of the module's images** — they are the
 same release, packaged twice:
 
@@ -70,6 +80,7 @@ matrix below (kept in this repo) makes it readable:
 | Suite | Pilot | Risk | Compliance | Audit | Vendor | Asset | Access | Surface | AppSec | Watch |
 |---|---|---|---|---|---|---|---|---|---|---|
 | 0.9.0 | 1.0.0 | 1.0.0 | 1.0.0 | 1.0.0 | 1.0.0 | 1.0.0 | 1.0.0 | 1.0.0 | 1.0.0 | 1.0.0 |
+| 0.9.1 | 1.0.0 | 1.0.0 | 1.0.0 | 1.0.0 | 1.0.0 | 1.0.0 | 1.0.0 | 1.0.0 | 1.0.1 | 1.0.0 |
 
 Rules that keep the two levels coherent:
 

@@ -31,6 +31,13 @@ async def upsert_findings(
         )
         existing = result.scalar_one_or_none()
 
+        # The line moves even when the finding does not: refresh it whatever
+        # the status, or the UI would keep pointing at where the code used to
+        # be. Never touched before, because a moved line used to mean a brand
+        # new row.
+        if existing is not None and raw.get("target"):
+            existing.target = raw["target"][:500]
+
         if existing is None:
             # Honour status from ignore_engine (false_positive) if present,
             # otherwise default to "new".
@@ -74,6 +81,7 @@ async def upsert_findings(
             else:
                 stats["refreshed"] += 1
         elif existing.status in ("false_positive", "to_fix"):
+            existing.evidence = raw.get("evidence", existing.evidence)
             existing.last_seen_at = now
             stats["silenced"] += 1
         elif existing.status == "fixed":
