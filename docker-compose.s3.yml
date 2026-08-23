@@ -1,0 +1,374 @@
+# ════════════════════════════════════════════════════════════════════════
+# Surcharge — sauvegarde externalisée vers un stockage objet S3 (FEAT-29)
+#
+# À ACTIVER dans le .env, jamais en éditant ce fichier :
+#
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.s3.yml
+#
+# Pourquoi un fichier séparé plutôt que des variables conditionnelles :
+# pgBackRest REFUSE une variable d'environnement vide
+# (« environment variable 'repo2-type' must have a value »). Un
+# ${BACKUP_S3_BUCKET:+s3} laissé vide empêcherait tout déploiement sans S3 de
+# démarrer. Ici, sans la surcharge, repo2 n'existe pas — pas une valeur vide,
+# pas de ligne du tout.
+#
+# Ce que la surcharge ajoute :
+#   · aux 10 bases  — repo2 en S3 + archivage WAL asynchrone (voir plus bas)
+#   · à backup-agent — repo2, pour les sauvegardes de base et la restauration
+#
+# Les sauvegardes de base exigent un appel explicite par dépôt (l'agent s'en
+# charge) ; l'archivage WAL, lui, est diffusé automatiquement à tous.
+# ════════════════════════════════════════════════════════════════════════
+services:
+
+  pilot-db:
+    environment:
+      PGBACKREST_REPO2_TYPE: s3
+      PGBACKREST_REPO2_PATH: ${BACKUP_S3_PATH:-/pgbackrest}
+      PGBACKREST_REPO2_S3_BUCKET: ${BACKUP_S3_BUCKET:?BACKUP_S3_BUCKET est obligatoire quand la surcharge S3 est active}
+      PGBACKREST_REPO2_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:?BACKUP_S3_ENDPOINT est obligatoire (ex. s3.fr-par.scw.cloud)}
+      PGBACKREST_REPO2_S3_REGION: ${BACKUP_S3_REGION:-us-east-1}
+      PGBACKREST_REPO2_S3_KEY: ${BACKUP_S3_KEY:?BACKUP_S3_KEY est obligatoire}
+      PGBACKREST_REPO2_S3_KEY_SECRET: ${BACKUP_S3_KEY_SECRET:?BACKUP_S3_KEY_SECRET est obligatoire}
+      PGBACKREST_REPO2_S3_URI_STYLE: ${BACKUP_S3_URI_STYLE:-host}
+      PGBACKREST_REPO2_CIPHER_TYPE: aes-256-cbc
+      # Passphrase propre au dépôt hors site, avec repli sur celle de repo1.
+      # Le hors-site est exposé à un tiers — l'hébergeur — là où repo1 ne
+      # l'est pas : pouvoir les séparer permet de confier l'une sans l'autre.
+      PGBACKREST_REPO2_CIPHER_PASS: ${BACKUP_S3_CIPHER_PASS:-${BACKUP_CIPHER_PASS:?BACKUP_CIPHER_PASS est obligatoire}}
+      # NON NÉGOCIABLE dès qu'un second dépôt existe. L'archivage WAL est
+      # diffusé à TOUS les dépôts ; sans archive-async, une indisponibilité de
+      # S3 empêche les autres dépôts d'avancer de plus d'un segment. Alors
+      # l'archive_command échoue, les WAL s'accumulent dans pg_wal, le disque
+      # se remplit et la base s'arrête. Autrement dit : la sauvegarde hors
+      # site, censée protéger d'une panne d'hôte, en provoquerait une — au
+      # moment choisi par l'hébergeur du stockage.
+      PGBACKREST_ARCHIVE_ASYNC: "y"
+      PGBACKREST_SPOOL_PATH: /var/spool/pgbackrest
+      PGBACKREST_ARCHIVE_PUSH_QUEUE_MAX: ${BACKUP_ARCHIVE_QUEUE_MAX:-1GiB}
+      PGBACKREST_PROCESS_MAX: "2"
+    volumes:
+      # Le spool de l'archivage asynchrone. Un volume nommé et non un tmpfs :
+      # une file d'attente qui grossit pendant une panne S3 ne doit pas
+      # consommer la mémoire de l'hôte.
+      - pilot-spool:/var/spool/pgbackrest
+
+  risk-db:
+    environment:
+      PGBACKREST_REPO2_TYPE: s3
+      PGBACKREST_REPO2_PATH: ${BACKUP_S3_PATH:-/pgbackrest}
+      PGBACKREST_REPO2_S3_BUCKET: ${BACKUP_S3_BUCKET:?BACKUP_S3_BUCKET est obligatoire quand la surcharge S3 est active}
+      PGBACKREST_REPO2_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:?BACKUP_S3_ENDPOINT est obligatoire (ex. s3.fr-par.scw.cloud)}
+      PGBACKREST_REPO2_S3_REGION: ${BACKUP_S3_REGION:-us-east-1}
+      PGBACKREST_REPO2_S3_KEY: ${BACKUP_S3_KEY:?BACKUP_S3_KEY est obligatoire}
+      PGBACKREST_REPO2_S3_KEY_SECRET: ${BACKUP_S3_KEY_SECRET:?BACKUP_S3_KEY_SECRET est obligatoire}
+      PGBACKREST_REPO2_S3_URI_STYLE: ${BACKUP_S3_URI_STYLE:-host}
+      PGBACKREST_REPO2_CIPHER_TYPE: aes-256-cbc
+      # Passphrase propre au dépôt hors site, avec repli sur celle de repo1.
+      # Le hors-site est exposé à un tiers — l'hébergeur — là où repo1 ne
+      # l'est pas : pouvoir les séparer permet de confier l'une sans l'autre.
+      PGBACKREST_REPO2_CIPHER_PASS: ${BACKUP_S3_CIPHER_PASS:-${BACKUP_CIPHER_PASS:?BACKUP_CIPHER_PASS est obligatoire}}
+      # NON NÉGOCIABLE dès qu'un second dépôt existe. L'archivage WAL est
+      # diffusé à TOUS les dépôts ; sans archive-async, une indisponibilité de
+      # S3 empêche les autres dépôts d'avancer de plus d'un segment. Alors
+      # l'archive_command échoue, les WAL s'accumulent dans pg_wal, le disque
+      # se remplit et la base s'arrête. Autrement dit : la sauvegarde hors
+      # site, censée protéger d'une panne d'hôte, en provoquerait une — au
+      # moment choisi par l'hébergeur du stockage.
+      PGBACKREST_ARCHIVE_ASYNC: "y"
+      PGBACKREST_SPOOL_PATH: /var/spool/pgbackrest
+      PGBACKREST_ARCHIVE_PUSH_QUEUE_MAX: ${BACKUP_ARCHIVE_QUEUE_MAX:-1GiB}
+      PGBACKREST_PROCESS_MAX: "2"
+    volumes:
+      # Le spool de l'archivage asynchrone. Un volume nommé et non un tmpfs :
+      # une file d'attente qui grossit pendant une panne S3 ne doit pas
+      # consommer la mémoire de l'hôte.
+      - risk-spool:/var/spool/pgbackrest
+
+  vendor-db:
+    environment:
+      PGBACKREST_REPO2_TYPE: s3
+      PGBACKREST_REPO2_PATH: ${BACKUP_S3_PATH:-/pgbackrest}
+      PGBACKREST_REPO2_S3_BUCKET: ${BACKUP_S3_BUCKET:?BACKUP_S3_BUCKET est obligatoire quand la surcharge S3 est active}
+      PGBACKREST_REPO2_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:?BACKUP_S3_ENDPOINT est obligatoire (ex. s3.fr-par.scw.cloud)}
+      PGBACKREST_REPO2_S3_REGION: ${BACKUP_S3_REGION:-us-east-1}
+      PGBACKREST_REPO2_S3_KEY: ${BACKUP_S3_KEY:?BACKUP_S3_KEY est obligatoire}
+      PGBACKREST_REPO2_S3_KEY_SECRET: ${BACKUP_S3_KEY_SECRET:?BACKUP_S3_KEY_SECRET est obligatoire}
+      PGBACKREST_REPO2_S3_URI_STYLE: ${BACKUP_S3_URI_STYLE:-host}
+      PGBACKREST_REPO2_CIPHER_TYPE: aes-256-cbc
+      # Passphrase propre au dépôt hors site, avec repli sur celle de repo1.
+      # Le hors-site est exposé à un tiers — l'hébergeur — là où repo1 ne
+      # l'est pas : pouvoir les séparer permet de confier l'une sans l'autre.
+      PGBACKREST_REPO2_CIPHER_PASS: ${BACKUP_S3_CIPHER_PASS:-${BACKUP_CIPHER_PASS:?BACKUP_CIPHER_PASS est obligatoire}}
+      # NON NÉGOCIABLE dès qu'un second dépôt existe. L'archivage WAL est
+      # diffusé à TOUS les dépôts ; sans archive-async, une indisponibilité de
+      # S3 empêche les autres dépôts d'avancer de plus d'un segment. Alors
+      # l'archive_command échoue, les WAL s'accumulent dans pg_wal, le disque
+      # se remplit et la base s'arrête. Autrement dit : la sauvegarde hors
+      # site, censée protéger d'une panne d'hôte, en provoquerait une — au
+      # moment choisi par l'hébergeur du stockage.
+      PGBACKREST_ARCHIVE_ASYNC: "y"
+      PGBACKREST_SPOOL_PATH: /var/spool/pgbackrest
+      PGBACKREST_ARCHIVE_PUSH_QUEUE_MAX: ${BACKUP_ARCHIVE_QUEUE_MAX:-1GiB}
+      PGBACKREST_PROCESS_MAX: "2"
+    volumes:
+      # Le spool de l'archivage asynchrone. Un volume nommé et non un tmpfs :
+      # une file d'attente qui grossit pendant une panne S3 ne doit pas
+      # consommer la mémoire de l'hôte.
+      - vendor-spool:/var/spool/pgbackrest
+
+  compliance-db:
+    environment:
+      PGBACKREST_REPO2_TYPE: s3
+      PGBACKREST_REPO2_PATH: ${BACKUP_S3_PATH:-/pgbackrest}
+      PGBACKREST_REPO2_S3_BUCKET: ${BACKUP_S3_BUCKET:?BACKUP_S3_BUCKET est obligatoire quand la surcharge S3 est active}
+      PGBACKREST_REPO2_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:?BACKUP_S3_ENDPOINT est obligatoire (ex. s3.fr-par.scw.cloud)}
+      PGBACKREST_REPO2_S3_REGION: ${BACKUP_S3_REGION:-us-east-1}
+      PGBACKREST_REPO2_S3_KEY: ${BACKUP_S3_KEY:?BACKUP_S3_KEY est obligatoire}
+      PGBACKREST_REPO2_S3_KEY_SECRET: ${BACKUP_S3_KEY_SECRET:?BACKUP_S3_KEY_SECRET est obligatoire}
+      PGBACKREST_REPO2_S3_URI_STYLE: ${BACKUP_S3_URI_STYLE:-host}
+      PGBACKREST_REPO2_CIPHER_TYPE: aes-256-cbc
+      # Passphrase propre au dépôt hors site, avec repli sur celle de repo1.
+      # Le hors-site est exposé à un tiers — l'hébergeur — là où repo1 ne
+      # l'est pas : pouvoir les séparer permet de confier l'une sans l'autre.
+      PGBACKREST_REPO2_CIPHER_PASS: ${BACKUP_S3_CIPHER_PASS:-${BACKUP_CIPHER_PASS:?BACKUP_CIPHER_PASS est obligatoire}}
+      # NON NÉGOCIABLE dès qu'un second dépôt existe. L'archivage WAL est
+      # diffusé à TOUS les dépôts ; sans archive-async, une indisponibilité de
+      # S3 empêche les autres dépôts d'avancer de plus d'un segment. Alors
+      # l'archive_command échoue, les WAL s'accumulent dans pg_wal, le disque
+      # se remplit et la base s'arrête. Autrement dit : la sauvegarde hors
+      # site, censée protéger d'une panne d'hôte, en provoquerait une — au
+      # moment choisi par l'hébergeur du stockage.
+      PGBACKREST_ARCHIVE_ASYNC: "y"
+      PGBACKREST_SPOOL_PATH: /var/spool/pgbackrest
+      PGBACKREST_ARCHIVE_PUSH_QUEUE_MAX: ${BACKUP_ARCHIVE_QUEUE_MAX:-1GiB}
+      PGBACKREST_PROCESS_MAX: "2"
+    volumes:
+      # Le spool de l'archivage asynchrone. Un volume nommé et non un tmpfs :
+      # une file d'attente qui grossit pendant une panne S3 ne doit pas
+      # consommer la mémoire de l'hôte.
+      - compliance-spool:/var/spool/pgbackrest
+
+  asset-db:
+    environment:
+      PGBACKREST_REPO2_TYPE: s3
+      PGBACKREST_REPO2_PATH: ${BACKUP_S3_PATH:-/pgbackrest}
+      PGBACKREST_REPO2_S3_BUCKET: ${BACKUP_S3_BUCKET:?BACKUP_S3_BUCKET est obligatoire quand la surcharge S3 est active}
+      PGBACKREST_REPO2_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:?BACKUP_S3_ENDPOINT est obligatoire (ex. s3.fr-par.scw.cloud)}
+      PGBACKREST_REPO2_S3_REGION: ${BACKUP_S3_REGION:-us-east-1}
+      PGBACKREST_REPO2_S3_KEY: ${BACKUP_S3_KEY:?BACKUP_S3_KEY est obligatoire}
+      PGBACKREST_REPO2_S3_KEY_SECRET: ${BACKUP_S3_KEY_SECRET:?BACKUP_S3_KEY_SECRET est obligatoire}
+      PGBACKREST_REPO2_S3_URI_STYLE: ${BACKUP_S3_URI_STYLE:-host}
+      PGBACKREST_REPO2_CIPHER_TYPE: aes-256-cbc
+      # Passphrase propre au dépôt hors site, avec repli sur celle de repo1.
+      # Le hors-site est exposé à un tiers — l'hébergeur — là où repo1 ne
+      # l'est pas : pouvoir les séparer permet de confier l'une sans l'autre.
+      PGBACKREST_REPO2_CIPHER_PASS: ${BACKUP_S3_CIPHER_PASS:-${BACKUP_CIPHER_PASS:?BACKUP_CIPHER_PASS est obligatoire}}
+      # NON NÉGOCIABLE dès qu'un second dépôt existe. L'archivage WAL est
+      # diffusé à TOUS les dépôts ; sans archive-async, une indisponibilité de
+      # S3 empêche les autres dépôts d'avancer de plus d'un segment. Alors
+      # l'archive_command échoue, les WAL s'accumulent dans pg_wal, le disque
+      # se remplit et la base s'arrête. Autrement dit : la sauvegarde hors
+      # site, censée protéger d'une panne d'hôte, en provoquerait une — au
+      # moment choisi par l'hébergeur du stockage.
+      PGBACKREST_ARCHIVE_ASYNC: "y"
+      PGBACKREST_SPOOL_PATH: /var/spool/pgbackrest
+      PGBACKREST_ARCHIVE_PUSH_QUEUE_MAX: ${BACKUP_ARCHIVE_QUEUE_MAX:-1GiB}
+      PGBACKREST_PROCESS_MAX: "2"
+    volumes:
+      # Le spool de l'archivage asynchrone. Un volume nommé et non un tmpfs :
+      # une file d'attente qui grossit pendant une panne S3 ne doit pas
+      # consommer la mémoire de l'hôte.
+      - asset-spool:/var/spool/pgbackrest
+
+  audit-db:
+    environment:
+      PGBACKREST_REPO2_TYPE: s3
+      PGBACKREST_REPO2_PATH: ${BACKUP_S3_PATH:-/pgbackrest}
+      PGBACKREST_REPO2_S3_BUCKET: ${BACKUP_S3_BUCKET:?BACKUP_S3_BUCKET est obligatoire quand la surcharge S3 est active}
+      PGBACKREST_REPO2_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:?BACKUP_S3_ENDPOINT est obligatoire (ex. s3.fr-par.scw.cloud)}
+      PGBACKREST_REPO2_S3_REGION: ${BACKUP_S3_REGION:-us-east-1}
+      PGBACKREST_REPO2_S3_KEY: ${BACKUP_S3_KEY:?BACKUP_S3_KEY est obligatoire}
+      PGBACKREST_REPO2_S3_KEY_SECRET: ${BACKUP_S3_KEY_SECRET:?BACKUP_S3_KEY_SECRET est obligatoire}
+      PGBACKREST_REPO2_S3_URI_STYLE: ${BACKUP_S3_URI_STYLE:-host}
+      PGBACKREST_REPO2_CIPHER_TYPE: aes-256-cbc
+      # Passphrase propre au dépôt hors site, avec repli sur celle de repo1.
+      # Le hors-site est exposé à un tiers — l'hébergeur — là où repo1 ne
+      # l'est pas : pouvoir les séparer permet de confier l'une sans l'autre.
+      PGBACKREST_REPO2_CIPHER_PASS: ${BACKUP_S3_CIPHER_PASS:-${BACKUP_CIPHER_PASS:?BACKUP_CIPHER_PASS est obligatoire}}
+      # NON NÉGOCIABLE dès qu'un second dépôt existe. L'archivage WAL est
+      # diffusé à TOUS les dépôts ; sans archive-async, une indisponibilité de
+      # S3 empêche les autres dépôts d'avancer de plus d'un segment. Alors
+      # l'archive_command échoue, les WAL s'accumulent dans pg_wal, le disque
+      # se remplit et la base s'arrête. Autrement dit : la sauvegarde hors
+      # site, censée protéger d'une panne d'hôte, en provoquerait une — au
+      # moment choisi par l'hébergeur du stockage.
+      PGBACKREST_ARCHIVE_ASYNC: "y"
+      PGBACKREST_SPOOL_PATH: /var/spool/pgbackrest
+      PGBACKREST_ARCHIVE_PUSH_QUEUE_MAX: ${BACKUP_ARCHIVE_QUEUE_MAX:-1GiB}
+      PGBACKREST_PROCESS_MAX: "2"
+    volumes:
+      # Le spool de l'archivage asynchrone. Un volume nommé et non un tmpfs :
+      # une file d'attente qui grossit pendant une panne S3 ne doit pas
+      # consommer la mémoire de l'hôte.
+      - audit-spool:/var/spool/pgbackrest
+
+  access-db:
+    environment:
+      PGBACKREST_REPO2_TYPE: s3
+      PGBACKREST_REPO2_PATH: ${BACKUP_S3_PATH:-/pgbackrest}
+      PGBACKREST_REPO2_S3_BUCKET: ${BACKUP_S3_BUCKET:?BACKUP_S3_BUCKET est obligatoire quand la surcharge S3 est active}
+      PGBACKREST_REPO2_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:?BACKUP_S3_ENDPOINT est obligatoire (ex. s3.fr-par.scw.cloud)}
+      PGBACKREST_REPO2_S3_REGION: ${BACKUP_S3_REGION:-us-east-1}
+      PGBACKREST_REPO2_S3_KEY: ${BACKUP_S3_KEY:?BACKUP_S3_KEY est obligatoire}
+      PGBACKREST_REPO2_S3_KEY_SECRET: ${BACKUP_S3_KEY_SECRET:?BACKUP_S3_KEY_SECRET est obligatoire}
+      PGBACKREST_REPO2_S3_URI_STYLE: ${BACKUP_S3_URI_STYLE:-host}
+      PGBACKREST_REPO2_CIPHER_TYPE: aes-256-cbc
+      # Passphrase propre au dépôt hors site, avec repli sur celle de repo1.
+      # Le hors-site est exposé à un tiers — l'hébergeur — là où repo1 ne
+      # l'est pas : pouvoir les séparer permet de confier l'une sans l'autre.
+      PGBACKREST_REPO2_CIPHER_PASS: ${BACKUP_S3_CIPHER_PASS:-${BACKUP_CIPHER_PASS:?BACKUP_CIPHER_PASS est obligatoire}}
+      # NON NÉGOCIABLE dès qu'un second dépôt existe. L'archivage WAL est
+      # diffusé à TOUS les dépôts ; sans archive-async, une indisponibilité de
+      # S3 empêche les autres dépôts d'avancer de plus d'un segment. Alors
+      # l'archive_command échoue, les WAL s'accumulent dans pg_wal, le disque
+      # se remplit et la base s'arrête. Autrement dit : la sauvegarde hors
+      # site, censée protéger d'une panne d'hôte, en provoquerait une — au
+      # moment choisi par l'hébergeur du stockage.
+      PGBACKREST_ARCHIVE_ASYNC: "y"
+      PGBACKREST_SPOOL_PATH: /var/spool/pgbackrest
+      PGBACKREST_ARCHIVE_PUSH_QUEUE_MAX: ${BACKUP_ARCHIVE_QUEUE_MAX:-1GiB}
+      PGBACKREST_PROCESS_MAX: "2"
+    volumes:
+      # Le spool de l'archivage asynchrone. Un volume nommé et non un tmpfs :
+      # une file d'attente qui grossit pendant une panne S3 ne doit pas
+      # consommer la mémoire de l'hôte.
+      - access-spool:/var/spool/pgbackrest
+
+  surface-db:
+    environment:
+      PGBACKREST_REPO2_TYPE: s3
+      PGBACKREST_REPO2_PATH: ${BACKUP_S3_PATH:-/pgbackrest}
+      PGBACKREST_REPO2_S3_BUCKET: ${BACKUP_S3_BUCKET:?BACKUP_S3_BUCKET est obligatoire quand la surcharge S3 est active}
+      PGBACKREST_REPO2_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:?BACKUP_S3_ENDPOINT est obligatoire (ex. s3.fr-par.scw.cloud)}
+      PGBACKREST_REPO2_S3_REGION: ${BACKUP_S3_REGION:-us-east-1}
+      PGBACKREST_REPO2_S3_KEY: ${BACKUP_S3_KEY:?BACKUP_S3_KEY est obligatoire}
+      PGBACKREST_REPO2_S3_KEY_SECRET: ${BACKUP_S3_KEY_SECRET:?BACKUP_S3_KEY_SECRET est obligatoire}
+      PGBACKREST_REPO2_S3_URI_STYLE: ${BACKUP_S3_URI_STYLE:-host}
+      PGBACKREST_REPO2_CIPHER_TYPE: aes-256-cbc
+      # Passphrase propre au dépôt hors site, avec repli sur celle de repo1.
+      # Le hors-site est exposé à un tiers — l'hébergeur — là où repo1 ne
+      # l'est pas : pouvoir les séparer permet de confier l'une sans l'autre.
+      PGBACKREST_REPO2_CIPHER_PASS: ${BACKUP_S3_CIPHER_PASS:-${BACKUP_CIPHER_PASS:?BACKUP_CIPHER_PASS est obligatoire}}
+      # NON NÉGOCIABLE dès qu'un second dépôt existe. L'archivage WAL est
+      # diffusé à TOUS les dépôts ; sans archive-async, une indisponibilité de
+      # S3 empêche les autres dépôts d'avancer de plus d'un segment. Alors
+      # l'archive_command échoue, les WAL s'accumulent dans pg_wal, le disque
+      # se remplit et la base s'arrête. Autrement dit : la sauvegarde hors
+      # site, censée protéger d'une panne d'hôte, en provoquerait une — au
+      # moment choisi par l'hébergeur du stockage.
+      PGBACKREST_ARCHIVE_ASYNC: "y"
+      PGBACKREST_SPOOL_PATH: /var/spool/pgbackrest
+      PGBACKREST_ARCHIVE_PUSH_QUEUE_MAX: ${BACKUP_ARCHIVE_QUEUE_MAX:-1GiB}
+      PGBACKREST_PROCESS_MAX: "2"
+    volumes:
+      # Le spool de l'archivage asynchrone. Un volume nommé et non un tmpfs :
+      # une file d'attente qui grossit pendant une panne S3 ne doit pas
+      # consommer la mémoire de l'hôte.
+      - surface-spool:/var/spool/pgbackrest
+
+  appsec-db:
+    environment:
+      PGBACKREST_REPO2_TYPE: s3
+      PGBACKREST_REPO2_PATH: ${BACKUP_S3_PATH:-/pgbackrest}
+      PGBACKREST_REPO2_S3_BUCKET: ${BACKUP_S3_BUCKET:?BACKUP_S3_BUCKET est obligatoire quand la surcharge S3 est active}
+      PGBACKREST_REPO2_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:?BACKUP_S3_ENDPOINT est obligatoire (ex. s3.fr-par.scw.cloud)}
+      PGBACKREST_REPO2_S3_REGION: ${BACKUP_S3_REGION:-us-east-1}
+      PGBACKREST_REPO2_S3_KEY: ${BACKUP_S3_KEY:?BACKUP_S3_KEY est obligatoire}
+      PGBACKREST_REPO2_S3_KEY_SECRET: ${BACKUP_S3_KEY_SECRET:?BACKUP_S3_KEY_SECRET est obligatoire}
+      PGBACKREST_REPO2_S3_URI_STYLE: ${BACKUP_S3_URI_STYLE:-host}
+      PGBACKREST_REPO2_CIPHER_TYPE: aes-256-cbc
+      # Passphrase propre au dépôt hors site, avec repli sur celle de repo1.
+      # Le hors-site est exposé à un tiers — l'hébergeur — là où repo1 ne
+      # l'est pas : pouvoir les séparer permet de confier l'une sans l'autre.
+      PGBACKREST_REPO2_CIPHER_PASS: ${BACKUP_S3_CIPHER_PASS:-${BACKUP_CIPHER_PASS:?BACKUP_CIPHER_PASS est obligatoire}}
+      # NON NÉGOCIABLE dès qu'un second dépôt existe. L'archivage WAL est
+      # diffusé à TOUS les dépôts ; sans archive-async, une indisponibilité de
+      # S3 empêche les autres dépôts d'avancer de plus d'un segment. Alors
+      # l'archive_command échoue, les WAL s'accumulent dans pg_wal, le disque
+      # se remplit et la base s'arrête. Autrement dit : la sauvegarde hors
+      # site, censée protéger d'une panne d'hôte, en provoquerait une — au
+      # moment choisi par l'hébergeur du stockage.
+      PGBACKREST_ARCHIVE_ASYNC: "y"
+      PGBACKREST_SPOOL_PATH: /var/spool/pgbackrest
+      PGBACKREST_ARCHIVE_PUSH_QUEUE_MAX: ${BACKUP_ARCHIVE_QUEUE_MAX:-1GiB}
+      PGBACKREST_PROCESS_MAX: "2"
+    volumes:
+      # Le spool de l'archivage asynchrone. Un volume nommé et non un tmpfs :
+      # une file d'attente qui grossit pendant une panne S3 ne doit pas
+      # consommer la mémoire de l'hôte.
+      - appsec-spool:/var/spool/pgbackrest
+
+  watch-db:
+    environment:
+      PGBACKREST_REPO2_TYPE: s3
+      PGBACKREST_REPO2_PATH: ${BACKUP_S3_PATH:-/pgbackrest}
+      PGBACKREST_REPO2_S3_BUCKET: ${BACKUP_S3_BUCKET:?BACKUP_S3_BUCKET est obligatoire quand la surcharge S3 est active}
+      PGBACKREST_REPO2_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:?BACKUP_S3_ENDPOINT est obligatoire (ex. s3.fr-par.scw.cloud)}
+      PGBACKREST_REPO2_S3_REGION: ${BACKUP_S3_REGION:-us-east-1}
+      PGBACKREST_REPO2_S3_KEY: ${BACKUP_S3_KEY:?BACKUP_S3_KEY est obligatoire}
+      PGBACKREST_REPO2_S3_KEY_SECRET: ${BACKUP_S3_KEY_SECRET:?BACKUP_S3_KEY_SECRET est obligatoire}
+      PGBACKREST_REPO2_S3_URI_STYLE: ${BACKUP_S3_URI_STYLE:-host}
+      PGBACKREST_REPO2_CIPHER_TYPE: aes-256-cbc
+      # Passphrase propre au dépôt hors site, avec repli sur celle de repo1.
+      # Le hors-site est exposé à un tiers — l'hébergeur — là où repo1 ne
+      # l'est pas : pouvoir les séparer permet de confier l'une sans l'autre.
+      PGBACKREST_REPO2_CIPHER_PASS: ${BACKUP_S3_CIPHER_PASS:-${BACKUP_CIPHER_PASS:?BACKUP_CIPHER_PASS est obligatoire}}
+      # NON NÉGOCIABLE dès qu'un second dépôt existe. L'archivage WAL est
+      # diffusé à TOUS les dépôts ; sans archive-async, une indisponibilité de
+      # S3 empêche les autres dépôts d'avancer de plus d'un segment. Alors
+      # l'archive_command échoue, les WAL s'accumulent dans pg_wal, le disque
+      # se remplit et la base s'arrête. Autrement dit : la sauvegarde hors
+      # site, censée protéger d'une panne d'hôte, en provoquerait une — au
+      # moment choisi par l'hébergeur du stockage.
+      PGBACKREST_ARCHIVE_ASYNC: "y"
+      PGBACKREST_SPOOL_PATH: /var/spool/pgbackrest
+      PGBACKREST_ARCHIVE_PUSH_QUEUE_MAX: ${BACKUP_ARCHIVE_QUEUE_MAX:-1GiB}
+      PGBACKREST_PROCESS_MAX: "2"
+    volumes:
+      # Le spool de l'archivage asynchrone. Un volume nommé et non un tmpfs :
+      # une file d'attente qui grossit pendant une panne S3 ne doit pas
+      # consommer la mémoire de l'hôte.
+      - watch-spool:/var/spool/pgbackrest
+
+  backup-agent:
+    environment:
+      PGBACKREST_REPO2_TYPE: s3
+      PGBACKREST_REPO2_PATH: ${BACKUP_S3_PATH:-/pgbackrest}
+      PGBACKREST_REPO2_S3_BUCKET: ${BACKUP_S3_BUCKET:?BACKUP_S3_BUCKET est obligatoire quand la surcharge S3 est active}
+      PGBACKREST_REPO2_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:?BACKUP_S3_ENDPOINT est obligatoire (ex. s3.fr-par.scw.cloud)}
+      PGBACKREST_REPO2_S3_REGION: ${BACKUP_S3_REGION:-us-east-1}
+      PGBACKREST_REPO2_S3_KEY: ${BACKUP_S3_KEY:?BACKUP_S3_KEY est obligatoire}
+      PGBACKREST_REPO2_S3_KEY_SECRET: ${BACKUP_S3_KEY_SECRET:?BACKUP_S3_KEY_SECRET est obligatoire}
+      PGBACKREST_REPO2_S3_URI_STYLE: ${BACKUP_S3_URI_STYLE:-host}
+      PGBACKREST_REPO2_CIPHER_TYPE: aes-256-cbc
+      # Passphrase propre au dépôt hors site, avec repli sur celle de repo1.
+      # Le hors-site est exposé à un tiers — l'hébergeur — là où repo1 ne
+      # l'est pas : pouvoir les séparer permet de confier l'une sans l'autre.
+      PGBACKREST_REPO2_CIPHER_PASS: ${BACKUP_S3_CIPHER_PASS:-${BACKUP_CIPHER_PASS:?BACKUP_CIPHER_PASS est obligatoire}}
+      PGBACKREST_REPO2_RETENTION_FULL: ${BACKUP_S3_RETENTION_FULL:-4}
+      # Déclenche la sauvegarde de base vers repo2 et le test de
+      # restauration hors site dans agent.sh.
+      BACKUP_S3_ENABLED: "1"
+
+volumes:
+  pilot-spool:
+  risk-spool:
+  vendor-spool:
+  compliance-spool:
+  asset-spool:
+  audit-spool:
+  access-spool:
+  surface-spool:
+  appsec-spool:
+  watch-spool:

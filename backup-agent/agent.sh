@@ -18,6 +18,14 @@ CONF_DIR="$REPO/agent"
 CONF="$CONF_DIR/pgbackrest.conf"
 STATUS="$CONF_DIR/status.json"
 BACKUP_HOUR="${BACKUP_HOUR:-2}"
+# Dépôt hors site (FEAT-29). Positionné par docker-compose.s3.yml, qui fournit
+# aussi les PGBACKREST_REPO2_* : la configuration de repo2 arrive donc par
+# l'environnement, pas par $CONF — les variables priment sur le fichier.
+S3="${BACKUP_S3_ENABLED:-0}"
+# Test de restauration hors site : mensuel, un module à la fois. Restaurer
+# depuis S3 télécharge une base entière ; le faire pour dix modules chaque
+# semaine coûterait en transfert sans rien prouver de plus.
+S3_TEST_DAY="${BACKUP_S3_TEST_DAY:-01}"
 export PGBACKREST_CONFIG="$CONF"
 
 mkdir -p "$CONF_DIR"
@@ -47,9 +55,23 @@ write_conf() {
 }
 
 wait_socket() {
+    # L'EXISTENCE du socket ne prouve rien : l'entrypoint de l'image postgres
+    # démarre un serveur temporaire pendant l'initialisation, socket compris.
+    # L'agent partait alors trop tôt, stanza-create et la sauvegarde initiale
+    # échouaient — et comme la boucle ne repasse qu'à l'heure planifiée, la
+    # stanza restait SANS sauvegarde de base, donc sans fenêtre PITR, jusqu'au
+    # lendemain et sans que rien ne le signale.
+    #
+    # On attend donc que la base RÉPONDE, pas qu'un fichier apparaisse.
     local m="$1" i=0
-    while [ ! -S "/sock/$m/.s.PGSQL.5432" ] && [ $i -lt 60 ]; do sleep 5; i=$((i+1)); done
-    [ -S "/sock/$m/.s.PGSQL.5432" ]
+    while [ $i -lt 60 ]; do
+        if [ -S "/sock/$m/.s.PGSQL.5432" ] \
+           && pg_isready -h "/sock/$m" -U "$m" -d "$m" >/dev/null 2>&1; then
+            return 0
+        fi
+        sleep 5; i=$((i+1))
+    done
+    return 1
 }
 
 ensure_stanza() {
@@ -57,18 +79,41 @@ ensure_stanza() {
     if ! pgbackrest --stanza="$m" info --output=json 2>/dev/null | grep -q '"status"'; then
         log "stanza-create $m"
     fi
+    # stanza-create traite TOUS les dépôts configurés en un appel — et
+    # refuse l'option --repo (« option 'repo' not valid for command
+    # 'stanza-create' »). Contrairement à backup, il n'y a donc rien à
+    # répéter pour repo2.
     pgbackrest --stanza="$m" stanza-create 2>&1 | sed "s/^/[$m] /" || true
 }
 
 has_full() {
-    pgbackrest --stanza="$1" info --output=json 2>/dev/null | grep -q '"type":"full"'
+    pgbackrest --stanza="$1" ${2:+--repo=$2} info --output=json 2>/dev/null \
+        | grep -q '"type":"full"'
 }
 
 run_backup() {
-    local m="$1" type="$2"
+    local m="$1" type="$2" rc=0
     log "backup $m ($type)"
     pgbackrest --stanza="$m" --type="$type" backup 2>&1 | tail -2 | sed "s/^/[$m] /"
-    return "${PIPESTATUS[0]}"
+    rc="${PIPESTATUS[0]}"
+
+    # Une sauvegarde de base ne va QU'AU dépôt prioritaire : « When multiple
+    # repositories are configured, pgBackRest will backup to the highest
+    # priority repository unless the --repo option is specified. » Seul
+    # l'archivage WAL est diffusé à tous. D'où ce second appel explicite.
+    if [ "$S3" = "1" ]; then
+        local t2="$type"
+        # Un diff sans full sur CE dépôt n'a rien sur quoi s'appuyer : les
+        # dépôts ont leurs propres cycles, repo2 peut être plus jeune.
+        has_full "$m" 2 || t2="full"
+        log "backup $m ($t2) → hors site"
+        pgbackrest --stanza="$m" --repo=2 --type="$t2" backup 2>&1 \
+            | tail -2 | sed "s/^/[$m repo2] /"
+        # Un échec hors site ne doit pas masquer une sauvegarde locale réussie :
+        # ce sont deux incidents de gravité différente.
+        [ "${PIPESTATUS[0]}" -eq 0 ] || log "WARN: sauvegarde hors site échouée pour $m"
+    fi
+    return "$rc"
 }
 
 restore_test() {
@@ -76,10 +121,10 @@ restore_test() {
     # a throwaway scratch on port 5434 (5433 belongs to admin sessions),
     # sanity = alembic_version readable. Result lands in restore-test.json,
     # surfaced by /health and the Pilot dashboard.
-    local m="$1" rc=1 rev=""
+    local m="$1" repo="${2:-1}" rc=1 rev=""
     local scratch="/tmp/rtest-data-$m" sock="/tmp/rtest-$m"
     rm -rf "$scratch" "$sock"; mkdir -p "$scratch" "$sock"; chmod 700 "$scratch"
-    if pgbackrest --stanza="$m" --pg1-path="$scratch" restore >/dev/null 2>&1; then
+    if pgbackrest --stanza="$m" --repo="$repo" --pg1-path="$scratch" restore >/dev/null 2>&1; then
         pg_ctl -D "$scratch" -l "$scratch/startup.log" \
             -o "-p 5434 -k $sock -c listen_addresses= -c archive_mode=off" start >/dev/null 2>&1
         local i=0
@@ -93,7 +138,7 @@ restore_test() {
         pg_ctl -D "$scratch" stop -m fast >/dev/null 2>&1
     fi
     rm -rf "$scratch" "$sock"
-    echo "{\"module\": \"$m\", \"ok\": $([ $rc -eq 0 ] && echo true || echo false), \"revision\": \"$rev\", \"at\": \"$(date -u '+%FT%TZ')\"}"
+    echo "{\"module\": \"$m\", \"repo\": $repo, \"ok\": $([ $rc -eq 0 ] && echo true || echo false), \"revision\": \"$rev\", \"at\": \"$(date -u '+%FT%TZ')\"}"
     return $rc
 }
 
@@ -112,6 +157,28 @@ run_restore_tests() {
     log "weekly restore-test done"
 }
 
+run_s3_restore_test() {
+    # Un dépôt hors site jamais restauré est une hypothèse, pas une
+    # sauvegarde : c'est celui dont on ne se sert jamais jusqu'au jour où
+    # tout en dépend, et dont les défaillances — identifiants expirés, bucket
+    # déplacé, rétention imposée par l'hébergeur — sont silencieuses.
+    #
+    # Un seul module par mois, tourné sur l'année : la preuve porte sur la
+    # chaîne (identifiants, réseau, déchiffrement, cohérence), pas sur un
+    # module en particulier. Restaurer les dix coûterait dix fois plus en
+    # transfert pour la même information.
+    local n mois idx m
+    set -- $MODULES; n=$#
+    mois=$(date -u '+%-m')
+    idx=$(( (mois - 1) % n + 1 ))
+    eval "m=\${$idx}"
+    log "test de restauration hors site — $m (dépôt 2)"
+    restore_test "$m" 2 > "$CONF_DIR/restore-test-s3.json.tmp" \
+        && mv "$CONF_DIR/restore-test-s3.json.tmp" "$CONF_DIR/restore-test-s3.json" \
+        || { log "WARN: test de restauration HORS SITE ÉCHOUÉ pour $m"
+             mv "$CONF_DIR/restore-test-s3.json.tmp" "$CONF_DIR/restore-test-s3.json" 2>/dev/null || true; }
+}
+
 write_status() {
     {
         echo "{"
@@ -121,7 +188,14 @@ write_status() {
         for m in $MODULES; do
             [ $first -eq 0 ] && echo "  ,"
             first=0
-            echo "  {\"module\": \"$m\", \"info\": $(pgbackrest --stanza="$m" info --output=json 2>/dev/null || echo 'null')}"
+            if [ "$S3" = "1" ]; then
+                # Deux dépôts publiés séparément : « locale fraîche, hors site
+                # en retard » est le mode de défaillance le plus probable, et
+                # il doit être lisible sans interprétation.
+                echo "  {\"module\": \"$m\", \"info\": $(pgbackrest --stanza="$m" info --output=json 2>/dev/null || echo 'null'), \"info_repo2\": $(pgbackrest --stanza="$m" --repo=2 info --output=json 2>/dev/null || echo 'null')}"
+            else
+                echo "  {\"module\": \"$m\", \"info\": $(pgbackrest --stanza="$m" info --output=json 2>/dev/null || echo 'null')}"
+            fi
         done
         echo "  ]"
         echo "}"
@@ -168,12 +242,17 @@ while true; do
             fi
             # Retention (expire) applies PGBACKREST_REPO1_RETENTION_* env.
             pgbackrest --stanza="$m" expire 2>&1 | tail -1 | sed "s/^/[$m] /" || true
+            [ "$S3" = "1" ] && { pgbackrest --stanza="$m" --repo=2 expire 2>&1 \
+                | tail -1 | sed "s/^/[$m repo2] /" || true; }
             if [ "$dow" = "1" ]; then
                 log "verify $m"
                 pgbackrest --stanza="$m" verify 2>&1 | tail -1 | sed "s/^/[$m] /" || log "WARN: verify failed for $m"
+                [ "$S3" = "1" ] && { pgbackrest --stanza="$m" --repo=2 verify 2>&1 \
+                    | tail -1 | sed "s/^/[$m repo2] /" || log "WARN: verify repo2 failed for $m"; }
             fi
         done
         [ "$dow" = "1" ] && run_restore_tests
+        [ "$S3" = "1" ] && [ "$(date -u '+%d')" = "$S3_TEST_DAY" ] && run_s3_restore_test
         write_status
     fi
 done

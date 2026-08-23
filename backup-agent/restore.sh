@@ -6,7 +6,13 @@
 #
 # Usage (from the host):
 #   podman exec -it ciso-backup-agent restore.sh <module> [--time "2026-08-12 14:35:00+00"]
+#   podman exec -it ciso-backup-agent restore.sh <module> --repo 2   # depuis le hors site
+#   podman exec -it ciso-backup-agent restore.sh <module> --set <label>
 #   podman exec -it ciso-backup-agent restore.sh <module> --stop     # stop+clean scratch
+#
+# --repo 2 restaure depuis le dépôt S3 (FEAT-29). C'est le chemin d'une
+# reprise après perte de l'hôte : les deux dépôts contiennent les mêmes
+# sauvegardes, mais seul le second survit à la disparition de la machine.
 #
 # After a successful restore the scratch postgres listens on the unix
 # socket /tmp/restore-<module> (port 5433). Examples:
@@ -19,7 +25,7 @@
 # the Pilot measures resync afterwards.
 set -euo pipefail
 
-MOD="${1:?usage: restore.sh <module> [--time \"YYYY-MM-DD HH:MM:SS+00\"] [--stop]}"
+MOD="${1:?usage: restore.sh <module> [--time \"YYYY-MM-DD HH:MM:SS+00\"] [--repo N] [--set LABEL] [--stop]}"
 shift || true
 REPO="${PGBACKREST_REPO1_PATH:-/var/lib/pgbackrest}"
 export PGBACKREST_CONFIG="$REPO/agent/pgbackrest.conf"
@@ -28,14 +34,26 @@ SOCKDIR="/tmp/restore-$MOD"
 PIDFILE="$SCRATCH/postmaster.pid"
 
 TIME=""
+SET=""
+RREPO="1"
 STOP=0
 while [ $# -gt 0 ]; do
     case "$1" in
         --time) TIME="$2"; shift 2 ;;
+        --set)  SET="$2";  shift 2 ;;
+        --repo) RREPO="$2"; shift 2 ;;
         --stop) STOP=1; shift ;;
         *) echo "unknown arg: $1" >&2; exit 2 ;;
     esac
 done
+
+# --time désigne un instant, --set une sauvegarde précise. Les combiner
+# revient à demander deux cibles contradictoires ; pgBackRest trancherait
+# silencieusement, ce qui est le pire des comportements pour une restauration.
+if [ -n "$TIME" ] && [ -n "$SET" ]; then
+    echo "!! --time et --set sont exclusifs : choisissez un instant OU une sauvegarde" >&2
+    exit 2
+fi
 
 if [ "$STOP" = "1" ]; then
     [ -f "$PIDFILE" ] && pg_ctl -D "$SCRATCH" stop -m fast || true
@@ -48,12 +66,15 @@ fi
 mkdir -p "$SCRATCH" "$SOCKDIR"
 chmod 700 "$SCRATCH"
 
-echo ">>> pgbackrest restore ($MOD${TIME:+ @ $TIME})"
+echo ">>> pgbackrest restore ($MOD${TIME:+ @ $TIME}${SET:+ set $SET}, dépôt $RREPO)"
 if [ -n "$TIME" ]; then
-    pgbackrest --stanza="$MOD" --pg1-path="$SCRATCH" \
+    pgbackrest --stanza="$MOD" --repo="$RREPO" --pg1-path="$SCRATCH" \
         --type=time --target="$TIME" --target-action=promote restore
+elif [ -n "$SET" ]; then
+    pgbackrest --stanza="$MOD" --repo="$RREPO" --pg1-path="$SCRATCH" \
+        --set="$SET" restore
 else
-    pgbackrest --stanza="$MOD" --pg1-path="$SCRATCH" restore
+    pgbackrest --stanza="$MOD" --repo="$RREPO" --pg1-path="$SCRATCH" restore
 fi
 
 echo ">>> starting scratch postgres (socket $SOCKDIR, port 5433)"

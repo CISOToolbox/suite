@@ -125,13 +125,17 @@ def _cleanup(module: str) -> None:
     shutil.rmtree(_sockdir(module), ignore_errors=True)
 
 
-def _do_recover(module: str, target_time: str | None) -> None:
-    """Worker thread: pgbackrest restore into scratch + start on :5433."""
+def _do_recover(module: str, target_time: str | None, repo: int = 1) -> None:
+    """Worker thread: pgbackrest restore into scratch + start on :5433.
+
+    `repo` selects the repository (FEAT-29): 1 = local, 2 = off-site S3.
+    After losing the host, only the second one still exists.
+    """
     try:
         _cleanup(module)
         os.makedirs(_scratch(module), mode=0o700)
         os.makedirs(_sockdir(module), exist_ok=True)
-        args = ["--stanza", module, f"--pg1-path={_scratch(module)}"]
+        args = ["--stanza", module, f"--repo={repo}", f"--pg1-path={_scratch(module)}"]
         if target_time:
             args += ["--type=time", f"--target={target_time}", "--target-action=promote"]
         r = _pgbackrest(*args, "restore")
@@ -211,10 +215,20 @@ def _do_promote(module: str) -> dict:
     return {"ok": True, "dumped_bytes": len(dump.stdout)}
 
 
-def _window() -> dict:
+S3_ENABLED = os.environ.get("BACKUP_S3_ENABLED", "0") == "1"
+
+
+def _window(repo: int = 1) -> dict:
+    """Recovery window per stanza, for one repository.
+
+    Both repositories hold the same backups but age independently: the
+    off-site one can lag without anything failing visibly. Reporting them
+    separately is what lets Pilot say "local fresh, off-site behind" rather
+    than averaging the two into a reassuring half-truth.
+    """
     out = {}
     for m in MODULES:
-        r = _pgbackrest("--stanza", m, "info", "--output=json")
+        r = _pgbackrest("--stanza", m, f"--repo={repo}", "info", "--output=json")
         entry = {"status": "unknown", "from": None, "to": None, "backups": []}
         try:
             info = json.loads(r.stdout)[0]
@@ -312,6 +326,10 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if not self._auth():
             return
+        if self.path == "/window/2":
+            if not S3_ENABLED:
+                return self._send(404, {"detail": "no off-site repository configured"})
+            return self._send(200, _window(2))
         if self.path == "/window":
             return self._send(200, _window())
         if self.path == "/health":
@@ -341,6 +359,14 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(400, {"detail": "invalid JSON"})
             mod = body.get("module", "")
             target_time = body.get("time") or None
+            # Repository selection (FEAT-29). Validated as an int in {1,2}
+            # rather than passed through: it reaches a command line, and
+            # "whatever the client sent" has no business there.
+            repo = body.get("repo", 1)
+            if repo not in (1, 2):
+                return self._send(400, {"detail": "repo must be 1 (local) or 2 (off-site)"})
+            if repo == 2 and not S3_ENABLED:
+                return self._send(400, {"detail": "no off-site repository configured"})
             if mod not in MODULES or not MOD_RE.match(mod):
                 return self._send(400, {"detail": f"unknown module '{mod}'"})
             if target_time is not None:
@@ -354,7 +380,7 @@ class Handler(BaseHTTPRequestHandler):
                     target_time += ":00"
                 # Clear refusal when T predates the PITR window (first full
                 # backup) — pgBackRest's own error is cryptic here.
-                win = _window().get(mod) or {}
+                win = _window(repo).get(mod) or {}
                 if win.get("from"):
                     try:
                         tgt = datetime.fromisoformat(target_time.replace("+00", "+00:00"))
@@ -369,11 +395,14 @@ class Handler(BaseHTTPRequestHandler):
                 if cur and cur["status"] == "preparing":
                     return self._send(409, {"detail": "session already preparing"})
                 _sessions[mod] = {"status": "preparing", "time": target_time,
+                                  "repo": repo,
                                   "error": None, "started_at": _time.time(),
                                   "touched_at": _time.time()}
-            _audit("recover", mod, self.client_address[0], f"target={target_time or 'latest'}")
-            threading.Thread(target=_do_recover, args=(mod, target_time), daemon=True).start()
-            return self._send(202, {"module": mod, "status": "preparing"})
+            _audit("recover", mod, self.client_address[0],
+                   f"target={target_time or 'latest'} repo={repo}")
+            threading.Thread(target=_do_recover, args=(mod, target_time, repo),
+                             daemon=True).start()
+            return self._send(202, {"module": mod, "status": "preparing", "repo": repo})
         m = re.fullmatch(r"/recover/([a-z]+)/promote", self.path)
         if m:
             mod = m.group(1)

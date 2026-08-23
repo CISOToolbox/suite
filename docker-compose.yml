@@ -21,7 +21,7 @@
 # Keeps the 8 backend services in sync without hand-maintained copies.
 # ─────────────────────────────────────────────────────────────
 x-module-env: &module-env
-  JWT_SECRET: ${JWT_SECRET}
+  JWT_SECRET: ${JWT_SECRET:?JWT_SECRET est obligatoire (openssl rand -hex 32)}
   SERVICE_TOKEN: ${SERVICE_TOKEN:?SERVICE_TOKEN is required}
   AUTH_MODE: ${AUTH_MODE:-pilot}
   PILOT_URL: http://pilot-app:8080
@@ -151,10 +151,10 @@ services:
     env_file: .env
     environment:
       - DATABASE_URL=postgresql+asyncpg://pilot:${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}@pilot-db:5432/pilot
-      - JWT_SECRET=${JWT_SECRET}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET est obligatoire (openssl rand -hex 32)}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY is required (openssl rand -hex 32) — see .env.example}
       - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-}
-      - SERVICE_TOKEN=${SERVICE_TOKEN}
+      - SERVICE_TOKEN=${SERVICE_TOKEN:?SERVICE_TOKEN est obligatoire (openssl rand -hex 32)}
       # FEAT-30 phase 2 — static DSN target for /internal/export-recovery
       - RECOVERY_DB_HOST=backup-agent
       - RECOVERY_DB_PORT=5433
@@ -185,14 +185,14 @@ services:
       - APPSEC_EXTERNAL_URL=/appsec/
       - AUDIT_URL=http://audit-app:8080
       - AUDIT_EXTERNAL_URL=/audit/
-      - ENTRA_CLIENT_ID=${ENTRA_CLIENT_ID}
-      - ENTRA_CLIENT_SECRET=${ENTRA_CLIENT_SECRET}
+      - ENTRA_CLIENT_ID=${ENTRA_CLIENT_ID:-}
+      - ENTRA_CLIENT_SECRET=${ENTRA_CLIENT_SECRET:-}
       - ENTRA_TENANT_ID=${ENTRA_TENANT_ID:-common}
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
-      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
-      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID}
-      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET}
-      - OIDC_ISSUER=${OIDC_ISSUER}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID:-}
+      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET:-}
+      - OIDC_ISSUER=${OIDC_ISSUER:-}
       - OIDC_LABEL=${OIDC_LABEL:-SSO}
     depends_on:
       pilot-db:
@@ -217,7 +217,7 @@ services:
 
   pilot-db:
     # ciso-postgres = same postgres:16-alpine base + pgBackRest (FEAT-30).
-    image: ghcr.io/cisotoolbox/ciso-postgres:16
+    image: ghcr.io/cisotoolbox/ciso-postgres:16.1
     # Continuous WAL archiving to the shared encrypted repository —
     # the PITR window starts at the first full backup (backup-agent).
     command: postgres -c wal_level=replica -c archive_mode=on
@@ -281,9 +281,9 @@ services:
     env_file: .env
     environment:
       - DATABASE_URL=postgresql+asyncpg://risk:${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}@risk-db:5432/risk
-      - JWT_SECRET=${JWT_SECRET}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET est obligatoire (openssl rand -hex 32)}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY is required (openssl rand -hex 32) — see .env.example}
-      - SERVICE_TOKEN=${SERVICE_TOKEN}
+      - SERVICE_TOKEN=${SERVICE_TOKEN:?SERVICE_TOKEN est obligatoire (openssl rand -hex 32)}
       # FEAT-30 phase 2 — static DSN target for /internal/export-recovery
       - RECOVERY_DB_HOST=backup-agent
       - RECOVERY_DB_PORT=5433
@@ -293,14 +293,14 @@ services:
       - MODULE_NAME=risk
       - PILOT_URL=http://pilot-app:8080
       - AI_MANAGED_BY_PILOT=true
-      - ENTRA_CLIENT_ID=${ENTRA_CLIENT_ID}
-      - ENTRA_CLIENT_SECRET=${ENTRA_CLIENT_SECRET}
+      - ENTRA_CLIENT_ID=${ENTRA_CLIENT_ID:-}
+      - ENTRA_CLIENT_SECRET=${ENTRA_CLIENT_SECRET:-}
       - ENTRA_TENANT_ID=${ENTRA_TENANT_ID:-common}
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
-      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
-      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID}
-      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET}
-      - OIDC_ISSUER=${OIDC_ISSUER}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID:-}
+      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET:-}
+      - OIDC_ISSUER=${OIDC_ISSUER:-}
       - OIDC_LABEL=${OIDC_LABEL:-SSO}
       - VENDOR_URL=http://vendor-app:8080
     depends_on:
@@ -316,7 +316,7 @@ services:
 
   risk-db:
     # ciso-postgres = same postgres:16-alpine base + pgBackRest (FEAT-30).
-    image: ghcr.io/cisotoolbox/ciso-postgres:16
+    image: ghcr.io/cisotoolbox/ciso-postgres:16.1
     # Continuous WAL archiving to the shared encrypted repository —
     # the PITR window starts at the first full backup (backup-agent).
     command: postgres -c wal_level=replica -c archive_mode=on
@@ -380,9 +380,9 @@ services:
     env_file: .env
     environment:
       - DATABASE_URL=postgresql+asyncpg://vendor:${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}@vendor-db:5432/vendor
-      - JWT_SECRET=${JWT_SECRET}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET est obligatoire (openssl rand -hex 32)}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY is required (openssl rand -hex 32) — see .env.example}
-      - SERVICE_TOKEN=${SERVICE_TOKEN}
+      - SERVICE_TOKEN=${SERVICE_TOKEN:?SERVICE_TOKEN est obligatoire (openssl rand -hex 32)}
       # FEAT-30 phase 2 — static DSN target for /internal/export-recovery
       - RECOVERY_DB_HOST=backup-agent
       - RECOVERY_DB_PORT=5433
@@ -392,14 +392,14 @@ services:
       - MODULE_NAME=vendor
       - AI_MANAGED_BY_PILOT=true
       - PILOT_URL=http://pilot-app:8080
-      - ENTRA_CLIENT_ID=${ENTRA_CLIENT_ID}
-      - ENTRA_CLIENT_SECRET=${ENTRA_CLIENT_SECRET}
+      - ENTRA_CLIENT_ID=${ENTRA_CLIENT_ID:-}
+      - ENTRA_CLIENT_SECRET=${ENTRA_CLIENT_SECRET:-}
       - ENTRA_TENANT_ID=${ENTRA_TENANT_ID:-common}
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
-      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
-      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID}
-      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET}
-      - OIDC_ISSUER=${OIDC_ISSUER}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID:-}
+      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET:-}
+      - OIDC_ISSUER=${OIDC_ISSUER:-}
       - OIDC_LABEL=${OIDC_LABEL:-SSO}
     depends_on:
       vendor-db:
@@ -414,7 +414,7 @@ services:
 
   vendor-db:
     # ciso-postgres = same postgres:16-alpine base + pgBackRest (FEAT-30).
-    image: ghcr.io/cisotoolbox/ciso-postgres:16
+    image: ghcr.io/cisotoolbox/ciso-postgres:16.1
     # Continuous WAL archiving to the shared encrypted repository —
     # the PITR window starts at the first full backup (backup-agent).
     command: postgres -c wal_level=replica -c archive_mode=on
@@ -478,9 +478,9 @@ services:
     env_file: .env
     environment:
       - DATABASE_URL=postgresql+asyncpg://compliance:${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}@compliance-db:5432/compliance
-      - JWT_SECRET=${JWT_SECRET}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET est obligatoire (openssl rand -hex 32)}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY is required (openssl rand -hex 32) — see .env.example}
-      - SERVICE_TOKEN=${SERVICE_TOKEN}
+      - SERVICE_TOKEN=${SERVICE_TOKEN:?SERVICE_TOKEN est obligatoire (openssl rand -hex 32)}
       # FEAT-30 phase 2 — static DSN target for /internal/export-recovery
       - RECOVERY_DB_HOST=backup-agent
       - RECOVERY_DB_PORT=5433
@@ -490,14 +490,14 @@ services:
       - MODULE_NAME=compliance
       - AI_MANAGED_BY_PILOT=true
       - PILOT_URL=http://pilot-app:8080
-      - ENTRA_CLIENT_ID=${ENTRA_CLIENT_ID}
-      - ENTRA_CLIENT_SECRET=${ENTRA_CLIENT_SECRET}
+      - ENTRA_CLIENT_ID=${ENTRA_CLIENT_ID:-}
+      - ENTRA_CLIENT_SECRET=${ENTRA_CLIENT_SECRET:-}
       - ENTRA_TENANT_ID=${ENTRA_TENANT_ID:-common}
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
-      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
-      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID}
-      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET}
-      - OIDC_ISSUER=${OIDC_ISSUER}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID:-}
+      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET:-}
+      - OIDC_ISSUER=${OIDC_ISSUER:-}
       - OIDC_LABEL=${OIDC_LABEL:-SSO}
     depends_on:
       compliance-db:
@@ -512,7 +512,7 @@ services:
 
   compliance-db:
     # ciso-postgres = same postgres:16-alpine base + pgBackRest (FEAT-30).
-    image: ghcr.io/cisotoolbox/ciso-postgres:16
+    image: ghcr.io/cisotoolbox/ciso-postgres:16.1
     # Continuous WAL archiving to the shared encrypted repository —
     # the PITR window starts at the first full backup (backup-agent).
     command: postgres -c wal_level=replica -c archive_mode=on
@@ -576,8 +576,8 @@ services:
     env_file: .env
     environment:
       - DATABASE_URL=postgresql+asyncpg://asset:${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}@asset-db:5432/asset
-      - JWT_SECRET=${JWT_SECRET}
-      - SERVICE_TOKEN=${SERVICE_TOKEN}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET est obligatoire (openssl rand -hex 32)}
+      - SERVICE_TOKEN=${SERVICE_TOKEN:?SERVICE_TOKEN est obligatoire (openssl rand -hex 32)}
       # FEAT-30 phase 2 — static DSN target for /internal/export-recovery
       - RECOVERY_DB_HOST=backup-agent
       - RECOVERY_DB_PORT=5433
@@ -588,14 +588,14 @@ services:
       - AI_MANAGED_BY_PILOT=true
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY is required (openssl rand -hex 32) — see .env.example}
       - PILOT_URL=http://pilot-app:8080
-      - ENTRA_CLIENT_ID=${ENTRA_CLIENT_ID}
-      - ENTRA_CLIENT_SECRET=${ENTRA_CLIENT_SECRET}
+      - ENTRA_CLIENT_ID=${ENTRA_CLIENT_ID:-}
+      - ENTRA_CLIENT_SECRET=${ENTRA_CLIENT_SECRET:-}
       - ENTRA_TENANT_ID=${ENTRA_TENANT_ID:-common}
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
-      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
-      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID}
-      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET}
-      - OIDC_ISSUER=${OIDC_ISSUER}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID:-}
+      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET:-}
+      - OIDC_ISSUER=${OIDC_ISSUER:-}
       - OIDC_LABEL=${OIDC_LABEL:-SSO}
     depends_on:
       asset-db:
@@ -610,7 +610,7 @@ services:
 
   asset-db:
     # ciso-postgres = same postgres:16-alpine base + pgBackRest (FEAT-30).
-    image: ghcr.io/cisotoolbox/ciso-postgres:16
+    image: ghcr.io/cisotoolbox/ciso-postgres:16.1
     # Continuous WAL archiving to the shared encrypted repository —
     # the PITR window starts at the first full backup (backup-agent).
     command: postgres -c wal_level=replica -c archive_mode=on
@@ -674,8 +674,8 @@ services:
     env_file: .env
     environment:
       - DATABASE_URL=postgresql+asyncpg://audit:${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}@audit-db:5432/audit
-      - JWT_SECRET=${JWT_SECRET}
-      - SERVICE_TOKEN=${SERVICE_TOKEN}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET est obligatoire (openssl rand -hex 32)}
+      - SERVICE_TOKEN=${SERVICE_TOKEN:?SERVICE_TOKEN est obligatoire (openssl rand -hex 32)}
       # FEAT-30 phase 2 — static DSN target for /internal/export-recovery
       - RECOVERY_DB_HOST=backup-agent
       - RECOVERY_DB_PORT=5433
@@ -686,14 +686,14 @@ services:
       - AI_MANAGED_BY_PILOT=true
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY is required (openssl rand -hex 32) — see .env.example}
       - PILOT_URL=http://pilot-app:8080
-      - ENTRA_CLIENT_ID=${ENTRA_CLIENT_ID}
-      - ENTRA_CLIENT_SECRET=${ENTRA_CLIENT_SECRET}
+      - ENTRA_CLIENT_ID=${ENTRA_CLIENT_ID:-}
+      - ENTRA_CLIENT_SECRET=${ENTRA_CLIENT_SECRET:-}
       - ENTRA_TENANT_ID=${ENTRA_TENANT_ID:-common}
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
-      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
-      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID}
-      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET}
-      - OIDC_ISSUER=${OIDC_ISSUER}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID:-}
+      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET:-}
+      - OIDC_ISSUER=${OIDC_ISSUER:-}
       - OIDC_LABEL=${OIDC_LABEL:-SSO}
     depends_on:
       audit-db:
@@ -708,7 +708,7 @@ services:
 
   audit-db:
     # ciso-postgres = same postgres:16-alpine base + pgBackRest (FEAT-30).
-    image: ghcr.io/cisotoolbox/ciso-postgres:16
+    image: ghcr.io/cisotoolbox/ciso-postgres:16.1
     # Continuous WAL archiving to the shared encrypted repository —
     # the PITR window starts at the first full backup (backup-agent).
     command: postgres -c wal_level=replica -c archive_mode=on
@@ -772,8 +772,8 @@ services:
     env_file: .env
     environment:
       - DATABASE_URL=postgresql+asyncpg://access:${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}@access-db:5432/access
-      - JWT_SECRET=${JWT_SECRET}
-      - SERVICE_TOKEN=${SERVICE_TOKEN}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET est obligatoire (openssl rand -hex 32)}
+      - SERVICE_TOKEN=${SERVICE_TOKEN:?SERVICE_TOKEN est obligatoire (openssl rand -hex 32)}
       # FEAT-30 phase 2 — static DSN target for /internal/export-recovery
       - RECOVERY_DB_HOST=backup-agent
       - RECOVERY_DB_PORT=5433
@@ -789,14 +789,14 @@ services:
       - ALLOW_PRIVATE_CONNECTOR_URLS=${ALLOW_PRIVATE_CONNECTOR_URLS:-false}
       - ASSET_URL=http://asset-app:8080
       - PILOT_URL=http://pilot-app:8080
-      - ENTRA_CLIENT_ID=${ENTRA_CLIENT_ID}
-      - ENTRA_CLIENT_SECRET=${ENTRA_CLIENT_SECRET}
+      - ENTRA_CLIENT_ID=${ENTRA_CLIENT_ID:-}
+      - ENTRA_CLIENT_SECRET=${ENTRA_CLIENT_SECRET:-}
       - ENTRA_TENANT_ID=${ENTRA_TENANT_ID:-common}
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
-      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
-      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID}
-      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET}
-      - OIDC_ISSUER=${OIDC_ISSUER}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID:-}
+      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET:-}
+      - OIDC_ISSUER=${OIDC_ISSUER:-}
       - OIDC_LABEL=${OIDC_LABEL:-SSO}
     depends_on:
       access-db:
@@ -811,7 +811,7 @@ services:
 
   access-db:
     # ciso-postgres = same postgres:16-alpine base + pgBackRest (FEAT-30).
-    image: ghcr.io/cisotoolbox/ciso-postgres:16
+    image: ghcr.io/cisotoolbox/ciso-postgres:16.1
     # Continuous WAL archiving to the shared encrypted repository —
     # the PITR window starts at the first full backup (backup-agent).
     command: postgres -c wal_level=replica -c archive_mode=on
@@ -877,8 +877,8 @@ services:
     env_file: .env
     environment:
       - DATABASE_URL=postgresql+asyncpg://surface:${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}@surface-db:5432/surface
-      - JWT_SECRET=${JWT_SECRET}
-      - SERVICE_TOKEN=${SERVICE_TOKEN}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET est obligatoire (openssl rand -hex 32)}
+      - SERVICE_TOKEN=${SERVICE_TOKEN:?SERVICE_TOKEN est obligatoire (openssl rand -hex 32)}
       # FEAT-30 phase 2 — static DSN target for /internal/export-recovery
       - RECOVERY_DB_HOST=backup-agent
       - RECOVERY_DB_PORT=5433
@@ -888,14 +888,14 @@ services:
       - MODULE_NAME=surface
       - AI_MANAGED_BY_PILOT=true
       - PILOT_URL=http://pilot-app:8080
-      - ENTRA_CLIENT_ID=${ENTRA_CLIENT_ID}
-      - ENTRA_CLIENT_SECRET=${ENTRA_CLIENT_SECRET}
+      - ENTRA_CLIENT_ID=${ENTRA_CLIENT_ID:-}
+      - ENTRA_CLIENT_SECRET=${ENTRA_CLIENT_SECRET:-}
       - ENTRA_TENANT_ID=${ENTRA_TENANT_ID:-common}
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
-      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
-      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID}
-      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET}
-      - OIDC_ISSUER=${OIDC_ISSUER}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID:-}
+      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET:-}
+      - OIDC_ISSUER=${OIDC_ISSUER:-}
       - OIDC_LABEL=${OIDC_LABEL:-SSO}
       # Nuclei tuning — override in .env if needed
       - SURFACE_NUCLEI_RATE_LIMIT=${SURFACE_NUCLEI_RATE_LIMIT:-20}
@@ -930,7 +930,7 @@ services:
 
   surface-db:
     # ciso-postgres = same postgres:16-alpine base + pgBackRest (FEAT-30).
-    image: ghcr.io/cisotoolbox/ciso-postgres:16
+    image: ghcr.io/cisotoolbox/ciso-postgres:16.1
     # Continuous WAL archiving to the shared encrypted repository —
     # the PITR window starts at the first full backup (backup-agent).
     command: postgres -c wal_level=replica -c archive_mode=on
@@ -1001,8 +1001,8 @@ services:
     env_file: .env
     environment:
       - DATABASE_URL=postgresql+asyncpg://appsec:${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}@appsec-db:5432/appsec
-      - JWT_SECRET=${JWT_SECRET}
-      - SERVICE_TOKEN=${SERVICE_TOKEN}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET est obligatoire (openssl rand -hex 32)}
+      - SERVICE_TOKEN=${SERVICE_TOKEN:?SERVICE_TOKEN est obligatoire (openssl rand -hex 32)}
       # FEAT-30 phase 2 — static DSN target for /internal/export-recovery
       - RECOVERY_DB_HOST=backup-agent
       - RECOVERY_DB_PORT=5433
@@ -1014,14 +1014,14 @@ services:
       - AI_MANAGED_BY_PILOT=true
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY is required (openssl rand -hex 32) — see .env.example}
       - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-}
-      - ENTRA_CLIENT_ID=${ENTRA_CLIENT_ID}
-      - ENTRA_CLIENT_SECRET=${ENTRA_CLIENT_SECRET}
+      - ENTRA_CLIENT_ID=${ENTRA_CLIENT_ID:-}
+      - ENTRA_CLIENT_SECRET=${ENTRA_CLIENT_SECRET:-}
       - ENTRA_TENANT_ID=${ENTRA_TENANT_ID:-common}
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
-      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
-      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID}
-      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET}
-      - OIDC_ISSUER=${OIDC_ISSUER}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID:-}
+      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET:-}
+      - OIDC_ISSUER=${OIDC_ISSUER:-}
       - OIDC_LABEL=${OIDC_LABEL:-SSO}
     depends_on:
       appsec-db:
@@ -1037,7 +1037,7 @@ services:
 
   appsec-db:
     # ciso-postgres = same postgres:16-alpine base + pgBackRest (FEAT-30).
-    image: ghcr.io/cisotoolbox/ciso-postgres:16
+    image: ghcr.io/cisotoolbox/ciso-postgres:16.1
     # Continuous WAL archiving to the shared encrypted repository —
     # the PITR window starts at the first full backup (backup-agent).
     command: postgres -c wal_level=replica -c archive_mode=on
@@ -1101,8 +1101,8 @@ services:
     env_file: .env
     environment:
       - DATABASE_URL=postgresql+asyncpg://watch:${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}@watch-db:5432/watch
-      - JWT_SECRET=${JWT_SECRET}
-      - SERVICE_TOKEN=${SERVICE_TOKEN}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET est obligatoire (openssl rand -hex 32)}
+      - SERVICE_TOKEN=${SERVICE_TOKEN:?SERVICE_TOKEN est obligatoire (openssl rand -hex 32)}
       # FEAT-30 phase 2 — static DSN target for /internal/export-recovery
       - RECOVERY_DB_HOST=backup-agent
       - RECOVERY_DB_PORT=5433
@@ -1114,14 +1114,14 @@ services:
       - APPSEC_URL=http://appsec-app:8080
       - AI_MANAGED_BY_PILOT=true
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY is required (openssl rand -hex 32) — see .env.example}
-      - ENTRA_CLIENT_ID=${ENTRA_CLIENT_ID}
-      - ENTRA_CLIENT_SECRET=${ENTRA_CLIENT_SECRET}
+      - ENTRA_CLIENT_ID=${ENTRA_CLIENT_ID:-}
+      - ENTRA_CLIENT_SECRET=${ENTRA_CLIENT_SECRET:-}
       - ENTRA_TENANT_ID=${ENTRA_TENANT_ID:-common}
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
-      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
-      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID}
-      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET}
-      - OIDC_ISSUER=${OIDC_ISSUER}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID:-}
+      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET:-}
+      - OIDC_ISSUER=${OIDC_ISSUER:-}
       - OIDC_LABEL=${OIDC_LABEL:-SSO}
     depends_on:
       watch-db:
@@ -1137,7 +1137,7 @@ services:
 
   watch-db:
     # ciso-postgres = same postgres:16-alpine base + pgBackRest (FEAT-30).
-    image: ghcr.io/cisotoolbox/ciso-postgres:16
+    image: ghcr.io/cisotoolbox/ciso-postgres:16.1
     # Continuous WAL archiving to the shared encrypted repository —
     # the PITR window starts at the first full backup (backup-agent).
     command: postgres -c wal_level=replica -c archive_mode=on
@@ -1187,7 +1187,7 @@ services:
   # verify weekly. No docker socket, no TLS pair, no extra daemon in
   # the DB containers. See backup-agent/agent.sh and the runbook.
   backup-agent:
-    image: ghcr.io/cisotoolbox/ciso-backup-agent:16
+    image: ghcr.io/cisotoolbox/ciso-backup-agent:16.2
     container_name: ciso-backup-agent
     restart: unless-stopped
     security_opt:

@@ -1,0 +1,139 @@
+# ════════════════════════════════════════════════════════════════════════
+# Surcharge — autorité de certification du stockage objet (FEAT-29)
+#
+# À N'ACTIVER QUE pour un stockage objet interne servant un certificat privé
+# (MinIO d'entreprise, par exemple) :
+#
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.s3.yml:docker-compose.s3-ca.yml
+#   BACKUP_S3_CA_FILE=/opt/ciso-toolbox/certs/minio-ca.crt
+#
+# BACKUP_S3_CA_FILE est le chemin sur l'HÔTE ; la surcharge le monte elle-même
+# dans chaque conteneur. Rien d'autre à faire.
+#
+# Fichier séparé, et non une variable à défaut vide dans docker-compose.s3.yml :
+# pgBackRest REFUSE une variable d'environnement vide. Les hébergeurs publics
+# (AWS, Scaleway, Wasabi…) présentent des certificats reconnus et n'ont pas
+# besoin de cette surcharge.
+# ════════════════════════════════════════════════════════════════════════
+services:
+
+  pilot-db:
+    environment:
+      # Chemin FIXE dans le conteneur : le fichier est monté juste en dessous.
+      # Auparavant cette surcharge désignait un chemin sans le fournir, et
+      # pgBackRest répondait « unable to set user-defined CA certificate
+      # location: no details available » — un message qui ne désigne rien.
+      PGBACKREST_REPO2_STORAGE_CA_FILE: /etc/pgbackrest/s3-ca.crt
+    volumes:
+      # Le chemin sur l'HÔTE du certificat de votre stockage objet.
+      - ${BACKUP_S3_CA_FILE:?BACKUP_S3_CA_FILE doit désigner, sur l'hôte, le certificat de l'autorité de votre stockage objet}:/etc/pgbackrest/s3-ca.crt:ro
+
+  risk-db:
+    environment:
+      # Chemin FIXE dans le conteneur : le fichier est monté juste en dessous.
+      # Auparavant cette surcharge désignait un chemin sans le fournir, et
+      # pgBackRest répondait « unable to set user-defined CA certificate
+      # location: no details available » — un message qui ne désigne rien.
+      PGBACKREST_REPO2_STORAGE_CA_FILE: /etc/pgbackrest/s3-ca.crt
+    volumes:
+      # Le chemin sur l'HÔTE du certificat de votre stockage objet.
+      - ${BACKUP_S3_CA_FILE:?BACKUP_S3_CA_FILE doit désigner, sur l'hôte, le certificat de l'autorité de votre stockage objet}:/etc/pgbackrest/s3-ca.crt:ro
+
+  vendor-db:
+    environment:
+      # Chemin FIXE dans le conteneur : le fichier est monté juste en dessous.
+      # Auparavant cette surcharge désignait un chemin sans le fournir, et
+      # pgBackRest répondait « unable to set user-defined CA certificate
+      # location: no details available » — un message qui ne désigne rien.
+      PGBACKREST_REPO2_STORAGE_CA_FILE: /etc/pgbackrest/s3-ca.crt
+    volumes:
+      # Le chemin sur l'HÔTE du certificat de votre stockage objet.
+      - ${BACKUP_S3_CA_FILE:?BACKUP_S3_CA_FILE doit désigner, sur l'hôte, le certificat de l'autorité de votre stockage objet}:/etc/pgbackrest/s3-ca.crt:ro
+
+  compliance-db:
+    environment:
+      # Chemin FIXE dans le conteneur : le fichier est monté juste en dessous.
+      # Auparavant cette surcharge désignait un chemin sans le fournir, et
+      # pgBackRest répondait « unable to set user-defined CA certificate
+      # location: no details available » — un message qui ne désigne rien.
+      PGBACKREST_REPO2_STORAGE_CA_FILE: /etc/pgbackrest/s3-ca.crt
+    volumes:
+      # Le chemin sur l'HÔTE du certificat de votre stockage objet.
+      - ${BACKUP_S3_CA_FILE:?BACKUP_S3_CA_FILE doit désigner, sur l'hôte, le certificat de l'autorité de votre stockage objet}:/etc/pgbackrest/s3-ca.crt:ro
+
+  asset-db:
+    environment:
+      # Chemin FIXE dans le conteneur : le fichier est monté juste en dessous.
+      # Auparavant cette surcharge désignait un chemin sans le fournir, et
+      # pgBackRest répondait « unable to set user-defined CA certificate
+      # location: no details available » — un message qui ne désigne rien.
+      PGBACKREST_REPO2_STORAGE_CA_FILE: /etc/pgbackrest/s3-ca.crt
+    volumes:
+      # Le chemin sur l'HÔTE du certificat de votre stockage objet.
+      - ${BACKUP_S3_CA_FILE:?BACKUP_S3_CA_FILE doit désigner, sur l'hôte, le certificat de l'autorité de votre stockage objet}:/etc/pgbackrest/s3-ca.crt:ro
+
+  audit-db:
+    environment:
+      # Chemin FIXE dans le conteneur : le fichier est monté juste en dessous.
+      # Auparavant cette surcharge désignait un chemin sans le fournir, et
+      # pgBackRest répondait « unable to set user-defined CA certificate
+      # location: no details available » — un message qui ne désigne rien.
+      PGBACKREST_REPO2_STORAGE_CA_FILE: /etc/pgbackrest/s3-ca.crt
+    volumes:
+      # Le chemin sur l'HÔTE du certificat de votre stockage objet.
+      - ${BACKUP_S3_CA_FILE:?BACKUP_S3_CA_FILE doit désigner, sur l'hôte, le certificat de l'autorité de votre stockage objet}:/etc/pgbackrest/s3-ca.crt:ro
+
+  access-db:
+    environment:
+      # Chemin FIXE dans le conteneur : le fichier est monté juste en dessous.
+      # Auparavant cette surcharge désignait un chemin sans le fournir, et
+      # pgBackRest répondait « unable to set user-defined CA certificate
+      # location: no details available » — un message qui ne désigne rien.
+      PGBACKREST_REPO2_STORAGE_CA_FILE: /etc/pgbackrest/s3-ca.crt
+    volumes:
+      # Le chemin sur l'HÔTE du certificat de votre stockage objet.
+      - ${BACKUP_S3_CA_FILE:?BACKUP_S3_CA_FILE doit désigner, sur l'hôte, le certificat de l'autorité de votre stockage objet}:/etc/pgbackrest/s3-ca.crt:ro
+
+  surface-db:
+    environment:
+      # Chemin FIXE dans le conteneur : le fichier est monté juste en dessous.
+      # Auparavant cette surcharge désignait un chemin sans le fournir, et
+      # pgBackRest répondait « unable to set user-defined CA certificate
+      # location: no details available » — un message qui ne désigne rien.
+      PGBACKREST_REPO2_STORAGE_CA_FILE: /etc/pgbackrest/s3-ca.crt
+    volumes:
+      # Le chemin sur l'HÔTE du certificat de votre stockage objet.
+      - ${BACKUP_S3_CA_FILE:?BACKUP_S3_CA_FILE doit désigner, sur l'hôte, le certificat de l'autorité de votre stockage objet}:/etc/pgbackrest/s3-ca.crt:ro
+
+  appsec-db:
+    environment:
+      # Chemin FIXE dans le conteneur : le fichier est monté juste en dessous.
+      # Auparavant cette surcharge désignait un chemin sans le fournir, et
+      # pgBackRest répondait « unable to set user-defined CA certificate
+      # location: no details available » — un message qui ne désigne rien.
+      PGBACKREST_REPO2_STORAGE_CA_FILE: /etc/pgbackrest/s3-ca.crt
+    volumes:
+      # Le chemin sur l'HÔTE du certificat de votre stockage objet.
+      - ${BACKUP_S3_CA_FILE:?BACKUP_S3_CA_FILE doit désigner, sur l'hôte, le certificat de l'autorité de votre stockage objet}:/etc/pgbackrest/s3-ca.crt:ro
+
+  watch-db:
+    environment:
+      # Chemin FIXE dans le conteneur : le fichier est monté juste en dessous.
+      # Auparavant cette surcharge désignait un chemin sans le fournir, et
+      # pgBackRest répondait « unable to set user-defined CA certificate
+      # location: no details available » — un message qui ne désigne rien.
+      PGBACKREST_REPO2_STORAGE_CA_FILE: /etc/pgbackrest/s3-ca.crt
+    volumes:
+      # Le chemin sur l'HÔTE du certificat de votre stockage objet.
+      - ${BACKUP_S3_CA_FILE:?BACKUP_S3_CA_FILE doit désigner, sur l'hôte, le certificat de l'autorité de votre stockage objet}:/etc/pgbackrest/s3-ca.crt:ro
+
+  backup-agent:
+    environment:
+      # Chemin FIXE dans le conteneur : le fichier est monté juste en dessous.
+      # Auparavant cette surcharge désignait un chemin sans le fournir, et
+      # pgBackRest répondait « unable to set user-defined CA certificate
+      # location: no details available » — un message qui ne désigne rien.
+      PGBACKREST_REPO2_STORAGE_CA_FILE: /etc/pgbackrest/s3-ca.crt
+    volumes:
+      # Le chemin sur l'HÔTE du certificat de votre stockage objet.
+      - ${BACKUP_S3_CA_FILE:?BACKUP_S3_CA_FILE doit désigner, sur l'hôte, le certificat de l'autorité de votre stockage objet}:/etc/pgbackrest/s3-ca.crt:ro
