@@ -133,9 +133,11 @@ services:
   # any image left on a bare tag.
   # Locally this is inert: docker-compose.override.yml rebuilds them as
   # `ciso-*:local` with `pull_policy: never`, so nothing is pulled from ghcr.io.
-  # NOTE: `ciso-postgres:16`, `ciso-backup-agent:16` and `ciso-audit-suite` are
-  # not yet published to GHCR, so they stay on their tag — pin-images.sh pins
-  # them automatically once they are.
+    # Infrastructure images (ciso-postgres, ciso-backup-agent) are pinned by
+    # tag AND digest like the modules: they are published to GHCR and public.
+    # ciso-backup-agent 16.2 fixes a startup race where the agent began before
+    # the database answered, leaving a stanza with no base backup — and so no
+    # recovery window — until the next scheduled run.
   pilot-app:
     image: ghcr.io/cisotoolbox/ciso-pilot-suite:v1.0.0@sha256:6dad274a18624c2e7a4fae5a8af29fad7b5f71c87561d5cb946313369921e092
     container_name: ciso-pilot
@@ -212,12 +214,19 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      # Cold start on a FRESH host means creating the whole schema by
+      # migration, while twenty-two containers start at once. Without a
+      # start_period long enough, Docker declares the container unhealthy
+      # after interval x retries and everything depending on it fails to
+      # start. Invisible on an existing deployment, where the schema is
+      # already there and nothing migrates.
+      start_period: 180s
     networks:
       - ciso-net
 
   pilot-db:
     # ciso-postgres = same postgres:16-alpine base + pgBackRest (FEAT-30).
-    image: ghcr.io/cisotoolbox/ciso-postgres:16.1
+    image: ghcr.io/cisotoolbox/ciso-postgres:16.1@sha256:6cd8070fb98bac5c4266bd7cb6bfaa0f533665834d39afa0ecee83b58081c641
     # Continuous WAL archiving to the shared encrypted repository —
     # the PITR window starts at the first full backup (backup-agent).
     command: postgres -c wal_level=replica -c archive_mode=on
@@ -311,12 +320,19 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      # Cold start on a FRESH host means creating the whole schema by
+      # migration, while twenty-two containers start at once. Without a
+      # start_period long enough, Docker declares the container unhealthy
+      # after interval x retries and everything depending on it fails to
+      # start. Invisible on an existing deployment, where the schema is
+      # already there and nothing migrates.
+      start_period: 180s
     networks:
       - ciso-net
 
   risk-db:
     # ciso-postgres = same postgres:16-alpine base + pgBackRest (FEAT-30).
-    image: ghcr.io/cisotoolbox/ciso-postgres:16.1
+    image: ghcr.io/cisotoolbox/ciso-postgres:16.1@sha256:6cd8070fb98bac5c4266bd7cb6bfaa0f533665834d39afa0ecee83b58081c641
     # Continuous WAL archiving to the shared encrypted repository —
     # the PITR window starts at the first full backup (backup-agent).
     command: postgres -c wal_level=replica -c archive_mode=on
@@ -409,12 +425,19 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      # Cold start on a FRESH host means creating the whole schema by
+      # migration, while twenty-two containers start at once. Without a
+      # start_period long enough, Docker declares the container unhealthy
+      # after interval x retries and everything depending on it fails to
+      # start. Invisible on an existing deployment, where the schema is
+      # already there and nothing migrates.
+      start_period: 180s
     networks:
       - ciso-net
 
   vendor-db:
     # ciso-postgres = same postgres:16-alpine base + pgBackRest (FEAT-30).
-    image: ghcr.io/cisotoolbox/ciso-postgres:16.1
+    image: ghcr.io/cisotoolbox/ciso-postgres:16.1@sha256:6cd8070fb98bac5c4266bd7cb6bfaa0f533665834d39afa0ecee83b58081c641
     # Continuous WAL archiving to the shared encrypted repository —
     # the PITR window starts at the first full backup (backup-agent).
     command: postgres -c wal_level=replica -c archive_mode=on
@@ -507,12 +530,19 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      # Cold start on a FRESH host means creating the whole schema by
+      # migration, while twenty-two containers start at once. Without a
+      # start_period long enough, Docker declares the container unhealthy
+      # after interval x retries and everything depending on it fails to
+      # start. Invisible on an existing deployment, where the schema is
+      # already there and nothing migrates.
+      start_period: 180s
     networks:
       - ciso-net
 
   compliance-db:
     # ciso-postgres = same postgres:16-alpine base + pgBackRest (FEAT-30).
-    image: ghcr.io/cisotoolbox/ciso-postgres:16.1
+    image: ghcr.io/cisotoolbox/ciso-postgres:16.1@sha256:6cd8070fb98bac5c4266bd7cb6bfaa0f533665834d39afa0ecee83b58081c641
     # Continuous WAL archiving to the shared encrypted repository —
     # the PITR window starts at the first full backup (backup-agent).
     command: postgres -c wal_level=replica -c archive_mode=on
@@ -605,12 +635,19 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      # Cold start on a FRESH host means creating the whole schema by
+      # migration, while twenty-two containers start at once. Without a
+      # start_period long enough, Docker declares the container unhealthy
+      # after interval x retries and everything depending on it fails to
+      # start. Invisible on an existing deployment, where the schema is
+      # already there and nothing migrates.
+      start_period: 180s
     networks:
       - ciso-net
 
   asset-db:
     # ciso-postgres = same postgres:16-alpine base + pgBackRest (FEAT-30).
-    image: ghcr.io/cisotoolbox/ciso-postgres:16.1
+    image: ghcr.io/cisotoolbox/ciso-postgres:16.1@sha256:6cd8070fb98bac5c4266bd7cb6bfaa0f533665834d39afa0ecee83b58081c641
     # Continuous WAL archiving to the shared encrypted repository —
     # the PITR window starts at the first full backup (backup-agent).
     command: postgres -c wal_level=replica -c archive_mode=on
@@ -703,12 +740,19 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      # Cold start on a FRESH host means creating the whole schema by
+      # migration, while twenty-two containers start at once. Without a
+      # start_period long enough, Docker declares the container unhealthy
+      # after interval x retries and everything depending on it fails to
+      # start. Invisible on an existing deployment, where the schema is
+      # already there and nothing migrates.
+      start_period: 180s
     networks:
       - ciso-net
 
   audit-db:
     # ciso-postgres = same postgres:16-alpine base + pgBackRest (FEAT-30).
-    image: ghcr.io/cisotoolbox/ciso-postgres:16.1
+    image: ghcr.io/cisotoolbox/ciso-postgres:16.1@sha256:6cd8070fb98bac5c4266bd7cb6bfaa0f533665834d39afa0ecee83b58081c641
     # Continuous WAL archiving to the shared encrypted repository —
     # the PITR window starts at the first full backup (backup-agent).
     command: postgres -c wal_level=replica -c archive_mode=on
@@ -806,12 +850,19 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      # Cold start on a FRESH host means creating the whole schema by
+      # migration, while twenty-two containers start at once. Without a
+      # start_period long enough, Docker declares the container unhealthy
+      # after interval x retries and everything depending on it fails to
+      # start. Invisible on an existing deployment, where the schema is
+      # already there and nothing migrates.
+      start_period: 180s
     networks:
       - ciso-net
 
   access-db:
     # ciso-postgres = same postgres:16-alpine base + pgBackRest (FEAT-30).
-    image: ghcr.io/cisotoolbox/ciso-postgres:16.1
+    image: ghcr.io/cisotoolbox/ciso-postgres:16.1@sha256:6cd8070fb98bac5c4266bd7cb6bfaa0f533665834d39afa0ecee83b58081c641
     # Continuous WAL archiving to the shared encrypted repository —
     # the PITR window starts at the first full backup (backup-agent).
     command: postgres -c wal_level=replica -c archive_mode=on
@@ -924,13 +975,19 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      # Cold start on a FRESH host means creating the whole schema by
+      # migration, while twenty-two containers start at once. Without a
+      # start_period long enough, Docker declares the container unhealthy
+      # after interval x retries and everything depending on it fails to
+      # start. Invisible on an existing deployment, where the schema is
+      # already there and nothing migrates.
+      start_period: 180s
     networks:
       - ciso-net
 
   surface-db:
     # ciso-postgres = same postgres:16-alpine base + pgBackRest (FEAT-30).
-    image: ghcr.io/cisotoolbox/ciso-postgres:16.1
+    image: ghcr.io/cisotoolbox/ciso-postgres:16.1@sha256:6cd8070fb98bac5c4266bd7cb6bfaa0f533665834d39afa0ecee83b58081c641
     # Continuous WAL archiving to the shared encrypted repository —
     # the PITR window starts at the first full backup (backup-agent).
     command: postgres -c wal_level=replica -c archive_mode=on
@@ -1031,13 +1088,19 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      # Cold start on a FRESH host means creating the whole schema by
+      # migration, while twenty-two containers start at once. Without a
+      # start_period long enough, Docker declares the container unhealthy
+      # after interval x retries and everything depending on it fails to
+      # start. Invisible on an existing deployment, where the schema is
+      # already there and nothing migrates.
+      start_period: 180s
     networks:
       - ciso-net
 
   appsec-db:
     # ciso-postgres = same postgres:16-alpine base + pgBackRest (FEAT-30).
-    image: ghcr.io/cisotoolbox/ciso-postgres:16.1
+    image: ghcr.io/cisotoolbox/ciso-postgres:16.1@sha256:6cd8070fb98bac5c4266bd7cb6bfaa0f533665834d39afa0ecee83b58081c641
     # Continuous WAL archiving to the shared encrypted repository —
     # the PITR window starts at the first full backup (backup-agent).
     command: postgres -c wal_level=replica -c archive_mode=on
@@ -1131,13 +1194,19 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      # Cold start on a FRESH host means creating the whole schema by
+      # migration, while twenty-two containers start at once. Without a
+      # start_period long enough, Docker declares the container unhealthy
+      # after interval x retries and everything depending on it fails to
+      # start. Invisible on an existing deployment, where the schema is
+      # already there and nothing migrates.
+      start_period: 180s
     networks:
       - ciso-net
 
   watch-db:
     # ciso-postgres = same postgres:16-alpine base + pgBackRest (FEAT-30).
-    image: ghcr.io/cisotoolbox/ciso-postgres:16.1
+    image: ghcr.io/cisotoolbox/ciso-postgres:16.1@sha256:6cd8070fb98bac5c4266bd7cb6bfaa0f533665834d39afa0ecee83b58081c641
     # Continuous WAL archiving to the shared encrypted repository —
     # the PITR window starts at the first full backup (backup-agent).
     command: postgres -c wal_level=replica -c archive_mode=on
@@ -1187,7 +1256,7 @@ services:
   # verify weekly. No docker socket, no TLS pair, no extra daemon in
   # the DB containers. See backup-agent/agent.sh and the runbook.
   backup-agent:
-    image: ghcr.io/cisotoolbox/ciso-backup-agent:16.2
+    image: ghcr.io/cisotoolbox/ciso-backup-agent:16.2@sha256:b6b99172439b42b7ced966188d7c981568d47dfdd03ca098354bbad798f16252
     container_name: ciso-backup-agent
     restart: unless-stopped
     security_opt:
