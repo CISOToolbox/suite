@@ -90,8 +90,14 @@ therefore a tested, reproducible combination. The full contract (what each
 number means, the compatibility matrix, the release procedure and its
 guardrail `tools/release-check.sh`) is in [RELEASING.md](RELEASING.md).
 
-Current line: modules **1.0.0**, suite **0.9.0** — the composition is
-published as a public beta while the cross-module contracts settle.
+Current line: modules **1.0.0** (AppSec **1.1.0**), suite **0.9.3** — the
+composition is published as a public beta while the cross-module contracts
+settle.
+
+What a restore gives back and what it does not — the secrets that cannot be
+inside a backup, the one-way nature of migrations, and the three ways a
+recovery goes wrong quietly — is in [RECOVERY.md](RECOVERY.md). Worth reading
+before you need it rather than during.
 
 ## Building a custom deployment
 
