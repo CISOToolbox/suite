@@ -383,6 +383,7 @@ _registerTranslations("fr", {
   "pilot.kpi.value_saved": "Valeur enregistrée",
   "pilot.kpi.view_full_history": "Voir l'historique complet ({n})",
   "pilot.measure.status.backlog": "Backlog",
+  "pilot.measure.status.cancelled": "Abandonné",
   "pilot.measure.status.completed": "Terminé",
   "pilot.measure.status.termine": "Terminé",
   "pilot.measure.status.in_progress": "En cours",

@@ -461,7 +461,10 @@
     // Status order used by both views (list status select, kanban columns,
     // drop-zone whitelist). Keep this single source of truth in sync with the
     // backend Literal in src/routes/measures.py::MeasureUpdate.
-    var _MEASURE_STATUSES = ["backlog", "planned", "in_progress", "completed"];
+    // « cancelled » vient des modules : une mesure qu'on renonce a mener
+    // (libellee « Abandonne » cote Vendor). Elle reste visible et filtrable
+    // ici — sans cette entree elle remonterait avec un statut sans libelle.
+    var _MEASURE_STATUSES = ["backlog", "planned", "in_progress", "completed", "cancelled"];
     var _measureView = (function () {
         try {
             return localStorage.getItem("pilot_measures_view") || "list";

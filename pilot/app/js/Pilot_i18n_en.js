@@ -381,6 +381,7 @@ _registerTranslations("en", {
     "pilot.kpi.value_saved": "Value recorded",
     "pilot.kpi.view_full_history": "View full history ({n})",
     "pilot.measure.status.backlog": "Backlog",
+    "pilot.measure.status.cancelled": "Abandoned",
     "pilot.measure.status.completed": "Completed",
     "pilot.measure.status.termine": "Completed",
     "pilot.measure.status.in_progress": "In progress",
