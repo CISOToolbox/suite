@@ -382,7 +382,7 @@ services:
   # ════════════════════════════════════════════════════════════
 
   vendor-app:
-    image: ghcr.io/cisotoolbox/ciso-vendor-suite:v1.0.1@sha256:3589c5d8dcac5dff027f3eadb0cc0d8734220f6b63aaa93fcc5b9ab7028c5cc6
+    image: ghcr.io/cisotoolbox/ciso-vendor-suite:v1.1.0@sha256:c2d2954c9ab883b24c70bd05f52798f9e9f740c362c76d1ab517708d64f5a117
     container_name: ciso-vendor
     restart: unless-stopped
     read_only: true
