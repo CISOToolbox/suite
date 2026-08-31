@@ -311,7 +311,7 @@ function _renderPicker(): void {
                 h += '<td class="ct-ta-r ct-nowrap">';
                 h += '<button class="ct-btn" data-size="xs" data-click="_auditPickerOpen" data-args=\'' + _da(p.id) + '\'>' + esc(t("auditapi.open")) + '</button> ';
                 h += '<button class="ct-btn" data-size="xs" data-write data-click="_auditPickerDup" data-args=\'' + _da(p.id) + '\' data-icon title="' + esc(t("auditapi.duplicate")) + '">' + _icon("copy", 14) + '</button> ';
-                h += '<button class="ct-btn admin-only" data-size="xs" data-variant="danger" data-click="_auditPickerDel" data-args=\'' + _da(p.id) + '\' data-icon title="' + esc(t("auditapi.delete")) + '">' + _icon("trash", 14) + '</button>';
+                h += '<button class="ct-btn ct-admin-only" data-size="xs" data-variant="danger" data-click="_auditPickerDel" data-args=\'' + _da(p.id) + '\' data-icon title="' + esc(t("auditapi.delete")) + '">' + _icon("trash", 14) + '</button>';
                 h += '</td></tr>';
             });
             h += '</tbody></table></div>';
@@ -430,7 +430,7 @@ window._editAuditMeasure = function(measureId: string) {
     if (!_activeId || !window.ct_measure_modal) return;
     var m = _measures.find(function(x) { return x.id === measureId; });
     if (!m) return;
-    var isAdmin = document.body.classList.contains("role-admin");
+    var isAdmin = document.body.classList.contains("ct-role-admin");
     ct_measure_modal.open(m, {
         title: m.id + (m.control_id ? " — " + m.control_id : ""),
         hideFields: ["type"],
@@ -520,7 +520,7 @@ function _initAuth(): void {
             var h = '<span style="color:var(--ct-ink-1);font-size:var(--ct-text-label);margin:0 var(--ct-s1)">' + esc(user.name || user.email) + '</span>';
             h += '<button class="ct-text-label ct-muted ct-bg-none ct-no-border ct-clickable ct-py-1 ct-px-2" data-click="_logout" title="Sign out">&#x23FB;</button>';
             var container = document.createElement("span");
-            container.className = "toolbar-right";
+            container.className = "ct-toolbar-right";
             container.style.cssText = "display:flex;align-items:center;gap:4px;margin-left:auto";
             container.innerHTML = h;
             right2.parentNode!.insertBefore(container, right2);
@@ -529,8 +529,8 @@ function _initAuth(): void {
             }).then(function(roleInfo: any) {
                 var role = roleInfo.role || "";
                 window._moduleRole = role;
-                if (role) document.body.classList.add("role-" + role);
-                if (user.role === "admin") document.body.classList.add("role-admin");
+                if (role) document.body.classList.add("ct-role-" + role);
+                if (user.role === "admin") document.body.classList.add("ct-role-admin");
             }).catch(function() {});
         });
     }).catch(function() {});

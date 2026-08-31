@@ -137,7 +137,7 @@ function _updateSidebarAccordion(id: string): void { document.querySelectorAll("
 // ═══════════════════════════════════════════════════════════════
 function _genId(prefix: string, arr: { id?: string }[]): string { var max = 0; arr.forEach(function(x) { var n = parseInt((x.id || "").replace(/\D/g, "")) || 0; if (n > max) max = n; }); return prefix + String(max + 1).padStart(3, "0"); }
 function _today(): string { return new Date().toISOString().split("T")[0]; }
-function _compTag(ok?: boolean): string { return '<span class="compliance-tag ' + (ok ? "ok" : "ko") + '">' + (ok ? "✓" : "✗") + '</span>'; }
+function _compTag(ok?: boolean): string { return '<span class="ct-compliance-tag ' + (ok ? "ok" : "ko") + '">' + (ok ? "✓" : "✗") + '</span>'; }
 
 // Sensibilisation card: connector-driven cumulative training history + computed
 // compliance (read-only). Falls back to the manual proof card when there is no
@@ -157,7 +157,7 @@ function _sensibilisationCard(u: any): string {
     h += '<span class="proof-card__title ct-inline-flex ct-items-center ct-gap-1">';
     h += '<span aria-hidden="true" style="display:inline-block;width:1.1em;text-align:center;font-weight:700;color:' + (ok ? 'var(--ct-low)' : 'var(--ct-critical)') + '">' + (ok ? '✓' : '✗') + '</span>';
     h += esc(t("user.sensibilisation")) + '</span>';
-    h += '<span class="compliance-tag ct-ml-auto ' + (ok ? 'ok' : 'ko') + '">' + esc(ok ? t("sensi.compliant") : t("sensi.noncompliant")) + '</span>';
+    h += '<span class="ct-compliance-tag ct-ml-auto ' + (ok ? 'ok' : 'ko') + '">' + esc(ok ? t("sensi.compliant") : t("sensi.noncompliant")) + '</span>';
     h += '</div>';
     // Timeline: overdue first, then in-progress, then completed (by due/date).
     var rows = camps.map(function(name) {
@@ -328,7 +328,7 @@ function renderUserList(): string {
     h += '<button class="ct-btn mt-8" data-write data-click="importUsersCsv">' + (t("user.import_csv") || "Importer CSV") + '</button>';
     h += '<a href="javascript:void(0)" class="access-link" data-click="downloadUsersCsvTemplate" style="font-size:var(--ct-text-label);align-self:center;text-decoration:underline">' + (t("user.csv_template") || "Modèle CSV") + '</a>';
     h += '<button class="ct-btn mt-8" data-write data-variant="primary" data-click="addUser">' + t("user.add") + '</button></div>';
-    if (!D.si_users.length) { h += '<div class="empty-state">' + t("user.empty") + '</div>'; return h; }
+    if (!D.si_users.length) { h += '<div class="ct-empty-state">' + t("user.empty") + '</div>'; return h; }
 
     var q = _userFilter.toLowerCase();
     var filtered = D.si_users.filter(function(u) {
@@ -336,7 +336,7 @@ function renderUserList(): string {
         return ((u.id || "") + " " + (u.nom || "") + " " + (u.prenom || "") + " " + (u.email || "") + " " + (u.fonction || "")).toLowerCase().indexOf(q) >= 0;
     });
 
-    if (!filtered.length) { h += '<div class="empty-state">' + (t("user.no_results") || "Aucun résultat") + '</div>'; return h; }
+    if (!filtered.length) { h += '<div class="ct-empty-state">' + (t("user.no_results") || "Aucun résultat") + '</div>'; return h; }
 
     h += ct_table.render({
         rows: filtered,
@@ -488,6 +488,7 @@ window._bulkDeleteUsers = function(scope) {
     if (!ids.length) return;
     var pid = (window as Window).getActiveProjectId ? getActiveProjectId() : null;
     D.si_users = D.si_users.filter(function(u) { return ids.indexOf(u.id) < 0; });
+    _purgeUserRefs(ids);
     if (pid && window.AccessAPI && (AccessAPI as Partial<AccessApi>).deleteSiUser) {
         ids.forEach(function(uid) {
             AccessAPI.deleteSiUser(pid!, uid).catch(function(e) { console.error("Delete user:", e); });
@@ -495,7 +496,7 @@ window._bulkDeleteUsers = function(scope) {
     }
     _save();
     ct_bulkbar.clear(scope);
-    showStatus(ids.length + " utilisateur(s) supprimé(s)");
+    showStatus(t("user.bulk_deleted", { n: String(ids.length) }));
     renderPanel();
 };
 
@@ -515,10 +516,63 @@ function addUser(): void {
     _selectedUser = D.si_users.length - 1; renderPanel(); _save();
 } window.addUser = addUser;
 function backToUsers(): void { _selectedUser = null; renderPanel(); } window.backToUsers = backToUsers;
+// Rien ne cascade cote base : application_id, review_entry_id et reviewers
+// sont des chaines libres, sans cle etrangere (les cascades du modele portent
+// uniquement sur project_id). Les liens se nettoient donc ici, et _save()
+// republie le blob complet.
+//
+// Une mesure n'est pas supprimee avec la revue qui l'a fait naitre : c'est un
+// travail assigne, avec un responsable et une echeance. On la detache.
+// Les entrees de revue, elles, ne sont jamais reecrites : une revue est un
+// enregistrement date, et l'entree porte deja email_or_login / nom / prenom
+// figes — _resolveEntryUser rend undefined et l'affichage retombe dessus.
+function _detachMeasures(entryIds: string[]): number {
+    if (!entryIds.length) return 0;
+    var n = 0;
+    (D.measures || []).forEach(function(m) {
+        if (m.review_entry_id && entryIds.indexOf(m.review_entry_id) >= 0) {
+            m.review_entry_id = ""; n++;
+        }
+    });
+    return n;
+}
+
+function _purgeUserRefs(ids: string[]): number {
+    var n = 0;
+    (D.applications || []).forEach(function(a) {
+        var before = (a.reviewers || []).length;
+        a.reviewers = (a.reviewers || []).filter(function(rid) { return ids.indexOf(rid) < 0; });
+        n += before - a.reviewers.length;
+    });
+    return n;
+}
+
+// Supprime les revues de ces applications, apres avoir detache leurs mesures.
+function _purgeAppRefs(ids: string[]): void {
+    var doomed = (D.reviews || []).filter(function(r) { return ids.indexOf(r.application_id) >= 0; });
+    _detachMeasures(_entryIdsOf(doomed));
+    D.reviews = (D.reviews || []).filter(function(r) { return ids.indexOf(r.application_id) < 0; });
+}
+
+function _entryIdsOf(reviews: AccessReview[]): string[] {
+    var ids: string[] = [];
+    reviews.forEach(function(r) {
+        (r.entries || []).forEach(function(e) { if (e.id) ids.push(e.id); });
+    });
+    return ids;
+}
+
 function deleteUser(): void {
     if (_selectedUser === null) return;
     var u = D.si_users[_selectedUser];
-    _ctConfirm(t("user.confirm_delete"), t("user.confirm_delete_body", { nom: u.nom + " " + u.prenom }), function() {
+    var uid = u.id;
+    var asReviewer = (D.applications || []).filter(function(a) {
+        return (a.reviewers || []).indexOf(uid) >= 0;
+    });
+    var body = t("user.confirm_delete_body", { nom: u.nom + " " + u.prenom });
+    if (asReviewer.length) body += " " + t("user.confirm_delete_reviewer", { n: String(asReviewer.length) });
+    _ctConfirm(t("user.confirm_delete"), body, function() {
+        _purgeUserRefs([uid]);
         D.si_users.splice(_selectedUser!, 1); _selectedUser = null; renderPanel(); _save();
     });
 } window.deleteUser = deleteUser;
@@ -535,13 +589,13 @@ function renderUserDetail(): string {
     h += '<span class="ct-flex-1"></span>';
     h += '<button class="ct-btn mt-8" data-write data-variant="danger" data-click="deleteUser">' + t("btn_delete") + '</button></div>';
 
-    h += '<div class="tprm-form"><div class="form-grid">';
+    h += '<div class="ct-tprm-form"><div class="ct-form-grid">';
     h += _field("nom",    t("user.nom"),    "text", u.nom,    lockedByPilot);
     h += _field("prenom", t("user.prenom"), "text", u.prenom, lockedByPilot);
-    h += '</div><div class="form-grid">';
+    h += '</div><div class="ct-form-grid">';
     h += _field("email",    "Email",           "email", u.email,    lockedByPilot);
     h += _field("fonction", t("user.fonction"), "text", u.fonction, lockedByPilot);
-    h += '</div><div class="form-grid">';
+    h += '</div><div class="ct-form-grid">';
     h += _sel("statut", t("user.statut_label"),
               ["actif", "ancien", "recrutement"].map(function(s) { return { v: s, l: _statusLabel(s) }; }),
               u.statut, lockedByPilot);
@@ -550,15 +604,15 @@ function renderUserDetail(): string {
                   return { v: s, l: t("user.type_compte." + s) || s };
               }),
               u.type_compte || "salarie");
-    h += '</div><div class="form-grid">';
+    h += '</div><div class="ct-form-grid">';
     h += _field("equipe", t("user.equipe") || "Équipe", "text", u.equipe);
     // Manager — shared user picker (ct_userpicker), mounted post-render on the
     // slot below. Stores the selected user's email in manager_email.
-    h += '<div class="form-row"><label>' + esc(t("user.manager") || "Manager") + '</label><div id="user-manager-slot"></div></div>';
+    h += '<div class="ct-form-row"><label>' + esc(t("user.manager") || "Manager") + '</label><div id="user-manager-slot"></div></div>';
     h += '</div>';
     // Contract end date — required/relevant for every type except salarie.
     if ((u.type_compte || "salarie") !== "salarie") {
-        h += '<div class="form-grid">';
+        h += '<div class="ct-form-grid">';
         h += _field("date_fin_contrat", t("user.date_fin_contrat") || "Date de fin de contrat", "date", u.date_fin_contrat);
         h += '</div>';
     }
@@ -787,7 +841,7 @@ function _renderEntitlements(): void {
         h += '</div>';
     }
     if (!_entitlements.length) {
-        h += '<div class="empty-state ct-py-2 ct-px-0">' + esc(t("user.ent_empty") || "Aucune habilitation demandée") + '</div>';
+        h += '<div class="ct-empty-state ct-py-2 ct-px-0">' + esc(t("user.ent_empty") || "Aucune habilitation demandée") + '</div>';
     } else {
         h += '<table class="ct-w-full ct-text-meta ct-mb-2"><thead><tr>';
         h += '<th class="ct-ta-l">' + esc(t("user.ent_perimetre")) + '</th>';
@@ -850,12 +904,12 @@ window.removeEntitlement = function(eid) {
 
 function _field(name: string, label: string, type: string, val: unknown, disabled?: boolean): string {
     var extra = disabled ? ' disabled style="background:var(--ct-surface-2);color:var(--access-disabled-ink,var(--ct-ink-1));cursor:not-allowed"' : '';
-    return '<div class="form-row"><label>' + esc(label) + '</label><input type="' + type + '" value="' + esc(String(val != null ? val : "")) + '"' + extra + ' data-change="saveUserField" data-args=\'["' + name + '"]\' data-pass-value></div>';
+    return '<div class="ct-form-row"><label>' + esc(label) + '</label><input type="' + type + '" value="' + esc(String(val != null ? val : "")) + '"' + extra + ' data-change="saveUserField" data-args=\'["' + name + '"]\' data-pass-value></div>';
 }
 
 function _sel(name: string, label: string, opts: { v: string; l: string }[], val: string | undefined, disabled?: boolean): string {
     var extra = disabled ? ' disabled style="background:var(--ct-surface-2);color:var(--access-disabled-ink,var(--ct-ink-1));cursor:not-allowed"' : '';
-    var h = '<div class="form-row"><label>' + esc(label) + '</label><select' + extra + ' data-change="saveUserField" data-args=\'["' + name + '"]\' data-pass-value>';
+    var h = '<div class="ct-form-row"><label>' + esc(label) + '</label><select' + extra + ' data-change="saveUserField" data-args=\'["' + name + '"]\' data-pass-value>';
     opts.forEach(function(o) { h += '<option value="' + esc(String(o.v)) + '"' + (String(val) === String(o.v) ? " selected" : "") + '>' + esc(o.l) + '</option>'; });
     return h + '</select></div>';
 }
@@ -893,7 +947,7 @@ function renderAppList(): string {
     h += '<button class="ct-btn mt-8" data-write data-click="importAppsCsv">' + t("app.import_csv") + '</button>';
     h += '<button class="ct-btn mt-8" data-write data-click="syncAppsFromAsset">' + t("app.sync_asset") + '</button>';
     h += '</div></div>';
-    if (!D.applications.length) { h += '<div class="empty-state">' + t("app.empty") + '</div>'; return h; }
+    if (!D.applications.length) { h += '<div class="ct-empty-state">' + t("app.empty") + '</div>'; return h; }
 
     var q = _appFilter.toLowerCase();
     // Enrich rows with derived info so the table renderer doesn't re-scan D.reviews per row
@@ -917,7 +971,7 @@ function renderAppList(): string {
         return ((a.id || "") + " " + (a.nom || "") + " " + (a.url || "") + " " + (a.__reviewer_names || "")).toLowerCase().indexOf(q) >= 0;
     });
 
-    if (!rows.length) { h += '<div class="empty-state">' + (t("app.no_results") || "Aucune application trouvée") + '</div>'; return h; }
+    if (!rows.length) { h += '<div class="ct-empty-state">' + (t("app.no_results") || "Aucune application trouvée") + '</div>'; return h; }
 
     h += ct_table.render({
         rows: rows,
@@ -969,6 +1023,8 @@ window._bulkDeleteApps = function(scope) {
     if (!ids.length) return;
     var pid = (window as Window).getActiveProjectId ? getActiveProjectId() : null;
     D.applications = D.applications.filter(function(a) { return ids.indexOf(a.id) < 0; });
+    _purgeAppRefs(ids);
+    if (_selectedReview !== null) _selectedReview = null;
     if (pid && window.AccessAPI && (AccessAPI as Partial<AccessApi>).deleteApp) {
         ids.forEach(function(aid) {
             AccessAPI.deleteApp(pid!, aid).catch(function(e) { console.error("Delete app:", e); });
@@ -976,7 +1032,7 @@ window._bulkDeleteApps = function(scope) {
     }
     _save();
     ct_bulkbar.clear(scope);
-    showStatus(ids.length + " application(s) supprimée(s)");
+    showStatus(t("app.bulk_deleted", { n: String(ids.length) }));
     renderPanel();
 };
 
@@ -989,7 +1045,20 @@ function backToApps(): void { _selectedApp = null; renderPanel(); } window.backT
 function deleteApp(): void {
     if (_selectedApp === null) return;
     var a = D.applications[_selectedApp];
-    _ctConfirm(t("app.confirm_delete"), t("app.confirm_delete_body", { nom: a.nom }), function() {
+    var aid = a.id;
+    var appReviews = (D.reviews || []).filter(function(r) { return r.application_id === aid; });
+    var entryIds = _entryIdsOf(appReviews);
+    var attached = (D.measures || []).filter(function(m) {
+        return m.review_entry_id && entryIds.indexOf(m.review_entry_id) >= 0;
+    }).length;
+    var body2 = t("app.confirm_delete_body", { nom: a.nom });
+    if (appReviews.length) body2 += " " + t("app.confirm_delete_cascade", { r: String(appReviews.length), m: String(attached) });
+    _ctConfirm(t("app.confirm_delete"), body2, function() {
+        // Les revues d'une application supprimee ne sont plus atteignables :
+        // toutes les vues les listent par application. Les garder reviendrait
+        // a les compter dans les indicateurs sans pouvoir les ouvrir.
+        _purgeAppRefs([aid]);
+        if (_selectedReview !== null) _selectedReview = null;
         D.applications.splice(_selectedApp!, 1); _selectedApp = null; renderPanel(); _save();
     });
 } window.deleteApp = deleteApp;
@@ -1096,7 +1165,7 @@ function renderAppDetail(): string {
     h += '<div class="app-detail-col">';
     h += '<h3 style="font-size:var(--ct-text-ui);margin:0 0 var(--ct-s2)">Revues d\'acces</h3>';
     if (!appReviews.length) {
-        h += '<div class="empty-state ct-p-5">Aucune revue. Cliquez sur "' + t("review.start") + '" pour en demarrer une.</div>';
+        h += '<div class="ct-empty-state ct-p-5">Aucune revue. Cliquez sur "' + t("review.start") + '" pour en demarrer une.</div>';
     } else {
         if (activeReviews.length) {
             h += '<div style="font-size:var(--ct-text-label);font-weight:600;color:var(--ct-ink-2);margin:var(--ct-s2) 0 var(--ct-s1);text-transform:uppercase">En cours</div>';
@@ -1138,20 +1207,30 @@ function renderAppDetail(): string {
 window.deleteReviewFromApp = function(reviewId) {
     var r = D.reviews.find(function(x) { return x.id === reviewId; });
     if (!r) return;
-    if (r.status !== "en_cours") { showStatus("Impossible de supprimer une revue cloturee", true); return; }
-    if (!confirm("Supprimer la revue " + reviewId + " ? Toutes les decisions seront perdues.")) return;
+    if (r.status !== "en_cours") { showStatus(t("review.delete_closed"), true); return; }
+    var entryIds = _entryIdsOf([r]);
+    var attached = (D.measures || []).filter(function(m) {
+        return m.review_entry_id && entryIds.indexOf(m.review_entry_id) >= 0;
+    }).length;
+    var msg = t("review.confirm_delete", { id: reviewId });
+    if (attached) msg += " " + t("review.confirm_delete_measures", { m: String(attached) });
+    if (!confirm(msg)) return;
+    var done = function() {
+        _detachMeasures(entryIds);
+        D.reviews = D.reviews.filter(function(x) { return x.id !== reviewId; });
+        if (_selectedReview !== null && D.reviews[_selectedReview] && D.reviews[_selectedReview].id === reviewId) _selectedReview = null;
+        renderPanel();
+        // Le detachement des mesures n'est porte par aucune route granulaire :
+        // il faut republier le blob, y compris dans la branche API.
+        _save();
+        showStatus(t("review.deleted"));
+    };
     var pid = (window as Window).getActiveProjectId ? getActiveProjectId() : null;
     if (pid && window.AccessAPI) {
-        AccessAPI.deleteReview(pid, reviewId).then(function() {
-            D.reviews = D.reviews.filter(function(x) { return x.id !== reviewId; });
-            if (_selectedReview !== null && D.reviews[_selectedReview] && D.reviews[_selectedReview].id === reviewId) _selectedReview = null;
-            renderPanel();
-            showStatus("Revue supprimee");
-        }).catch(function(e) { showStatus(e.message || "Erreur", true); });
+        AccessAPI.deleteReview(pid, reviewId).then(done)
+            .catch(function(e) { showStatus(e.message || t("error"), true); });
     } else {
-        D.reviews = D.reviews.filter(function(x) { return x.id !== reviewId; });
-        renderPanel(); _save();
-        showStatus("Revue supprimee");
+        done();
     }
 };
 function saveAppField(field: string, val: string): void { if (_selectedApp === null) return; (D.applications[_selectedApp] as Record<string, unknown>)[field] = val; _save(); } window.saveAppField = saveAppField;
@@ -1243,7 +1322,7 @@ function renderReviewList(): string {
     if (f.a_demarrer && toStart.length) {
         h += '<h3 style="font-size:var(--ct-text-data);margin:var(--ct-s3) 0 var(--ct-s2);color:var(--ct-critical)">' + (t("review.to_start") || "À démarrer (échéance dépassée)") + '</h3>';
         toStart.forEach(function(app) {
-            h += '<div class="groupe-card ct-flex ct-items-center ct-gap-2">';
+            h += '<div class="ct-groupe-card ct-flex ct-items-center ct-gap-2">';
             h += '<div class="ct-flex-1 ct-minw-0"><strong>' + esc(app.nom || app.id) + '</strong> <span class="ct-badge" data-tone="info">' + esc(_freqLabel(app.frequence_revue)) + '</span></div>';
             h += '<button class="ct-btn mt-8" data-write data-variant="primary" data-size="xs" data-click="startReview" data-args=\'' + _da(app.id) + '\' data-stop>' + t("review.start") + '</button>';
             h += '</div>';
@@ -1256,7 +1335,7 @@ function renderReviewList(): string {
             var origIdx = D.reviews.indexOf(r);
             var app = _findApp(r.application_id);
             var total = (r.entries || []).length, decided = (r.entries || []).filter(function(e) { return e.decision !== "pending"; }).length;
-            h += '<div class="groupe-card ct-userpicker" data-click="openReview" data-args=\'' + _da(origIdx) + '\'>';
+            h += '<div class="ct-groupe-card ct-userpicker" data-click="openReview" data-args=\'' + _da(origIdx) + '\'>';
             h += '<button class="app-review-del" style="position:absolute;top:8px;right:8px" title="Supprimer cette revue" data-click="deleteReviewFromApp" data-args=\'' + _da(r.id) + '\' data-stop>' + _icon("trash", 14) + '</button>';
             h += '<div class="ct-flex ct-items-center ct-gap-2"><strong>' + esc(app ? app.nom : r.application_id) + '</strong> <span class="ct-badge" data-tone="info">' + t("review.en_cours") + '</span></div>';
             h += '<div class="ct-text-label ct-muted ct-mt-1">' + t("review.started") + ' ' + esc(r.started_at) + ' — ' + decided + '/' + total + ' ' + t("review.decided") + '</div>';
@@ -1271,7 +1350,7 @@ function renderReviewList(): string {
             var origIdx = D.reviews.indexOf(r);
             var app = _findApp(r.application_id);
             var nc = (r.entries || []).filter(function(e) { return e.decision === "non_conforme"; }).length;
-            h += '<div class="groupe-card" style="opacity:0.8" data-click="openReview" data-args=\'' + _da(origIdx) + '\'>';
+            h += '<div class="ct-groupe-card" style="opacity:0.8" data-click="openReview" data-args=\'' + _da(origIdx) + '\'>';
             h += '<div class="ct-flex ct-items-center ct-gap-2"><strong>' + esc(app ? app.nom : r.application_id) + '</strong> <span class="ct-badge" data-tone="low">' + t("review.cloturee") + '</span></div>';
             h += '<div class="ct-text-label ct-muted ct-mt-1">' + esc(r.closed_at) + ' — ' + (r.entries || []).length + ' ' + t("review.entries") + (nc ? ', ' + nc + ' NC' : '') + '</div>';
             h += '</div>';
@@ -1279,7 +1358,7 @@ function renderReviewList(): string {
     }
 
     var shownAny = (f.en_cours && active.length) || (f.a_demarrer && toStart.length) || (f.closed && closed.length);
-    if (!shownAny) h += '<div class="empty-state">' + t("review.empty") + '</div>';
+    if (!shownAny) h += '<div class="ct-empty-state">' + t("review.empty") + '</div>';
     return h;
 }
 window._toggleReviewListFilter = function(key: string) {
@@ -1405,7 +1484,7 @@ function renderReviewDetail(): string {
         }
         h += '<button class="ct-btn mt-8" data-write data-click="importReviewCsv">' + t("review.import_csv") + '</button>';
         h += '<a href="javascript:void(0)" class="access-link" data-click="downloadCsvTemplate" style="font-size:var(--ct-text-label);margin-left:var(--ct-s2);text-decoration:underline;align-self:center">' + t("review.csv_template") + '</a>';
-        if (entries.length && decided === entries.length) h += '<button class="ct-btn mt-8 ct-kpi-tone ct-ml-1" data-write data-variant="primary" data-click="closeReview">' + t("review.close") + '</button>';
+        if (entries.length && decided === entries.length) h += '<button class="ct-btn mt-8 ct-ml-1" data-write data-variant="primary" data-click="closeReview">' + t("review.close") + '</button>';
     }
     if (isClosed) h += '<a href="' + esc(AccessAPI.exportReview(getActiveProjectId(), r.id)) + '" class="ct-btn mt-8 ct-no-underline ct-ml-1" data-write data-variant="primary">' + t("review.export") + '</a>';
     h += '</div>';
@@ -1419,7 +1498,7 @@ function renderReviewDetail(): string {
     h += '</div>';
 
     if (!entries.length) {
-        h += '<div class="empty-state">' + t("review.no_entries") + '</div>';
+        h += '<div class="ct-empty-state">' + t("review.no_entries") + '</div>';
         return h;
     }
 
@@ -1491,7 +1570,7 @@ function renderReviewDetail(): string {
     });
 
     if (!visible.length) {
-        h += '<div class="empty-state">' + (t("review.no_matches") || "Aucune entree ne correspond aux filtres actifs.") + '</div>';
+        h += '<div class="ct-empty-state">' + (t("review.no_matches") || "Aucune entree ne correspond aux filtres actifs.") + '</div>';
         return h;
     }
     if (visible.length !== entries.length) {
@@ -1826,7 +1905,7 @@ function renderSAList(): string {
     var h = '<div class="ct-row ct-row-between ct-mb-3">';
     h += '<h2>' + t("svc.title") + '</h2>';
     h += '<button class="ct-btn mt-8" data-write data-variant="primary" data-click="addServiceAccount">' + t("svc.add") + '</button></div>';
-    if (!(D.service_accounts || []).length) { h += '<div class="empty-state">' + t("svc.empty") + '</div>'; return h; }
+    if (!(D.service_accounts || []).length) { h += '<div class="ct-empty-state">' + t("svc.empty") + '</div>'; return h; }
     h += '<table><thead><tr><th>' + t("svc.name") + '</th><th>' + t("svc.identifier") + '</th><th>' + t("svc.platform") + '</th><th>' + t("svc.application") + '</th><th>' + t("svc.secret_storage") + '</th><th>' + t("svc.rotation_policy") + '</th><th>' + t("svc.risk_level") + '</th><th></th></tr></thead><tbody>';
     D.service_accounts.forEach(function(sa, i) {
         var app = _findApp(sa.application_id);
@@ -1891,22 +1970,22 @@ function renderSADetail(): string {
     h += '<span class="ct-flex-1"></span>';
     h += '<button class="ct-btn mt-8" data-write data-variant="danger" data-click="deleteServiceAccount" data-args=\'' + _da(_selectedSA) + '\'>' + t("btn_delete") + '</button></div>';
 
-    h += '<div class="tprm-form"><div class="form-grid">';
+    h += '<div class="ct-tprm-form"><div class="ct-form-grid">';
     h += _saField("name", t("svc.name"), "text", sa.name);
     h += _saField("identifier", t("svc.identifier"), "text", sa.identifier);
-    h += '</div><div class="form-grid">';
+    h += '</div><div class="ct-form-grid">';
     h += _saSel("platform", t("svc.platform"), ["", "azure", "aws", "gcp", "on-prem", "saas", "other"].map(function(p) { return { v: p, l: p ? _platformLabel(p) : "-" }; }), sa.platform);
     h += _saSel("application_id", t("svc.application"), [{ v: "", l: "-" }].concat(D.applications.map(function(a) { return { v: a.id, l: a.nom || a.id }; })), sa.application_id);
     h += '</div>';
-    h += '<div class="form-row"><label>' + t("svc.purpose") + '</label><textarea rows="2" class="ct-journal-body ct-bordered ct-r-sm ct-p-1 ct-text-meta ct-resize-y" data-change="saveSAField" data-args=\'["purpose"]\' data-pass-value>' + esc(sa.purpose || "") + '</textarea></div>';
-    h += '<div class="form-grid">';
+    h += '<div class="ct-form-row"><label>' + t("svc.purpose") + '</label><textarea rows="2" class="ct-journal-body ct-bordered ct-r-sm ct-p-1 ct-text-meta ct-resize-y" data-change="saveSAField" data-args=\'["purpose"]\' data-pass-value>' + esc(sa.purpose || "") + '</textarea></div>';
+    h += '<div class="ct-form-grid">';
     h += _saSel("secret_storage", t("svc.secret_storage"), ["vault", "env_var", "key_management", "hardcoded", "unknown"].map(function(s) { return { v: s, l: _storageLabel(s) }; }), sa.secret_storage);
     h += _saSel("rotation_policy", t("svc.rotation_policy"), ["30d", "60d", "90d", "180d", "365d", "never", "unknown"].map(function(r) { return { v: r, l: _rotationLabel(r) }; }), sa.rotation_policy);
-    h += '</div><div class="form-grid">';
+    h += '</div><div class="ct-form-grid">';
     h += _saField("last_rotation", t("svc.last_rotation"), "date", sa.last_rotation);
     h += _saSel("risk_level", t("svc.risk_level"), ["critical", "high", "medium", "low"].map(function(r) { return { v: r, l: _riskLabel(r) }; }), sa.risk_level);
     h += '</div>';
-    h += '<div class="form-row"><label>' + t("svc.notes") + '</label><textarea rows="2" class="ct-journal-body ct-bordered ct-r-sm ct-p-1 ct-text-meta ct-resize-y" data-change="saveSAField" data-args=\'["notes"]\' data-pass-value>' + esc(sa.notes || "") + '</textarea></div>';
+    h += '<div class="ct-form-row"><label>' + t("svc.notes") + '</label><textarea rows="2" class="ct-journal-body ct-bordered ct-r-sm ct-p-1 ct-text-meta ct-resize-y" data-change="saveSAField" data-args=\'["notes"]\' data-pass-value>' + esc(sa.notes || "") + '</textarea></div>';
     h += '</div>';
     return h;
 }
@@ -1922,8 +2001,8 @@ function saveSAField(field: string, val: string): void {
     } else { _save(); }
 } window.saveSAField = saveSAField;
 
-function _saField(name: string, label: string, type: string, val: unknown): string { return '<div class="form-row"><label>' + esc(label) + '</label><input type="' + type + '" value="' + esc(String(val != null ? val : "")) + '" data-change="saveSAField" data-args=\'["' + name + '"]\' data-pass-value></div>'; }
-function _saSel(name: string, label: string, opts: { v: string; l: string }[], val: string | undefined): string { var h = '<div class="form-row"><label>' + esc(label) + '</label><select data-change="saveSAField" data-args=\'["' + name + '"]\' data-pass-value>'; opts.forEach(function(o) { h += '<option value="' + esc(String(o.v)) + '"' + (String(val) === String(o.v) ? " selected" : "") + '>' + esc(o.l) + '</option>'; }); return h + '</select></div>'; }
+function _saField(name: string, label: string, type: string, val: unknown): string { return '<div class="ct-form-row"><label>' + esc(label) + '</label><input type="' + type + '" value="' + esc(String(val != null ? val : "")) + '" data-change="saveSAField" data-args=\'["' + name + '"]\' data-pass-value></div>'; }
+function _saSel(name: string, label: string, opts: { v: string; l: string }[], val: string | undefined): string { var h = '<div class="ct-form-row"><label>' + esc(label) + '</label><select data-change="saveSAField" data-args=\'["' + name + '"]\' data-pass-value>'; opts.forEach(function(o) { h += '<option value="' + esc(String(o.v)) + '"' + (String(val) === String(o.v) ? " selected" : "") + '>' + esc(o.l) + '</option>'; }); return h + '</select></div>'; }
 
 // ═══════════════════════════════════════════════════════════════
 // MEASURES
@@ -1940,7 +2019,7 @@ function renderMeasureList(): string {
     h += '<button class="ct-btn mt-8" data-write data-click="_refreshMeasures" title="' + esc(t("measure.refresh") || "Rafraîchir") + '">&#x21bb;</button>';
     h += '<button class="ct-btn mt-8" data-write data-variant="primary" data-click="addMeasure">' + t("measure.add") + '</button>';
     h += '</div></div>';
-    if (!D.measures.length) { h += '<div class="empty-state">' + t("measure.empty") + '</div>'; return h; }
+    if (!D.measures.length) { h += '<div class="ct-empty-state">' + t("measure.empty") + '</div>'; return h; }
 
     h += ct_table.render({
         rows: D.measures,
@@ -2146,21 +2225,21 @@ function renderPlugins(): string {
     h += '<h2>' + t("plg.title") + '</h2>';
     h += '<button class="ct-btn mt-8" data-write data-variant="primary" data-click="showPluginModal">' + t("plg.add") + '</button></div>';
 
-    if (!_pluginList.length) { h += '<div class="empty-state">' + t("plg.empty") + '</div>'; return h; }
+    if (!_pluginList.length) { h += '<div class="ct-empty-state">' + t("plg.empty") + '</div>'; return h; }
 
     _pluginList.forEach(function(p) {
         var statusCls = p.last_sync_status === "success" ? "ok" : (p.last_sync_status === "error" ? "ko" : "");
-        h += '<div class="groupe-card ct-userpicker ct-clickable" data-click="showPluginModal" data-args=\'' + _da(p.id) + '\'>';
+        h += '<div class="ct-groupe-card ct-userpicker ct-clickable" data-click="showPluginModal" data-args=\'' + _da(p.id) + '\'>';
         h += '<div class="ct-flex ct-items-center ct-gap-2 ct-mb-1">';
         h += '<strong>' + esc(p.label || p.plugin_type) + '</strong>';
         h += '<span class="ct-badge" data-tone="info">' + esc(p.plugin_type) + '</span>';
-        h += '<span class="compliance-tag ' + (p.enabled ? "ok" : "ko") + '">' + (p.enabled ? t("plg.enabled") : t("plg.disabled")) + '</span>';
+        h += '<span class="ct-compliance-tag ' + (p.enabled ? "ok" : "ko") + '">' + (p.enabled ? t("plg.enabled") : t("plg.disabled")) + '</span>';
         h += '</div>';
 
         h += '<div class="ct-text-label ct-muted ct-mb-2">';
         h += t("plg.schedule") + ': ' + esc(t("plg.schedule." + p.schedule) || p.schedule);
         if (p.last_sync_at) h += ' &middot; ' + t("plg.last_sync") + ': ' + esc(p.last_sync_at.split("T")[0]);
-        if (p.last_sync_status) h += ' <span class="compliance-tag ' + statusCls + '">' + esc(t("plg.status." + p.last_sync_status) || p.last_sync_status) + '</span>';
+        if (p.last_sync_status) h += ' <span class="ct-compliance-tag ' + statusCls + '">' + esc(t("plg.status." + p.last_sync_status) || p.last_sync_status) + '</span>';
         h += '</div>';
 
         h += '<div class="ct-flex ct-gap-1 ct-row-wrap">';
@@ -2182,7 +2261,7 @@ function showPluginModal(pluginId?: string): void {
     var title = existing ? esc(existing.label || existing.plugin_type) : t("plg.add");
 
     var h = '<div style="max-width:500px;max-height:80vh;overflow-y:auto">';
-    h += '<div class="pwd-title">' + title + '</div>';
+    h += '<div class="ct-pwd-title">' + title + '</div>';
 
     // Type selector (only for new plugins — card grid with search)
     if (!existing) {
@@ -2253,7 +2332,7 @@ function showPluginModal(pluginId?: string): void {
     h += '<button class="ct-btn" data-variant="primary" data-click="_plgSave" data-args=\'' + _da(existing ? existing.id : "") + '\'>' + (existing ? "OK" : t("plg.add")) + '</button>';
     h += '</div></div>';
 
-    var panel = ov.querySelector<HTMLElement>(".pwd-panel")!;
+    var panel = ov.querySelector<HTMLElement>(".ct-pwd-panel")!;
     panel.innerHTML = h;
     ov.style.display = "flex";
 } window.showPluginModal = showPluginModal;
@@ -2326,7 +2405,7 @@ window._plgCancel = function() {
     if (!ov) return;
     ov.style.display = "none";
     // Reset any inline width override applied by a wide modal (history)
-    var panel = ov.querySelector<HTMLElement>(".pwd-panel");
+    var panel = ov.querySelector<HTMLElement>(".ct-pwd-panel");
     if (panel) { panel.style.maxWidth = ""; panel.style.width = ""; }
 };
 
@@ -2426,7 +2505,7 @@ window._plgSave = function(existingId) {
 
     _plgSaveInFlight = true;
     // Visually disable the OK button while the request is in flight
-    var okBtn = document.querySelector<HTMLButtonElement>("#confirm-overlay .pwd-ok");
+    var okBtn = document.querySelector<HTMLButtonElement>("#confirm-overlay .ct-pwd-ok");
     if (okBtn) { okBtn.disabled = true; okBtn.style.opacity = "0.6"; }
 
     promise.then(function() {
@@ -2470,13 +2549,13 @@ function showPluginHistory(pluginId: string): void {
         var ov = document.getElementById("confirm-overlay")!;
         // Override the standard narrow panel width — override the inline
         // width on .pwd-panel so the table isn't crammed.
-        var panel = ov.querySelector<HTMLElement>(".pwd-panel")!;
+        var panel = ov.querySelector<HTMLElement>(".ct-pwd-panel")!;
         panel.style.maxWidth = "min(95vw, 1000px)";
         panel.style.width = "100%";
         var h = '<div style="max-height:85vh;overflow-y:auto">';
-        h += '<div class="pwd-title ct-mb-4">' + t("plg.history") + '</div>';
+        h += '<div class="ct-pwd-title ct-mb-4">' + t("plg.history") + '</div>';
         if (!jobs.length) {
-            h += '<div class="empty-state">' + (t("plg.history_empty") || "Aucun historique de synchronisation pour ce connecteur.") + '</div>';
+            h += '<div class="ct-empty-state">' + (t("plg.history_empty") || "Aucun historique de synchronisation pour ce connecteur.") + '</div>';
         } else {
             h += '<table class="ct-w-full ct-text-meta">'
               +  '<thead><tr>'
@@ -2493,7 +2572,7 @@ function showPluginHistory(pluginId: string): void {
                 var startedFmt = startedRaw ? startedRaw.replace("T", " ").split(".")[0].slice(0, 16) : "-";
                 h += '<tr>';
                 h += '<td class="ct-py-1 ct-px-2 ct-border-bottom-alt ct-nowrap">' + esc(startedFmt) + '</td>';
-                h += '<td class="ct-py-1 ct-px-2 ct-border-bottom-alt"><span class="compliance-tag ' + statusCls + '">' + esc(t("plg.status." + j.status) || j.status) + '</span></td>';
+                h += '<td class="ct-py-1 ct-px-2 ct-border-bottom-alt"><span class="ct-compliance-tag ' + statusCls + '">' + esc(t("plg.status." + j.status) || j.status) + '</span></td>';
                 h += '<td class="ct-py-1 ct-px-2 ct-border-bottom-alt ct-ta-r">' + (j.users_found != null ? j.users_found : "-") + '</td>';
                 h += '<td class="ct-py-1 ct-px-2 ct-border-bottom-alt ct-ta-r">' + (j.users_created != null ? j.users_created : "-") + '</td>';
                 h += '<td class="ct-py-1 ct-px-2 ct-border-bottom-alt ct-ta-r">' + (j.users_updated != null ? j.users_updated : "-") + '</td>';
@@ -2515,7 +2594,7 @@ function showPluginHistory(pluginId: string): void {
 // ═══════════════════════════════════════════════════════════════
 function _ctConfirm(title: string, body: string, onYes: () => void, okLabel?: string, cancelLabel?: string): void {
     var ov = document.getElementById("confirm-overlay")!;
-    var panel = ov.querySelector<HTMLElement>(".pwd-panel")!;
+    var panel = ov.querySelector<HTMLElement>(".ct-pwd-panel")!;
     // Reset any width override applied by a wide modal before
     // reusing the panel for a regular confirm dialog.
     panel.style.maxWidth = "";
@@ -2524,7 +2603,7 @@ function _ctConfirm(title: string, body: string, onYes: () => void, okLabel?: st
     // inject their own HTML into this shared overlay and destroy the
     // confirm-title / confirm-body / confirm-oui / confirm-non children.
     panel.innerHTML =
-        '<div class="pwd-title" id="confirm-title"></div>' +
+        '<div class="ct-pwd-title" id="confirm-title"></div>' +
         '<div id="confirm-body" class="ct-text-data ct-mb-3"></div>' +
         '<div class="ct-flex ct-gap-2 ct-justify-end">' +
             '<button class="ct-btn" id="confirm-non"></button>' +

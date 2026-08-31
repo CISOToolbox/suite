@@ -81,7 +81,7 @@ function _render(): Promise<void> | void {
 }
 
 function _placeholder(title: string, subtitle: string): string {
-    return '<div class="empty-state">'
+    return '<div class="ct-empty-state">'
         + '<h2 style="margin:0 0 var(--ct-s3) 0;color:var(--ct-ink-1)">' + esc(title) + '</h2>'
         + '<p class="ct-m-0 ct-text-ui">' + esc(subtitle) + '</p>'
         + '</div>';
@@ -92,7 +92,7 @@ async function _renderDashboard(c: HTMLElement): Promise<void> {
     var d: any;
     try { d = await WatchAPI.getDashboard(); }
     catch (e: any) {
-        c.innerHTML = '<div class="empty-state ct-text-critical">'
+        c.innerHTML = '<div class="ct-empty-state ct-text-critical">'
             + esc(t("dashboard.load_error")) + ' — ' + esc(e.message || "") + '</div>';
         return;
     }
@@ -136,7 +136,7 @@ async function _renderDashboard(c: HTMLElement): Promise<void> {
     h += '<div class="ct-strong ct-mb-2">' + esc(t("dashboard.recent_alerts")) + '</div>';
     var recent = d.recent_alerts || [];
     if (!recent.length) {
-        h += '<div class="empty-state" style="border:1px solid var(--ct-line);border-radius:var(--ct-r-md)">' + esc(t("dashboard.recent_empty")) + '</div>';
+        h += '<div class="ct-empty-state" style="border:1px solid var(--ct-line);border-radius:var(--ct-r-md)">' + esc(t("dashboard.recent_empty")) + '</div>';
     } else {
         h += '<table class="table">';
         h += '<thead><tr class="ct-bg-alt">';
@@ -199,7 +199,7 @@ async function _renderDigest(c: HTMLElement): Promise<void> {
     // History
     h += '<div class="ct-strong ct-mb-2">' + esc(t("digest.history")) + '</div>';
     if (!runs.length) {
-        h += '<div class="empty-state">' + esc(t("digest.history_empty")) + '</div>';
+        h += '<div class="ct-empty-state">' + esc(t("digest.history_empty")) + '</div>';
     } else {
         h += '<table class="table">';
         h += '<thead><tr class="ct-bg-alt"><th class="ct-ta-l ct-p-2">' + esc(t("digest.col.date")) + '</th><th class="ct-ta-l ct-p-2">' + esc(t("digest.col.kind")) + '</th><th class="ct-ta-l ct-p-2">' + esc(t("digest.col.recipient")) + '</th><th class="ct-p-2">' + esc(t("digest.col.alerts")) + '</th><th class="ct-ta-l ct-p-2">' + esc(t("digest.col.status")) + '</th><th class="ct-p-2"></th></tr></thead><tbody>';
@@ -279,7 +279,7 @@ async function _renderScopes(c: HTMLElement): Promise<void> {
     try {
         _scopes = await WatchAPI.listScopes() || [];
     } catch (e: any) {
-        c.innerHTML = '<div class="empty-state ct-text-critical">'
+        c.innerHTML = '<div class="ct-empty-state ct-text-critical">'
             + esc(t("scopes.load_error")) + ' — ' + esc(e.message || "") + '</div>';
         return;
     }
@@ -291,7 +291,7 @@ async function _renderScopes(c: HTMLElement): Promise<void> {
     h += '</div>';
 
     if (_scopes.length === 0) {
-        h += '<div class="empty-state">'
+        h += '<div class="ct-empty-state">'
             + '<p style="margin:0 0 var(--ct-s2) 0;font-size:var(--ct-text-body);color:var(--ct-ink-1)">' + esc(t("scopes.empty_title")) + '</p>'
             + '<p class="ct-m-0 ct-text-data">' + esc(t("scopes.empty_hint")) + '</p>'
             + '</div>';
@@ -519,7 +519,7 @@ function _openScopeEditor(scope: WatchScope | null): void {
     }
     // Admin-only force-send buttons. Only visible on existing scopes and
     // only when the toolbar resolved the user as admin (body.role-admin).
-    var isAdmin = (document.body && document.body.classList.contains("role-admin"));
+    var isAdmin = (document.body && document.body.classList.contains("ct-role-admin"));
     if (!isNew && isAdmin) {
         h +=   '<button class="ct-btn" data-click="forceSendDigest" data-args=\'' + _da(scope!.id, "vuln") + '\' title="' + esc(t("scopes.modal.force_send_vuln_hint")) + '">' + esc(t("scopes.modal.force_send_vuln")) + '</button>';
         h +=   '<button class="ct-btn" data-click="forceSendDigest" data-args=\'' + _da(scope!.id, "threat") + '\' title="' + esc(t("scopes.modal.force_send_threat_hint")) + '">' + esc(t("scopes.modal.force_send_threat")) + '</button>';
@@ -943,14 +943,14 @@ async function _refreshAlertsRows(): Promise<void> {
             search: _alertFilters.q || ""
         }) || [];
     } catch (e: any) {
-        zone.innerHTML = '<div class="empty-state ct-text-critical">'
+        zone.innerHTML = '<div class="ct-empty-state ct-text-critical">'
             + esc(t("alerts.load_error")) + ' — ' + esc(e.message || "") + '</div>';
         return;
     }
     _alertsCache = rows;
 
     if (rows.length === 0) {
-        zone.innerHTML = '<div class="empty-state">' + esc(t("alerts.empty")) + '</div>';
+        zone.innerHTML = '<div class="ct-empty-state">' + esc(t("alerts.empty")) + '</div>';
         return;
     }
 
@@ -1280,7 +1280,7 @@ async function _renderSources(c: HTMLElement): Promise<void> {
     var rows: any[] = [];
     try { rows = await WatchAPI.listFeeds() || []; }
     catch (e: any) {
-        c.innerHTML = '<div class="empty-state ct-text-critical">'
+        c.innerHTML = '<div class="ct-empty-state ct-text-critical">'
             + esc(t("sources.load_error")) + ' — ' + esc(e.message || "") + '</div>';
         return;
     }
@@ -1292,7 +1292,7 @@ async function _renderSources(c: HTMLElement): Promise<void> {
     h += '</div>';
 
     if (rows.length === 0) {
-        h += '<div class="empty-state">' + esc(t("sources.empty")) + '</div>';
+        h += '<div class="ct-empty-state">' + esc(t("sources.empty")) + '</div>';
         c.innerHTML = h;
         return;
     }

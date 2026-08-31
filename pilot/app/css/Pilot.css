@@ -116,7 +116,7 @@
 .dash-activity-date { color: var(--ct-ink-2); font-size: 0.78em; font-variant-numeric: tabular-nums; }
 
 /* ── Directory personnel edit modal (ported from vendor TPRM.css) ─── */
-.form-grid > .form-row { margin-bottom: 0; }
+.ct-form-grid > .ct-form-row { margin-bottom: 0; }
 
 /* ── Measures view toggle (Liste / Kanban) ─────────────────────────── */
 .pilot-view-btn {

@@ -335,7 +335,7 @@ function renderEcheances() {
     }
     h += '</div>';
     if (!items.length) {
-        h += '<div class="empty-state">' + t("echeance.empty") + '</div>';
+        h += '<div class="ct-empty-state">' + t("echeance.empty") + '</div>';
         return h;
     }
     h += '<div class="ct-muted ct-text-meta ct-mb-2">'
@@ -544,7 +544,7 @@ function renderAssetList() {
         return true;
     });
     if (!filtered.length) {
-        h += '<div class="empty-state">' + t("asset.empty") + '</div>';
+        h += '<div class="ct-empty-state">' + t("asset.empty") + '</div>';
         return h;
     }
     // Enrich rows with groupes names so ct_table renderer stays O(1)
@@ -1045,57 +1045,57 @@ function renderAssetDetail() {
             + '</button>';
         h += '</div>';
     }
-    h += '<div class="tprm-form">';
-    h += '<div class="form-grid">';
+    h += '<div class="ct-tprm-form">';
+    h += '<div class="ct-form-grid">';
     h += _formField("nom", t("asset.col_nom"), "text", a.nom);
     h += _formSelect("type", t("asset.col_type"), ASSET_TYPES.map(function (t2) { return { v: t2, l: _typeLabel(t2) }; }), a.type);
     h += '</div>';
-    h += '<div class="form-grid">';
-    h += '<div class="form-row"><label>' + esc(t("asset.col_proprio")) + '</label>' + _dirPicker(a.proprietaire, "saveAssetField", _da("proprietaire")) + '</div>';
+    h += '<div class="ct-form-grid">';
+    h += '<div class="ct-form-row"><label>' + esc(t("asset.col_proprio")) + '</label>' + _dirPicker(a.proprietaire, "saveAssetField", _da("proprietaire")) + '</div>';
     h += _formField("localisation", t("asset.localisation"), "text", a.localisation);
     h += '</div>';
-    h += '<div class="form-grid">';
+    h += '<div class="ct-form-grid">';
     h += _formField("fournisseur", t("asset.fournisseur"), "text", a.fournisseur);
     h += _formField("quantite", t("asset.quantite"), "number", a.quantite);
     h += '</div>';
-    h += '<div class="form-grid">';
+    h += '<div class="ct-form-grid">';
     h += _formField("os", t("asset.os"), "text", a.os);
     h += _formField("version", t("asset.version"), "text", a.version);
     h += '</div>';
-    h += '<div class="form-grid">';
+    h += '<div class="ct-form-grid">';
     h += _formField("ip_address", t("asset.col_ip") || "IP", "text", a.ip_address);
     h += '<div></div>';
     h += '</div>';
-    h += '<div class="form-grid">';
+    h += '<div class="ct-form-grid">';
     h += _formField("fin_support", t("asset.col_fin_support"), "date", a.fin_support);
     h += _formField("fin_vie", t("asset.fin_vie"), "date", a.fin_vie);
     h += '</div>';
     // Licence / support contract cycle
     var lic = a.licence || {};
     h += '<div class="form-section">' + t("licence.section") + '</div>';
-    h += '<div class="form-grid">';
+    h += '<div class="ct-form-grid">';
     h += _licField("date_renouvellement", t("licence.date_renouvellement"), "date", lic.date_renouvellement);
     h += _licField("preavis_jours", t("licence.preavis_jours"), "number", lic.preavis_jours != null ? lic.preavis_jours : 30);
     h += '</div>';
-    h += '<div class="form-grid">';
+    h += '<div class="ct-form-grid">';
     h += _licField("cout", t("licence.cout"), "text", lic.cout);
     h += _licField("devise", t("licence.devise"), "text", lic.devise || "EUR");
     h += '</div>';
-    h += '<div class="form-grid">';
+    h += '<div class="ct-form-grid">';
     h += _licField("reference", t("licence.reference"), "text", lic.reference);
     h += _licField("contact", t("licence.contact"), "text", lic.contact);
     h += '</div>';
-    h += '<div class="form-grid">';
+    h += '<div class="ct-form-grid">';
     h += _formSelect("criticite", t("asset.col_crit"), [1, 2, 3, 4, 5].map(function (v) { return { v: v, l: _critLabel(v) }; }), a.criticite);
     h += _formSelect("statut", t("asset.col_statut"), ["actif", "inactif", "en_cours", "retire"].map(function (s) { return { v: s, l: _statusLabel(s) }; }), a.statut);
     h += '</div>';
-    h += '<div class="form-row"><label>' + t("asset.description") + '</label>';
+    h += '<div class="ct-form-row"><label>' + t("asset.description") + '</label>';
     h += '<textarea id="asset-description" rows="3" data-change="saveAssetField" data-args=\'["description"]\' data-pass-value>' + esc(a.description || "") + '</textarea>';
     if (window._aiIsEnabled != null && _aiIsEnabled()) {
         h += '<button class="ct-btn btn-ai" data-size="xs" data-click="aiSuggestDescription">&#10024; ' + t("ai.suggest_description") + '</button>';
     }
     h += '</div>';
-    h += '<div class="form-row"><label>' + t("asset.notes") + '</label>';
+    h += '<div class="ct-form-row"><label>' + t("asset.notes") + '</label>';
     h += '<textarea rows="2" data-change="saveAssetField" data-args=\'["notes"]\' data-pass-value>' + esc(a.notes || "") + '</textarea></div>';
     // Dependencies (assets + groupes)
     h += '<div class="form-section">' + t("asset.dependances") + '</div>';
@@ -1158,11 +1158,11 @@ function renderAssetDetail() {
     return h;
 }
 function _formField(name, label, type, val) {
-    return '<div class="form-row"><label>' + esc(label) + '</label>'
+    return '<div class="ct-form-row"><label>' + esc(label) + '</label>'
         + '<input type="' + type + '" value="' + esc(String(val != null ? val : "")) + '" data-change="saveAssetField" data-args=\'["' + name + '"]\' data-pass-value></div>';
 }
 function _formSelect(name, label, opts, val) {
-    var h = '<div class="form-row"><label>' + esc(label) + '</label><select data-change="saveAssetField" data-args=\'["' + name + '"]\' data-pass-value>';
+    var h = '<div class="ct-form-row"><label>' + esc(label) + '</label><select data-change="saveAssetField" data-args=\'["' + name + '"]\' data-pass-value>';
     opts.forEach(function (o) {
         h += '<option value="' + esc(String(o.v)) + '"' + (String(val) === String(o.v) ? " selected" : "") + '>' + esc(o.l) + '</option>';
     });
@@ -1233,7 +1233,7 @@ function saveAssetField(field, val) {
 }
 window.saveAssetField = saveAssetField;
 function _licField(name, label, type, val) {
-    return '<div class="form-row"><label>' + esc(label) + '</label>'
+    return '<div class="ct-form-row"><label>' + esc(label) + '</label>'
         + '<input type="' + type + '" value="' + esc(String(val != null ? val : "")) + '" data-change="saveLicenceField" data-args=\'["' + name + '"]\' data-pass-value></div>';
 }
 function saveLicenceField(field, val) {
@@ -1326,12 +1326,12 @@ function renderGroupeList() {
     h += '<button class="ct-btn mt-8" data-write data-variant="primary" data-size="xs" data-click="addGroupe">' + t("groupe.add") + '</button>';
     h += '</div>';
     if (!D.groupes.length) {
-        h += '<div class="empty-state">' + t("groupe.empty") + '</div>';
+        h += '<div class="ct-empty-state">' + t("groupe.empty") + '</div>';
         return h;
     }
     D.groupes.forEach(function (g, i) {
         var n = (g.asset_ids || []).length;
-        h += '<div class="groupe-card" data-click="openGroupe" data-args=\'' + _da(i) + '\'>';
+        h += '<div class="ct-groupe-card" data-click="openGroupe" data-args=\'' + _da(i) + '\'>';
         h += '<div class="ct-flex ct-items-center ct-gap-2">';
         h += '<strong class="ct-flex-1">' + esc(g.nom || t("groupe.new")) + '</strong>';
         h += _critBadge(g.criticite || 1);
@@ -1427,18 +1427,18 @@ window.switchGroupeTab = switchGroupeTab;
 function backToGroupes() { _selectedGroupe = null; renderPanel(); }
 window.backToGroupes = backToGroupes;
 function _renderGroupeInfo(g) {
-    var h = '<div class="tprm-form">';
-    h += '<div class="form-grid">';
+    var h = '<div class="ct-tprm-form">';
+    h += '<div class="ct-form-grid">';
     h += _gField("nom", t("groupe.nom"), "text", g.nom);
     h += _gSelect("criticite", t("asset.col_crit"), [1, 2, 3, 4, 5].map(function (v) { return { v: v, l: _critLabel(v) }; }), g.criticite);
     h += '</div>';
-    h += '<div class="form-row"><label>' + t("groupe.principe") + '</label>';
+    h += '<div class="ct-form-row"><label>' + t("groupe.principe") + '</label>';
     h += '<textarea id="groupe-principe" rows="4" data-change="saveGroupeField" data-args=\'["principe"]\' data-pass-value>' + esc(g.principe || "") + '</textarea>';
     if (window._aiIsEnabled != null && _aiIsEnabled()) {
         h += '<button class="ct-btn btn-ai" data-size="xs" data-click="aiSuggestPrincipe">&#10024; ' + t("ai.suggest_principe") + '</button>';
     }
     h += '</div>';
-    h += '<div class="form-row"><label>' + t("asset.notes") + '</label>';
+    h += '<div class="ct-form-row"><label>' + t("asset.notes") + '</label>';
     h += '<textarea rows="2" data-change="saveGroupeField" data-args=\'["notes"]\' data-pass-value>' + esc(g.notes || "") + '</textarea></div>';
     h += '</div>';
     return h;
@@ -1465,7 +1465,7 @@ function _ensureRaciArray(g) {
 function _renderGroupeRaci(g) {
     _ensureRaciArray(g);
     var roles = ["r", "a", "c", "i"];
-    var h = '<div class="tprm-form">';
+    var h = '<div class="ct-tprm-form">';
     if (window._aiIsEnabled != null && _aiIsEnabled()) {
         h += '<button class="ct-btn btn-ai ct-mb-3" data-size="xs" data-click="aiSuggestRaci">&#10024; ' + t("ai.suggest_raci") + '</button>';
     }
@@ -1541,22 +1541,22 @@ function removeRaciRow(idx) {
 }
 window.removeRaciRow = removeRaciRow;
 function _renderGroupePolitiques(g) {
-    var h = '<div class="tprm-form">';
+    var h = '<div class="ct-tprm-form">';
     if (window._aiIsEnabled != null && _aiIsEnabled()) {
         h += '<button class="ct-btn btn-ai ct-mb-3" data-size="xs" data-click="aiSuggestPolitiques">&#10024; ' + t("ai.suggest_politiques") + '</button>';
     }
     // Backup policy
     var ps = g.politique_sauvegarde || {};
     h += '<div class="form-section">' + t("groupe.pol_sauvegarde") + '</div>';
-    h += '<div class="form-grid">';
+    h += '<div class="ct-form-grid">';
     h += _gPolField("politique_sauvegarde", "frequence", t("groupe.pol_frequence"), ps.frequence);
     h += _gPolField("politique_sauvegarde", "retention", t("groupe.pol_retention"), ps.retention);
     h += '</div>';
-    h += '<div class="form-grid">';
+    h += '<div class="ct-form-grid">';
     h += _gPolField("politique_sauvegarde", "type", t("groupe.pol_type_sauv"), ps.type);
     h += _gPolField("politique_sauvegarde", "dernier_test", t("groupe.pol_dernier_test"), ps.dernier_test, "date");
     h += '</div>';
-    h += '<div class="form-grid">';
+    h += '<div class="ct-form-grid">';
     h += _gPolCheck("politique_sauvegarde", "site_distant", t("groupe.pol_site_distant"), ps.site_distant);
     h += _gPolCheck("politique_sauvegarde", "teste", t("groupe.pol_teste"), ps.teste);
     h += '</div>';
@@ -1564,11 +1564,11 @@ function _renderGroupePolitiques(g) {
     // Monitoring policy
     var pm = g.politique_supervision || {};
     h += '<div class="form-section">' + t("groupe.pol_supervision") + '</div>';
-    h += '<div class="form-grid">';
+    h += '<div class="ct-form-grid">';
     h += _gPolField("politique_supervision", "outil", t("groupe.pol_outil"), pm.outil);
     h += _gPolField("politique_supervision", "perimetre", t("groupe.pol_perimetre"), pm.perimetre);
     h += '</div>';
-    h += '<div class="form-grid">';
+    h += '<div class="ct-form-grid">';
     h += _gPolCheck("politique_supervision", "alerting", t("groupe.pol_alerting"), pm.alerting);
     h += _gPolCheck("politique_supervision", "h24", t("groupe.pol_h24"), pm.h24);
     h += '</div>';
@@ -1576,11 +1576,11 @@ function _renderGroupePolitiques(g) {
     // Update policy
     var pu = g.politique_maj || {};
     h += '<div class="form-section">' + t("groupe.pol_maj") + '</div>';
-    h += '<div class="form-grid">';
+    h += '<div class="ct-form-grid">';
     h += _gPolField("politique_maj", "frequence", t("groupe.pol_frequence"), pu.frequence);
     h += _gPolField("politique_maj", "fenetre", t("groupe.pol_fenetre"), pu.fenetre);
     h += '</div>';
-    h += '<div class="form-grid">';
+    h += '<div class="ct-form-grid">';
     h += _gPolField("politique_maj", "validation", t("groupe.pol_validation"), pu.validation);
     h += _gPolField("politique_maj", "critique_delai", t("groupe.pol_critique_delai"), pu.critique_delai);
     h += '</div>';
@@ -1590,7 +1590,7 @@ function _renderGroupePolitiques(g) {
 }
 function _renderGroupeActifs(g) {
     var members = (g.asset_ids || []).map(function (id) { return D.assets.find(function (x) { return x.id === id; }); }).filter(Boolean);
-    var h = '<div class="tprm-form">';
+    var h = '<div class="ct-tprm-form">';
     if (members.length) {
         h += '<table id="groupe-assets-table"><thead><tr>';
         h += '<th>ID</th><th>' + t("asset.col_nom") + '</th><th>' + t("asset.col_type") + '</th><th>' + t("asset.col_crit") + '</th><th class="ct-w-30"></th>';
@@ -1734,7 +1734,7 @@ function _renderGroupeDeps(g) {
             return { id: asset.id, nom: asset.nom, badge: _typeBadge(asset.type), kind: "asset" };
         return null;
     }).filter(Boolean);
-    var h = '<div class="tprm-form">';
+    var h = '<div class="ct-tprm-form">';
     h += '<div class="form-section" style="margin-top:0;border-top:none;padding-top:0">' + t("groupe.depends_on") + '</div>';
     if (deps.length) {
         deps.forEach(function (d) {
@@ -1791,26 +1791,26 @@ function removeGroupeDep(id) {
 window.removeGroupeDep = removeGroupeDep;
 // Groupe field helpers
 function _gField(name, label, type, val) {
-    return '<div class="form-row"><label>' + esc(label) + '</label>'
+    return '<div class="ct-form-row"><label>' + esc(label) + '</label>'
         + '<input type="' + type + '" value="' + esc(String(val != null ? val : "")) + '" data-change="saveGroupeField" data-args=\'["' + name + '"]\' data-pass-value></div>';
 }
 function _gSelect(name, label, opts, val) {
-    var h = '<div class="form-row"><label>' + esc(label) + '</label><select data-change="saveGroupeField" data-args=\'["' + name + '"]\' data-pass-value>';
+    var h = '<div class="ct-form-row"><label>' + esc(label) + '</label><select data-change="saveGroupeField" data-args=\'["' + name + '"]\' data-pass-value>';
     opts.forEach(function (o) {
         h += '<option value="' + esc(String(o.v)) + '"' + (String(val) === String(o.v) ? " selected" : "") + '>' + esc(o.l) + '</option>';
     });
     return h + '</select></div>';
 }
 function _gPolField(pol, field, label, val, type) {
-    return '<div class="form-row"><label>' + esc(label) + '</label>'
+    return '<div class="ct-form-row"><label>' + esc(label) + '</label>'
         + '<input type="' + (type || "text") + '" value="' + esc(String(val || "")) + '" data-change="saveGroupePol" data-args=\'' + _da(pol, field) + '\' data-pass-value></div>';
 }
 function _gPolCheck(pol, field, label, val) {
-    return '<div class="form-row"><label style="display:inline-flex;align-items:center;gap:var(--ct-s1);cursor:pointer;text-transform:none">'
+    return '<div class="ct-form-row"><label style="display:inline-flex;align-items:center;gap:var(--ct-s1);cursor:pointer;text-transform:none">'
         + '<input type="checkbox"' + (val ? " checked" : "") + ' data-change="saveGroupePolCheck" data-args=\'' + _da(pol, field) + '\' data-pass-el> ' + esc(label) + '</label></div>';
 }
 function _gPolTextarea(pol, field, label, val) {
-    return '<div class="form-row"><label>' + esc(label) + '</label>'
+    return '<div class="ct-form-row"><label>' + esc(label) + '</label>'
         + '<textarea rows="2" data-change="saveGroupePol" data-args=\'' + _da(pol, field) + '\' data-pass-value>' + esc(val || "") + '</textarea></div>';
 }
 function saveGroupeField(field, val) {
@@ -1849,7 +1849,7 @@ window.saveGroupePolCheck = saveGroupePolCheck;
 function renderDependances() {
     var h = '<h2>' + t("nav.dependances") + '</h2>';
     if (!D.groupes.length && !D.assets.length) {
-        h += '<div class="empty-state">' + t("asset.empty") + '</div>';
+        h += '<div class="ct-empty-state">' + t("asset.empty") + '</div>';
         return h;
     }
     // Matrix: groups x asset types
@@ -2228,21 +2228,21 @@ function renderPluginsPanel(c) {
     h += '<button class="ct-btn mt-8" data-write data-variant="primary" data-click="showPluginModal">' + (t("plg.add") || "Ajouter un connecteur") + '</button>';
     h += '</div>';
     if (!_pluginList.length) {
-        h += '<div class="empty-state">' + (t("plg.empty") || "Aucun connecteur configure. Cliquez sur Ajouter pour synchroniser des actifs depuis AD, Intune, EDR, etc.") + '</div>';
+        h += '<div class="ct-empty-state">' + (t("plg.empty") || "Aucun connecteur configure. Cliquez sur Ajouter pour synchroniser des actifs depuis AD, Intune, EDR, etc.") + '</div>';
         c.innerHTML = h;
         return;
     }
     _pluginList.forEach(function (p) {
         var statusCls = p.last_sync_status === "success" ? "ok"
             : (p.last_sync_status === "error" ? "ko" : "");
-        h += '<div class="groupe-card ct-clickable ct-userpicker ct-mb-2" data-click="showPluginModal" data-args=\'' + _da(p.id) + '\' title="' + esc(t("plg.edit") || "Modifier") + '">';
+        h += '<div class="ct-groupe-card ct-clickable ct-userpicker ct-mb-2" data-click="showPluginModal" data-args=\'' + _da(p.id) + '\' title="' + esc(t("plg.edit") || "Modifier") + '">';
         h += '<div class="ct-flex ct-items-center ct-gap-2 ct-mb-1 ct-row-wrap">';
         h += '<strong>' + esc(p.label || p.plugin_type) + '</strong>';
         h += '<span class="ct-badge" data-tone="info">' + esc(p.plugin_type) + '</span>';
-        h += '<span class="compliance-tag ' + (p.enabled ? "ok" : "ko") + '">'
+        h += '<span class="ct-compliance-tag ' + (p.enabled ? "ok" : "ko") + '">'
             + (p.enabled ? (t("plg.enabled") || "Actif") : (t("plg.disabled") || "Inactif")) + '</span>';
         if (p.last_sync_status) {
-            h += '<span class="compliance-tag ' + statusCls + '">' + esc(p.last_sync_status) + '</span>';
+            h += '<span class="ct-compliance-tag ' + statusCls + '">' + esc(p.last_sync_status) + '</span>';
         }
         h += '</div>';
         h += '<div class="ct-text-label ct-muted ct-mb-2">';
@@ -2623,7 +2623,7 @@ window.showAssetPluginHistory = function (pluginId) {
     AssetAPI.pluginHistory(pid, pluginId).then(function (jobs) {
         var h = '';
         if (!jobs.length) {
-            h = '<div class="empty-state">' + (t("plg.history_empty") || "Aucun historique.") + '</div>';
+            h = '<div class="ct-empty-state">' + (t("plg.history_empty") || "Aucun historique.") + '</div>';
         }
         else {
             h = '<table class="ct-w-full ct-text-meta">';
@@ -2641,7 +2641,7 @@ window.showAssetPluginHistory = function (pluginId) {
                 var ts = j.started_at ? j.started_at.replace("T", " ").split(".")[0].slice(0, 16) : "-";
                 h += '<tr>';
                 h += '<td class="ct-py-1 ct-px-2 ct-border-bottom-alt ct-nowrap">' + esc(ts) + '</td>';
-                h += '<td class="ct-py-1 ct-px-2 ct-border-bottom-alt"><span class="compliance-tag ' + cls + '">' + esc(j.status) + '</span></td>';
+                h += '<td class="ct-py-1 ct-px-2 ct-border-bottom-alt"><span class="ct-compliance-tag ' + cls + '">' + esc(j.status) + '</span></td>';
                 h += '<td class="ct-py-1 ct-px-2 ct-border-bottom-alt ct-ta-r">' + (j.assets_found != null ? j.assets_found : "-") + '</td>';
                 h += '<td class="ct-py-1 ct-px-2 ct-border-bottom-alt ct-ta-r">' + (j.assets_created != null ? j.assets_created : "-") + '</td>';
                 h += '<td class="ct-py-1 ct-px-2 ct-border-bottom-alt ct-ta-r">' + (j.assets_updated != null ? j.assets_updated : "-") + '</td>';
@@ -2707,7 +2707,7 @@ function renderMeasuresPanel(c) {
     h += '<button class="ct-btn mt-8" data-write data-variant="primary" data-click="_newAssetMeasure">' + (t("measure.new") || "Nouvelle action") + '</button>';
     h += '</div>';
     if (!_measureList.length) {
-        h += '<div class="empty-state">' + (t("mes.empty") || "Aucune action. Les échéances d'actifs en génèrent automatiquement, ou créez-en une.") + '</div>';
+        h += '<div class="ct-empty-state">' + (t("mes.empty") || "Aucune action. Les échéances d'actifs en génèrent automatiquement, ou créez-en une.") + '</div>';
         c.innerHTML = h;
         return;
     }

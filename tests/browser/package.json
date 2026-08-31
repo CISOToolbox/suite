@@ -1,0 +1,15 @@
+{
+  "name": "ciso-suite-browser-tests",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Browser tests for the suite: every module, every panel, no console error",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "report": "playwright show-report playwright-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.1"
+  },
+  "license": "ISC"
+}

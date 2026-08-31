@@ -39,8 +39,8 @@
 /* ── Responsive ───────────────────────────────────────────── */
 @media (max-width: 768px) {
     .type-bar-label { min-width: 100px; font-size: 0.8em; }
-    .tprm-form { padding: 12px; }
-    .form-grid { grid-template-columns: 1fr; }
+    .ct-tprm-form { padding: 12px; }
+    .ct-form-grid { grid-template-columns: 1fr; }
     .vendor-tabs { flex-direction: column; }
     .vendor-tab { padding: 10px; font-size: 0.85em; }
     table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
@@ -49,16 +49,16 @@
 }
 
 /* ── Dark theme fixes (light rendering unchanged) ─────────── */
-/* Saturated green .btn-add: dark ink on filled button (convention). */
+/* Saturated green .ct-btn-add: dark ink on filled button (convention). */
 /* Accent (violet) filled variants keep light text — they are correct as-is. */
 
 /* Neutral secondary buttons (light: gray via inline background:var(--ct-ink-2)). */
-:root[data-theme="dark"] .btn-add.btn-neutral {
+:root[data-theme="dark"] .ct-btn-add.btn-neutral {
     background: var(--ct-surface) !important;
     border: 1px solid var(--ct-line-strong);
     color: var(--ct-ink) !important;
 }
-:root[data-theme="dark"] .btn-add.btn-neutral:hover { background: var(--ct-surface-2) !important; opacity: 1; }
+:root[data-theme="dark"] .ct-btn-add.btn-neutral:hover { background: var(--ct-surface-2) !important; opacity: 1; }
 
 /* Destructive: tinted at rest, solid red on hover (spec bouton Supprimer). */
 

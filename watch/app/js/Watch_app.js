@@ -91,7 +91,7 @@ function _render() {
     }
 }
 function _placeholder(title, subtitle) {
-    return '<div class="empty-state">'
+    return '<div class="ct-empty-state">'
         + '<h2 style="margin:0 0 var(--ct-s3) 0;color:var(--ct-ink-1)">' + esc(title) + '</h2>'
         + '<p class="ct-m-0 ct-text-ui">' + esc(subtitle) + '</p>'
         + '</div>';
@@ -103,7 +103,7 @@ async function _renderDashboard(c) {
         d = await WatchAPI.getDashboard();
     }
     catch (e) {
-        c.innerHTML = '<div class="empty-state ct-text-critical">'
+        c.innerHTML = '<div class="ct-empty-state ct-text-critical">'
             + esc(t("dashboard.load_error")) + ' — ' + esc(e.message || "") + '</div>';
         return;
     }
@@ -143,7 +143,7 @@ async function _renderDashboard(c) {
     h += '<div class="ct-strong ct-mb-2">' + esc(t("dashboard.recent_alerts")) + '</div>';
     var recent = d.recent_alerts || [];
     if (!recent.length) {
-        h += '<div class="empty-state" style="border:1px solid var(--ct-line);border-radius:var(--ct-r-md)">' + esc(t("dashboard.recent_empty")) + '</div>';
+        h += '<div class="ct-empty-state" style="border:1px solid var(--ct-line);border-radius:var(--ct-r-md)">' + esc(t("dashboard.recent_empty")) + '</div>';
     }
     else {
         h += '<table class="table">';
@@ -205,7 +205,7 @@ async function _renderDigest(c) {
     // History
     h += '<div class="ct-strong ct-mb-2">' + esc(t("digest.history")) + '</div>';
     if (!runs.length) {
-        h += '<div class="empty-state">' + esc(t("digest.history_empty")) + '</div>';
+        h += '<div class="ct-empty-state">' + esc(t("digest.history_empty")) + '</div>';
     }
     else {
         h += '<table class="table">';
@@ -295,7 +295,7 @@ async function _renderScopes(c) {
         _scopes = await WatchAPI.listScopes() || [];
     }
     catch (e) {
-        c.innerHTML = '<div class="empty-state ct-text-critical">'
+        c.innerHTML = '<div class="ct-empty-state ct-text-critical">'
             + esc(t("scopes.load_error")) + ' — ' + esc(e.message || "") + '</div>';
         return;
     }
@@ -305,7 +305,7 @@ async function _renderScopes(c) {
     h += '<button class="ct-btn" data-variant="primary" data-click="openScopeCreate">+ ' + esc(t("scopes.new")) + '</button>';
     h += '</div>';
     if (_scopes.length === 0) {
-        h += '<div class="empty-state">'
+        h += '<div class="ct-empty-state">'
             + '<p style="margin:0 0 var(--ct-s2) 0;font-size:var(--ct-text-body);color:var(--ct-ink-1)">' + esc(t("scopes.empty_title")) + '</p>'
             + '<p class="ct-m-0 ct-text-data">' + esc(t("scopes.empty_hint")) + '</p>'
             + '</div>';
@@ -532,7 +532,7 @@ function _openScopeEditor(scope) {
     }
     // Admin-only force-send buttons. Only visible on existing scopes and
     // only when the toolbar resolved the user as admin (body.role-admin).
-    var isAdmin = (document.body && document.body.classList.contains("role-admin"));
+    var isAdmin = (document.body && document.body.classList.contains("ct-role-admin"));
     if (!isNew && isAdmin) {
         h += '<button class="ct-btn" data-click="forceSendDigest" data-args=\'' + _da(scope.id, "vuln") + '\' title="' + esc(t("scopes.modal.force_send_vuln_hint")) + '">' + esc(t("scopes.modal.force_send_vuln")) + '</button>';
         h += '<button class="ct-btn" data-click="forceSendDigest" data-args=\'' + _da(scope.id, "threat") + '\' title="' + esc(t("scopes.modal.force_send_threat_hint")) + '">' + esc(t("scopes.modal.force_send_threat")) + '</button>';
@@ -989,13 +989,13 @@ async function _refreshAlertsRows() {
         }) || [];
     }
     catch (e) {
-        zone.innerHTML = '<div class="empty-state ct-text-critical">'
+        zone.innerHTML = '<div class="ct-empty-state ct-text-critical">'
             + esc(t("alerts.load_error")) + ' — ' + esc(e.message || "") + '</div>';
         return;
     }
     _alertsCache = rows;
     if (rows.length === 0) {
-        zone.innerHTML = '<div class="empty-state">' + esc(t("alerts.empty")) + '</div>';
+        zone.innerHTML = '<div class="ct-empty-state">' + esc(t("alerts.empty")) + '</div>';
         return;
     }
     var h = '<table class="table">';
@@ -1338,7 +1338,7 @@ async function _renderSources(c) {
         rows = await WatchAPI.listFeeds() || [];
     }
     catch (e) {
-        c.innerHTML = '<div class="empty-state ct-text-critical">'
+        c.innerHTML = '<div class="ct-empty-state ct-text-critical">'
             + esc(t("sources.load_error")) + ' — ' + esc(e.message || "") + '</div>';
         return;
     }
@@ -1348,7 +1348,7 @@ async function _renderSources(c) {
     h += '<h2 class="ct-m-0">' + esc(t("sources.title")) + '</h2>';
     h += '</div>';
     if (rows.length === 0) {
-        h += '<div class="empty-state">' + esc(t("sources.empty")) + '</div>';
+        h += '<div class="ct-empty-state">' + esc(t("sources.empty")) + '</div>';
         c.innerHTML = h;
         return;
     }

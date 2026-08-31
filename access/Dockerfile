@@ -9,10 +9,23 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
-# Connector-specific deps (ldap3, boto3, …) are no longer installed here:
-# every connector is an add-on (addons/generic/<x>/ or addons/custom/<client>/)
-# that ships its own requirements.txt, installed at client-image build time by
-# shared/build-client-image.sh. The core image stays connector-free.
+# Dependencies of the generic connectors (ldap3, boto3, …). Each add-on ships
+# its own requirements.txt; they are installed here so the connectors bundled
+# below actually import.
+#
+# Why bundle them at all: unlike Surface, Access has no addons/core tier — all
+# 23 connectors live under addons/generic. A "plain core build" therefore
+# shipped an image with ZERO connectors, and nothing said so: the loader logs a
+# warning at most, and the UI simply renders an empty type grid. The README
+# documents these connectors as a standard Access feature and propagation sends
+# them to the public standalone tree, so they belong in the image.
+#
+# addons/custom/<client>/ stays out, and is layered by Dockerfile.addons via
+# shared/build-client-image.sh.
+COPY addons/generic/ /tmp/addons/
+RUN find /tmp/addons -name requirements.txt \
+      -exec pip install --no-cache-dir --prefix=/install -r {} \; \
+    && rm -rf /tmp/addons
 
 FROM python:3.13-slim@sha256:6771159cd4fa5d9bba1258caf0b82e6b73458c694d178ad97c5e925c2d0e1a91
 
@@ -22,6 +35,9 @@ RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /install /usr/local
 COPY src/ src/
 COPY app/ app/
+# The loader walks /app/addons recursively (src/plugins/__init__.py) and
+# tolerates a broken add-on with a warning rather than failing to boot.
+COPY addons/generic/ addons/generic/
 COPY alembic/ alembic/
 COPY alembic.ini .
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh

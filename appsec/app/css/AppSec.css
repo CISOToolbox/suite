@@ -290,7 +290,7 @@ fieldset.app-section legend {
    --ct-ink so the label can't fall back to a light-mode link blue while
    the currentColor icon stays light. */
 
-/* Green .btn-add family ("Ajouter une application", "Exporter CSV",
+/* Green .ct-btn-add family ("Ajouter une application", "Exporter CSV",
    "Ajouter une regle"): saturated fill → near-black text in dark. */
 
 /* Solid red scan buttons ("Scanner tout" / "Scanner maintenant") — replaces
@@ -324,6 +324,6 @@ fieldset.app-section legend {
    (correct dans les modules où triager est un alias de viewer). Ici le backend
    autorise le triager à créer/modifier une application, lancer un scan et
    triager les findings (require_min_role "triager") : on ré-affiche les
-   contrôles data-write. Le :not(.admin-only) préserve le masquage des actions
+   contrôles data-write. Le :not(.ct-admin-only) préserve le masquage des actions
    admin-only (ignore rules, suppression) portées par la classe dans le markup. */
-body.role-triager [data-write]:not(.admin-only) { display: inline-flex !important; }
+body.ct-role-triager [data-write]:not(.ct-admin-only) { display: inline-flex !important; }

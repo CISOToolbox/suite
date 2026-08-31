@@ -381,6 +381,149 @@ def test_login_redirect_is_validated() -> list[str]:
     return problems
 
 
+def _modules() -> list[Path]:
+    """Every module directory of the suite, discovered — never a fixed list."""
+    return sorted(p.parent.parent.parent for p in REPO_ROOT.glob("*/src/routes/ai.py"))
+
+
+# ── SSRF egress (audit finding H4) ───────────────────────────────────
+#
+# Moved here from risk/tests/unit/test_ssrf_egress.py: these sweep every
+# module, so living inside one module meant nobody ran them when touching
+# another. The behavioural tests, which exercise risk's own
+# _validate_proxy_url, stayed there.
+#
+# They used to grep for "resolve_safe_target" in routes/ai.py and
+# "getaddrinfo" in routes/internal.py. Both guards were factored into
+# src/ssrf_guard.py, so the greps found nothing and validated no module at
+# all. Two traps when repairing them, still worth respecting:
+#   - scanning ssrf_guard.py itself would make them tautological — that file
+#     DEFINES the functions being looked for;
+#   - asserting `"ssrf_guard" in src` matched the function's DOCSTRING and
+#     survived deleting the delegation, hence the import-form assertion.
+GUARD_CALLS = ("resolve_safe_url", "resolve_safe_target")
+
+
+def test_every_custom_llm_branch_has_ssrf_guard() -> list[str]:
+    problems, checked = [], 0
+    for mod in _modules():
+        src = (mod / "src" / "routes" / "ai.py").read_text(encoding="utf-8")
+        common = mod / "src" / "ai_proxy_common.py"
+        if common.exists():
+            src += common.read_text(encoding="utf-8")
+        if 'provider == "custom"' not in src:
+            continue  # no custom-LLM branch, nothing to guard
+        checked += 1
+        if not any(c in src for c in GUARD_CALLS):
+            problems.append(f"{mod.name}: custom-LLM branch does not call the shared SSRF guard")
+    if not checked:
+        problems.append("no module has a custom-LLM branch — has the branch been renamed?")
+    return problems
+
+
+def test_every_proxy_validator_delegates_to_the_guard() -> list[str]:
+    problems, checked = [], 0
+    for mod in _modules():
+        internal = mod / "src" / "routes" / "internal.py"
+        if not internal.exists():
+            continue
+        src = internal.read_text(encoding="utf-8")
+        if "def _validate_proxy_url" not in src:
+            continue
+        checked += 1
+        if "from src.ssrf_guard import" not in src:
+            problems.append(f"{mod.name}/internal.py _validate_proxy_url does not delegate to ssrf_guard")
+    if not checked:
+        problems.append("no module defines _validate_proxy_url — has it been renamed?")
+    return problems
+
+
+# ── Add-ons : ce qui est livre doit etre chargeable ────────────────────
+#
+# Access a expedie pendant un temps une image sans AUCUN de ses 22 connecteurs :
+# ils vivent sous addons/generic/ et le Dockerfile ne copiait que src/, app/ et
+# alembic/. Rien ne le signalait — le chargeur emet au mieux un avertissement et
+# l'interface affiche une grille vide. Le README promettait 22 connecteurs,
+# l'API en renvoyait zero, et tous les controles etaient au vert.
+#
+# La regle n'est pas "tout embarquer" : Surface laisse volontairement son palier
+# generic optionnel (scanners lourds, superposes par build-client-image.sh).
+# Elle est : tout palier non vide doit etre soit embarque, soit declare optionnel
+# ici, avec sa raison.
+OPTIONAL_ADDON_TIERS = {
+    ("surface", "generic"): "scanners lourds/optionnels, superposes par build-client-image.sh",
+    ("surface", "custom"): "add-ons specifiques client",
+    ("access", "custom"): "connecteurs specifiques client",
+}
+
+
+def _final_stage(dockerfile: str) -> str:
+    """Le contenu de la derniere etape FROM d'un Dockerfile multi-stage."""
+    parts = re.split(r'^FROM\s', dockerfile, flags=re.M)
+    return parts[-1] if parts else dockerfile
+
+
+def _addon_tiers() -> list[tuple[str, str, int]]:
+    """(module, palier, nombre d'add-ons) pour chaque palier non vide."""
+    out = []
+    for addons in sorted(REPO_ROOT.glob("*/addons")):
+        module = addons.parent.name
+        for tier in sorted(p for p in addons.iterdir() if p.is_dir()):
+            n = sum(1 for d in tier.iterdir() if d.is_dir())
+            if n:
+                out.append((module, tier.name, n))
+    return out
+
+
+def test_every_bundled_addon_tier_is_copied() -> list[str]:
+    problems = []
+    for module, tier, n in _addon_tiers():
+        if (module, tier) in OPTIONAL_ADDON_TIERS:
+            continue
+        dockerfile = REPO_ROOT / module / "Dockerfile"
+        if not dockerfile.is_file():
+            problems.append(f"{module}: no Dockerfile, cannot ship its {n} {tier} add-on(s)")
+            continue
+        # Seule la DERNIERE etape compte : un COPY dans le builder (pour
+        # installer les deps) ne met rien dans l'image finale — il l'efface
+        # meme. Un premier jet de ce controle matchait ce COPY-la et laissait
+        # passer la panne qu'il etait cense attraper.
+        src = _final_stage(dockerfile.read_text(encoding="utf-8"))
+        if not re.search(rf'^COPY\b[^#\n]*addons/{tier}\b', src, re.M):
+            problems.append(
+                f"{module}: {n} add-on(s) in addons/{tier}/ but the Dockerfile never "
+                f"COPYs them — the image would ship none. Bundle the tier, or declare "
+                f"it in OPTIONAL_ADDON_TIERS with a reason."
+            )
+    return problems
+
+
+def test_bundled_addons_get_their_dependencies() -> list[str]:
+    """Un add-on embarque dont les deps manquent est ignore avec un simple
+    avertissement : vingt connecteurs marchent, trois non, et rien ne le dit."""
+    problems = []
+    for module, tier, _n in _addon_tiers():
+        if (module, tier) in OPTIONAL_ADDON_TIERS:
+            continue
+        reqs = list((REPO_ROOT / module / "addons" / tier).glob("*/requirements.txt"))
+        if not reqs:
+            continue
+        dockerfile = REPO_ROOT / module / "Dockerfile"
+        if not dockerfile.is_file():
+            continue
+        src = dockerfile.read_text(encoding="utf-8")
+        installs = re.search(r'addons?[^\n]*requirements\.txt|requirements\.txt[^\n]*addons', src) \
+            or re.search(r'find\s+\S*addons\S*\s+-name\s+requirements\.txt', src)
+        if not installs:
+            names = ", ".join(sorted(r.parent.name for r in reqs))
+            problems.append(
+                f"{module}: {len(reqs)} bundled add-on(s) ship their own requirements.txt "
+                f"({names}) but the Dockerfile never installs them — they would load "
+                f"broken while the others work."
+            )
+    return problems
+
+
 CHECKS = (
     ("canonical field names", test_every_receiver_uses_the_canonical_fields),
     ("a push can clear a field", test_every_receiver_can_clear_a_field),
@@ -394,6 +537,10 @@ CHECKS = (
     ("catalogued providers callable", test_every_catalogued_provider_can_be_called),
     ("actions pinned to a commit", test_actions_are_pinned_to_a_commit),
     ("login redirect validated", test_login_redirect_is_validated),
+    ("custom-LLM branch guarded", test_every_custom_llm_branch_has_ssrf_guard),
+    ("proxy validator delegates", test_every_proxy_validator_delegates_to_the_guard),
+    ("bundled add-on tiers copied", test_every_bundled_addon_tier_is_copied),
+    ("bundled add-ons get their deps", test_bundled_addons_get_their_dependencies),
 )
 
 

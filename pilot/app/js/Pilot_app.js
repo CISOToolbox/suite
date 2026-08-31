@@ -569,14 +569,51 @@
         // list/kanban; the group renders as ONE consolidated row/card.
         var memberOf = {};
         _groups.forEach(function (g) { (g.members || []).forEach(function (mm) { memberOf[mm.id] = g; }); });
+        // Un groupe passe les memes filtres que les mesures : il n'en subissait
+        // que celui du module, si bien qu'une recherche sans resultat affichait
+        // « 0 / 90 » au compteur pendant que les lignes de groupe restaient au
+        // tableau. Un groupe est retenu des qu'un de ses membres correspond —
+        // c'est ce qu'on attend d'une ligne consolidee.
         var groupsShown = _groups.filter(function (g) {
-            if (_measureFilter.module)
-                return (g.members || []).some(function (mm) { return mm.module === _measureFilter.module; });
+            var membres = g.members || [];
+            if (_measureFilter.module
+                && !membres.some(function (mm) { return mm.module === _measureFilter.module; }))
+                return false;
+            if (_measureView === "list" && _measureFilter.status && g.status !== _measureFilter.status)
+                return false;
+            if (_measureView === "list" && _measureFilter.overdue
+                && !(g.due_date && g.due_date < today && g.status !== "completed"))
+                return false;
+            if (_measureFilter.project) {
+                var lie = membres.some(function (mm) {
+                    var pr = measureProject[mm.id];
+                    return _measureFilter.project === "__none__" ? !pr : (pr && pr.id === _measureFilter.project);
+                });
+                if (!lie)
+                    return false;
+            }
+            if (_measureView === "list" && _measureFilter.orphan
+                && membres.some(function (mm) { return assigned[mm.id]; }))
+                return false;
+            if (q) {
+                var foin = (g.title || "") + " " + (g.ref || "") + " " + (g.responsible || "") + " "
+                    + membres.map(function (mm) { return (mm.title || "") + " " + (mm.source_id || ""); }).join(" ");
+                if (foin.toLowerCase().indexOf(q) < 0)
+                    return false;
+            }
             return true;
         });
         filtered = filtered.filter(function (m) { return !memberOf[m.id]; });
-        var orphanCount = filtered.filter(function (m) { return !measureProject[m.id]; }).length;
-        h += '<div class="ct-text-label ct-muted ct-mb-2">' + t("pilot.measures.count", { shown: filtered.length, total: _measures.length });
+        // Le compteur parle d'ACTIONS, pas de lignes : une ligne de groupe en
+        // represente plusieurs. Sans ce report, il annoncait « 79 / 90 » alors
+        // qu'aucun filtre n'etait pose — les 11 membres de groupes manquaient.
+        var shownCount = filtered.length
+            + groupsShown.reduce(function (n, g) { return n + (g.members || []).length; }, 0);
+        var orphanCount = filtered.filter(function (m) { return !measureProject[m.id]; }).length
+            + groupsShown.reduce(function (n, g) {
+                return n + (g.members || []).filter(function (mm) { return !measureProject[mm.id]; }).length;
+            }, 0);
+        h += '<div class="ct-text-label ct-muted ct-mb-2">' + t("pilot.measures.count", { shown: shownCount, total: _measures.length });
         if (orphanCount)
             h += ' &mdash; <span class="ct-text-high ct-strong">' + t("pilot.measures.orphan_count", { n: orphanCount }) + '</span>';
         h += '</div>';
@@ -1552,25 +1589,58 @@
             });
         });
     };
+    function memberOfGroup(measureId) {
+        return _groups.some(function (g) {
+            return (g.members || []).some(function (mm) { return mm.id === measureId; });
+        });
+    }
     window._searchMeasuresToAdd = function (val) {
         var q = (val || "").toLowerCase();
         var el = document.getElementById("pj-measure-results");
         if (!el)
             return;
         var existingIds = (_editingProject.measures || []).map(function (m) { return m.id; });
+        // Les groupes d'abord. Sur le plan d'action ils apparaissent comme UNE
+        // ligne consolidee, donc on les cherchait ici sous leur titre de groupe —
+        // en vain, la liste ne proposait que des mesures individuelles. Ajouter un
+        // groupe rattache ses membres : le modele lie un projet a des mesures
+        // (ProjectMeasure), un groupe n'est pas une entite rattachable.
+        var groupResults = _groups.filter(function (g) {
+            var membres = (g.members || []).filter(function (mm) { return existingIds.indexOf(mm.id) < 0; });
+            if (!membres.length)
+                return false;
+            if (!q)
+                return true;
+            var foin = (g.title || "") + " " + (g.ref || "") + " "
+                + membres.map(function (mm) { return (mm.title || "") + " " + (mm.source_id || ""); }).join(" ");
+            return foin.toLowerCase().indexOf(q) >= 0;
+        });
         var results = _measures.filter(function (m) {
             if (existingIds.indexOf(m.id) >= 0)
+                return false;
+            // Un membre de groupe s'ajoute avec son groupe, pas isolement : le
+            // proposer deux fois laisserait rattacher la moitie d'un groupe.
+            if (memberOfGroup(m.id))
                 return false;
             if (!q)
                 return true;
             return ((m.title || "") + " " + (m.source_id || "") + " " + (m.module || "") + " " + (m.entity_name || "")).toLowerCase().indexOf(q) >= 0;
         });
-        if (!results.length) {
+        if (!results.length && !groupResults.length) {
             el.innerHTML = '<div class="ct-muted ct-text-meta">' + t("pilot.common.no_results") + '</div>';
             return;
         }
         var h = '<div class="ct-mb-2"><button class="ct-btn ct-text-label" data-variant="primary" data-size="xs" data-click="_addSelectedMeasures">' + t("pilot.action.add_selection") + '</button></div>';
         h += '<table class="ct-table ct-text-label"><tbody>';
+        groupResults.slice(0, 15).forEach(function (g) {
+            var membres = (g.members || []).filter(function (mm) { return existingIds.indexOf(mm.id) < 0; });
+            h += '<tr>';
+            h += '<td class="ct-w-30"><input type="checkbox" class="pj-measure-cb" value="' + esc(membres.map(function (mm) { return mm.id; }).join(",")) + '" data-module="' + esc(t("pilot.groups.linked_badge")) + '" data-ref="' + esc(g.ref || "") + '" data-title="' + esc(g.title || "") + '"></td>';
+            h += '<td><span class="ct-badge" data-tone="neutral">' + esc(t("pilot.groups.linked_badge")) + '</span></td>';
+            h += '<td class="ct-mono ct-text-data">' + esc(g.ref || "") + '</td>';
+            h += '<td>' + esc(g.title || "") + ' <span class="ct-muted ct-text-meta">(' + membres.length + ')</span></td>';
+            h += '</tr>';
+        });
         results.slice(0, 30).forEach(function (m) {
             h += '<tr>';
             h += '<td class="ct-w-30"><input type="checkbox" class="pj-measure-cb" value="' + esc(m.id) + '" data-title="' + esc(m.title) + '" data-ref="' + esc(m.source_id) + '" data-module="' + esc(m.module) + '"></td>';
@@ -1593,7 +1663,9 @@
         var ids = [];
         var lines = [];
         cbs.forEach(function (cb) {
-            ids.push(cb.value);
+            // Une case de groupe porte les identifiants de tous ses membres.
+            cb.value.split(",").forEach(function (id) { if (id)
+                ids.push(id); });
             lines.push("[" + cb.getAttribute("data-module") + "] " + cb.getAttribute("data-ref") + " — " + cb.getAttribute("data-title"));
         });
         _fetch("/projects/" + _editingProject.id + "/measures", { method: "POST", body: { measure_ids: ids } }).then(function (p) {
@@ -2018,21 +2090,21 @@
         // Read-only when fed from Access (HR connector). Identities flow
         // Access → Pilot only; editing/deleting here is disabled.
         var locked = !isNew && p.sync_source === "access";
-        var body = '<div class="tprm-form" style="border:none;padding:0">';
+        var body = '<div class="ct-tprm-form" style="border:none;padding:0">';
         if (locked) {
             body += '<div style="background:var(--ct-medium-tint);color:var(--ct-medium-ink);border-radius:var(--ct-r-md);padding:var(--ct-s2) var(--ct-s3);margin-bottom:var(--ct-s3);font-size:var(--ct-text-meta)">'
                 + t("pilot.directory.access_locked_banner") + '</div>';
         }
-        body += '<div class="form-grid">';
+        body += '<div class="ct-form-grid">';
         body += _dirModalField("nom", t("pilot.directory.field_lastname"), p.nom, "text", locked);
         body += _dirModalField("prenom", t("pilot.directory.field_firstname"), p.prenom, "text", locked);
-        body += '</div><div class="form-grid">';
+        body += '</div><div class="ct-form-grid">';
         body += _dirModalField("email", t("pilot.directory.field_email"), p.email, "email", locked);
         body += _dirModalField("fonction", t("pilot.directory.col_function"), p.fonction, "text", locked);
-        body += '</div><div class="form-grid">';
+        body += '</div><div class="ct-form-grid">';
         body += _dirModalField("departement", t("pilot.directory.col_department"), p.departement, "text", locked);
         body += _dirModalSelect("statut", t("pilot.col.status"), ["actif", "inactif", "externe"], p.statut || "actif", locked, function (o) { return t("pilot.directory.status." + o); });
-        body += '</div><div class="form-grid">';
+        body += '</div><div class="ct-form-grid">';
         body += _dirModalField("telephone", t("pilot.directory.field_phone"), p.telephone, "tel", locked);
         body += _dirModalField("site", t("pilot.directory.col_site"), p.site, "text", locked);
         body += '</div>';
@@ -2040,7 +2112,7 @@
             body += _dirModalUserSelect("manager_email", t("pilot.directory.field_manager"), p.manager_email, p.email, true);
         }
         else {
-            body += '<div class="form-row"><label for="pdm-manager">' + esc(t("pilot.directory.field_manager")) + '</label><div id="pdm-manager-slot"></div></div>';
+            body += '<div class="ct-form-row"><label for="pdm-manager">' + esc(t("pilot.directory.field_manager")) + '</label><div id="pdm-manager-slot"></div></div>';
         }
         body += '</div>';
         var buttons = [];
@@ -2119,11 +2191,11 @@
         });
     }
     function _dirModalField(name, label, val, type, disabled) {
-        return '<div class="form-row"><label for="pdm-' + name + '">' + esc(label) + '</label>'
+        return '<div class="ct-form-row"><label for="pdm-' + name + '">' + esc(label) + '</label>'
             + '<input type="' + (type || "text") + '" id="pdm-' + name + '" value="' + esc(String(val || "")) + '"' + (disabled ? " disabled" : "") + '></div>';
     }
     function _dirModalSelect(name, label, opts, val, disabled, labelFn) {
-        var h = '<div class="form-row"><label for="pdm-' + name + '">' + esc(label) + '</label>'
+        var h = '<div class="ct-form-row"><label for="pdm-' + name + '">' + esc(label) + '</label>'
             + '<select id="pdm-' + name + '"' + (disabled ? " disabled" : "") + '>';
         opts.forEach(function (o) {
             h += '<option value="' + esc(o) + '"' + (val === o ? " selected" : "") + '>' + esc(labelFn ? labelFn(o) : o) + '</option>';
@@ -2131,7 +2203,7 @@
         return h + '</select></div>';
     }
     function _dirModalUserSelect(name, label, current, excludeEmail, disabled) {
-        var h = '<div class="form-row"><label for="pdm-' + name + '">' + esc(label) + '</label>'
+        var h = '<div class="ct-form-row"><label for="pdm-' + name + '">' + esc(label) + '</label>'
             + '<select id="pdm-' + name + '"' + (disabled ? " disabled" : "") + '>';
         h += '<option value=""' + (!current ? " selected" : "") + '>—</option>';
         var found = false;
@@ -2264,8 +2336,13 @@
             var perms = u.permissions || {};
             h += '<tr>';
             h += '<td><div class="ct-flex ct-items-center ct-gap-1">';
-            if (u.picture)
+            // L'avatar vient du fournisseur d'identite. La CSP le bloque, donc
+            // l'image ne s'est jamais affichee : il ne restait qu'une requete vers
+            // l'IdP depuis le navigateur de l'administrateur a chaque rendu de ce
+            // tableau. On ne rend que ce que la suite sert elle-meme.
+            if (u.picture && /^(\/|data:)/.test(u.picture)) {
                 h += '<img src="' + esc(u.picture) + '" style="width:20px;height:20px;border-radius:50%">';
+            }
             h += '<span>' + esc(u.name || "-") + '</span></div></td>';
             h += '<td class="ct-text-meta ct-muted">' + esc(u.email) + '</td>';
             h += '<td><select data-change="_changeRole" data-args=\'["' + u.id + '"]\' data-pass-value>';

@@ -913,8 +913,8 @@ function generateReport() {
         var p = _aiEnsurePanel();
         p.title.textContent = t("audit.report.title");
         p.body.innerHTML = '<div style="white-space:pre-wrap;font-size:0.88em;line-height:1.6;padding:8px">' + esc(response) + '</div>';
-        p.footer.innerHTML = '<button class="pwd-btn pwd-ok" id="export-report-word" style="background:var(--ct-accent)">' + t("audit.report.export_word") + '</button>'
-            + '<button class="pwd-btn pwd-ok" id="copy-report-btn">' + t("audit.report.copy") + '</button>';
+        p.footer.innerHTML = '<button class="ct-pwd-btn ct-pwd-ok" id="export-report-word" style="background:var(--ct-accent)">' + t("audit.report.export_word") + '</button>'
+            + '<button class="ct-pwd-btn ct-pwd-ok" id="copy-report-btn">' + t("audit.report.copy") + '</button>';
         document.getElementById("copy-report-btn").onclick = function () {
             if (navigator.clipboard) {
                 navigator.clipboard.writeText(response);

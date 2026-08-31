@@ -92,7 +92,7 @@ function renderPlanning() {
     h += '</div>';
     // ── Generate button ──
     h += '<div style="text-align:center;margin-bottom:20px">';
-    h += '<button class="btn-add" style="padding:10px 28px;font-size:0.95em;font-weight:600;border-radius:8px" data-click="generatePlanning">' + t("audit.planning.generate") + '</button>';
+    h += '<button class="ct-btn-add" style="padding:10px 28px;font-size:0.95em;font-weight:600;border-radius:8px" data-click="generatePlanning">' + t("audit.planning.generate") + '</button>';
     h += '</div>';
     // ── Planning timeline ──
     if (D.planning.slots && D.planning.slots.length > 0) {

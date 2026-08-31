@@ -212,14 +212,14 @@ mark.admin-term {
 }
 
 /* ── User / detail form styles (ported from vendor TPRM.css) ─────── */
-.form-grid > .form-row { margin-bottom: 0; }
+.ct-form-grid > .ct-form-row { margin-bottom: 0; }
 .form-section {
     font-size: 0.78em; font-weight: 700; text-transform: uppercase;
     letter-spacing: 0.5px; color: var(--ct-ink-2);
     margin: 16px 0 8px; padding-top: 12px; border-top: 1px solid var(--ct-line);
 }
 /* Checkbox rows shouldn't force uppercase labels */
-.tprm-form .form-row > label[style*="inline-flex"] {
+.ct-tprm-form .ct-form-row > label[style*="inline-flex"] {
     text-transform: none; font-weight: 500; color: inherit; letter-spacing: normal;
 }
 
@@ -303,13 +303,13 @@ mark.admin-term {
 /* Service-account risk level badge (background set inline) */
 
 /* ── Dark mode ───────────────────────────────────────────────────── */
-/* Saturated fills (green .btn-add, accent chips, decision buttons,
+/* Saturated fills (green .ct-btn-add, accent chips, decision buttons,
    warn badges on token colors) are LIGHT colors in dark mode, so the
    text flips to near-black — same convention as
    .ct-btn[data-variant="primary"] in cisotoolbox.css. */
 
 /* Neutral secondary button → surface + strong line + ink */
-:root[data-theme="dark"] .btn-add.btn-neutral {
+:root[data-theme="dark"] .ct-btn-add.btn-neutral {
     background: var(--ct-surface);
     border: 1px solid var(--ct-line-strong);
     color: var(--ct-ink);

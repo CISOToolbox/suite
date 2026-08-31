@@ -31,7 +31,7 @@
     <div class="ct-appbar-actions">
         <button class="ct-iconaction" data-click="ct_toggleLang" data-icon="globe" aria-label="Langue" title="Langue FR / EN"></button>
         <button class="ct-iconaction" data-click="ct_toggleTheme" data-icon="moon" aria-label="Thème" title="Thème clair / sombre"></button>
-        <span class="toolbar-right" id="toolbar-right"></span>
+        <span class="ct-toolbar-right" id="toolbar-right"></span>
     </div>
 </header>
 
@@ -55,7 +55,7 @@
       <button class="ct-rail-group" aria-expanded="true" data-click="ct_toggleRailGroup" data-pass-el>
         <span class="ct-icon-btn-slot" data-icon="chevron-right"></span><span>Administration</span>
       </button>
-      <button class="ct-rail-item admin-only" data-click="selectPanel" data-args='["plugins"]'><span class="ct-rail-item-label" data-i18n="nav.plugins">Connecteurs</span></button>
+      <button class="ct-rail-item ct-admin-only" data-click="selectPanel" data-args='["plugins"]'><span class="ct-rail-item-label" data-i18n="nav.plugins">Connecteurs</span></button>
     </div>
 
     <div class="ct-rail-section">
@@ -80,9 +80,9 @@
 <input type="file" id="csv-import-input" accept=".csv,.txt" class="ct-hidden">
 <input type="file" id="connector-file-input" accept=".xlsx" class="ct-hidden">
 
-<div class="pwd-overlay" id="confirm-overlay">
-<div class="pwd-panel">
-    <div class="pwd-title" id="confirm-title"></div>
+<div class="ct-pwd-overlay" id="confirm-overlay">
+<div class="ct-pwd-panel">
+    <div class="ct-pwd-title" id="confirm-title"></div>
     <div id="confirm-body" class="ct-text-data ct-mb-3"></div>
     <div class="ct-flex ct-gap-2 ct-justify-end">
         <button class="ct-btn" id="confirm-non" data-i18n="btn_discard">Non</button>
@@ -91,12 +91,12 @@
 </div>
 </div>
 
-<div class="pwd-overlay" id="pwd-overlay">
-<div class="pwd-panel">
-    <div class="pwd-title" id="pwd-title">Mot de passe</div>
-    <input type="password" class="pwd-input" id="pwd-input" placeholder="Mot de passe" autocomplete="off">
-    <input type="password" class="pwd-input hidden" id="pwd-input2" placeholder="Confirmer le mot de passe" autocomplete="off">
-    <div class="pwd-error" id="pwd-error"></div>
+<div class="ct-pwd-overlay" id="pwd-overlay">
+<div class="ct-pwd-panel">
+    <div class="ct-pwd-title" id="pwd-title">Mot de passe</div>
+    <input type="password" class="ct-pwd-input" id="pwd-input" placeholder="Mot de passe" autocomplete="off">
+    <input type="password" class="ct-pwd-input hidden" id="pwd-input2" placeholder="Confirmer le mot de passe" autocomplete="off">
+    <div class="ct-pwd-error" id="pwd-error"></div>
     <div class="ct-flex ct-gap-2 ct-justify-end ct-mt-2">
         <button class="ct-btn" id="pwd-cancel">Annuler</button>
         <button class="ct-btn" data-variant="primary" id="pwd-ok">OK</button>

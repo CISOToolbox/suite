@@ -346,8 +346,12 @@ function _renderApplications(c: HTMLElement): void {
     h += '<button class="ct-btn"' + (_appsView === "table" ? ' data-variant="primary"' : '')
        + ' data-click="_appsSetView" data-args=\'' + _da("table") + '\' title="' + t("apps.view_table") + '" data-icon>' + _icon("list", 14) + '</button>';
     h += '</div>';
-    h += '<button class="ct-btn mt-8" data-write data-click="_scanAllApps">' + _icon("refresh", 14) + ' ' + t("apps.scan_all") + '</button>';
-    h += '<button class="ct-btn mt-8" data-write data-variant="primary" data-click="showAddApp">' + _icon("plus", 14) + ' ' + t("apps.add") + '</button>';
+    // Pas de mt-8 : .ct-row centre verticalement, donc une marge haute
+    // decale ces deux boutons de 8px par rapport au selecteur de vue. Le
+    // gap de .ct-row espace deja les lignes quand la barre s'enroule —
+    // c'est ce qui place correctement le groupe de vues, qui n'en a pas.
+    h += '<button class="ct-btn" data-write data-click="_scanAllApps">' + _icon("refresh", 14) + ' ' + t("apps.scan_all") + '</button>';
+    h += '<button class="ct-btn" data-write data-variant="primary" data-click="showAddApp">' + _icon("plus", 14) + ' ' + t("apps.add") + '</button>';
     h += '</div>';
     h += '<div id="apps-list">' + _appsListHtml() + '</div>';
     c.innerHTML = h;
@@ -472,7 +476,7 @@ async function _renderAppDetail(c: HTMLElement): Promise<void> {
     if (!app.enabled) h += '<span class="ct-badge app-badge" data-tone="neutral">OFF</span>';
     h += '<button class="ct-btn" data-click="_editAppDialog" data-args=\'' + _da(app.id) + '\'>' + _icon("edit", 14) + ' ' + t("apps.configure") + '</button>';
     h += '<button class="ct-btn" data-variant="primary" data-click="_triggerScan" data-args=\'' + _da(app.id) + '\'>' + _icon("play", 14) + ' ' + t("apps.scan_now") + '</button>';
-    h += '<button class="ct-btn admin-only" data-variant="danger" data-click="_deleteAppFromDetail" data-args=\'' + _da(app.id) + '\' data-icon>' + _icon("trash", 14) + '</button>';
+    h += '<button class="ct-btn ct-admin-only" data-variant="danger" data-click="_deleteAppFromDetail" data-args=\'' + _da(app.id) + '\' data-icon>' + _icon("trash", 14) + '</button>';
     h += '</div>';
 
     // Config summary card
@@ -704,7 +708,7 @@ function _showAppModal(app: AppSecApp | null): void {
 
     h += '<div class="ct-modal-footer">';
     if (isEdit) {
-        h += '<button class="ct-btn admin-only" data-variant="danger" data-click="_deleteApp" data-args=\'' + _da(app!.id) + '\' style="margin-right:auto">' + _icon("trash", 14) + ' ' + t("apps.delete") + '</button>';
+        h += '<button class="ct-btn ct-admin-only" data-variant="danger" data-click="_deleteApp" data-args=\'' + _da(app!.id) + '\' style="margin-right:auto">' + _icon("trash", 14) + ' ' + t("apps.delete") + '</button>';
         h += '<button class="ct-btn" data-click="_triggerScan" data-args=\'' + _da(app!.id) + '\'>' + _icon("play", 14) + ' ' + t("apps.scan_now") + '</button>';
     }
     h += '<button class="ct-btn" data-click="_closeAppModal">' + t("apps.cancel") + '</button>';
@@ -1217,7 +1221,7 @@ function _offerIgnoreRuleFromFinding(finding: AppSecFinding, reason: string): vo
     // Les ignore rules sont admin-only côté backend (POST /ignore-rules →
     // require_admin) : ne pas proposer la création à un triager, il finirait
     // sur un 403.
-    if (!document.body.classList.contains("role-admin")) { _backToFindings(); return; }
+    if (!document.body.classList.contains("ct-role-admin")) { _backToFindings(); return; }
     ct_modal.confirm({
         title: t("ignore.offer_title") || "Créer une règle d'exclusion ?",
         message: (t("ignore.offer_body") || "Ce finding a été déclaré faux positif. Souhaitez-vous créer une règle pour ignorer automatiquement les findings similaires lors des prochains scans ?"),
@@ -1277,7 +1281,7 @@ function _openIgnoreRuleFromFinding(finding: AppSecFinding, reason: string): voi
         h += '</div>';
     });
     h += '</div>';
-    h += '<button type="button" class="ct-btn ct-mt-1 admin-only" data-write data-variant="primary" data-size="xs" data-click="_irAddCrit">'
+    h += '<button type="button" class="ct-btn ct-mt-1 ct-admin-only" data-write data-variant="primary" data-size="xs" data-click="_irAddCrit">'
        + '+ ' + t("ignore.add_criterion") + '</button>';
     h += '</div>';
 
@@ -1611,7 +1615,7 @@ var _irCriteriaCount = 0; // counter for dynamic criteria rows in the modal
 async function _renderIgnoreRules(c: HTMLElement): Promise<void> {
     var h = '<div class="ct-row ct-row-wrap ct-mb-3">';
     h += '<h2 class="ct-m-0">' + t("ignore.title") + '</h2><span class="ct-flex-1"></span>';
-    h += '<button class="ct-btn mt-8 admin-only" data-write data-variant="primary" data-click="_addIgnoreRule">' + t("ignore.add") + '</button>';
+    h += '<button class="ct-btn mt-8 ct-admin-only" data-write data-variant="primary" data-click="_addIgnoreRule">' + t("ignore.add") + '</button>';
     h += '</div>';
     h += '<p class="fs-sm text-muted ct-mb-3">' + t("ignore.help") + '</p>';
     h += '<div id="ignore-body"><p class="text-muted">' + t("ai.loading") + '</p></div>';
@@ -1653,9 +1657,9 @@ async function _refreshIgnoreRules(): Promise<void> {
             h += '<td class="fs-sm ct-maxw-200 ct-overflow-hidden ct-ellipsis" title="' + esc(r.reason) + '">' + esc(r.reason) + '</td>';
             h += '<td class="fs-xs text-muted">' + esc(r.created_by) + '</td>';
             h += '<td class="ct-ta-r ct-nowrap">';
-            h += '<button class="filter-pill admin-only' + (r.enabled ? " active" : "") + '" style="font-size:var(--ct-text-label);padding:var(--ct-s1) var(--ct-s2);margin-right:var(--ct-s1)" data-click="_toggleIgnoreRule" data-args=\'' + _da(r.id, !r.enabled) + '\'>' + (r.enabled ? "ON" : "OFF") + '</button>';
-            h += '<button class="ct-btn admin-only" data-size="xs" data-click="_editIgnoreRule" data-args=\'' + _da(r.id) + '\' title="' + esc(t("ignore.edit")) + '" data-icon>' + _icon("edit", 14) + '</button>';
-            h += '<button class="ct-btn admin-only" data-size="xs" data-click="_deleteIgnoreRule" data-args=\'' + _da(r.id) + '\' title="' + esc(t("apps.delete")) + '" data-icon>' + _icon("trash", 14) + '</button>';
+            h += '<button class="filter-pill ct-admin-only' + (r.enabled ? " active" : "") + '" style="font-size:var(--ct-text-label);padding:var(--ct-s1) var(--ct-s2);margin-right:var(--ct-s1)" data-click="_toggleIgnoreRule" data-args=\'' + _da(r.id, !r.enabled) + '\'>' + (r.enabled ? "ON" : "OFF") + '</button>';
+            h += '<button class="ct-btn ct-admin-only" data-size="xs" data-click="_editIgnoreRule" data-args=\'' + _da(r.id) + '\' title="' + esc(t("ignore.edit")) + '" data-icon>' + _icon("edit", 14) + '</button>';
+            h += '<button class="ct-btn ct-admin-only" data-size="xs" data-click="_deleteIgnoreRule" data-args=\'' + _da(r.id) + '\' title="' + esc(t("apps.delete")) + '" data-icon>' + _icon("trash", 14) + '</button>';
             h += '</td></tr>';
         }
         h += '</tbody></table>';
@@ -1725,7 +1729,7 @@ window._addIgnoreRule = function() {
     h += '<div id="ir-criteria-container" class="ct-mt-1">';
     h += _irCriterionRow(0);
     h += '</div>';
-    h += '<button type="button" class="ct-btn ct-mt-1 admin-only" data-write data-variant="primary" data-size="xs" data-click="_irAddCrit">'
+    h += '<button type="button" class="ct-btn ct-mt-1 ct-admin-only" data-write data-variant="primary" data-size="xs" data-click="_irAddCrit">'
        + '+ ' + (t("ignore.add_criterion") || "Ajouter un critère (AND)") + '</button>';
     h += '</div>';
 
@@ -1822,7 +1826,7 @@ window._editIgnoreRule = function(ruleId: string) {
         h += '</div>';
     });
     h += '</div>';
-    h += '<button type="button" class="ct-btn ct-mt-1 admin-only" data-write data-variant="primary" data-size="xs" data-click="_irAddCrit">'
+    h += '<button type="button" class="ct-btn ct-mt-1 ct-admin-only" data-write data-variant="primary" data-size="xs" data-click="_irAddCrit">'
        + '+ ' + t("ignore.add_criterion") + '</button>';
     h += '</div>';
 
@@ -2015,7 +2019,7 @@ async function _renderMeasures(c: HTMLElement): Promise<void> {
         { id: "done", icon: "check", label: "Terminé", variant: "success",
           onClick: "_bulkAppsecMeasuresDone" }
     ];
-    if (document.body.classList.contains("role-admin")) {
+    if (document.body.classList.contains("ct-role-admin")) {
         measureActions.push({ id: "delete", icon: "trash", label: "Supprimer", danger: true,
             onClick: "_bulkAppsecMeasuresDelete",
             confirm: { title: "Supprimer {n} remédiation(s) ?", message: "Cette action est irréversible." } });
@@ -2059,7 +2063,7 @@ window._editAppsecMeasureRow = function(row: any) {
         },
         // DELETE /measures est admin-only : sans onDelete la modale
         // n'affiche pas le bouton Supprimer.
-        onDelete: !document.body.classList.contains("role-admin") ? undefined : function() {
+        onDelete: !document.body.classList.contains("ct-role-admin") ? undefined : function() {
             ct_modal.confirm({
                 title: "Supprimer la remédiation",
                 message: "Cette action est irréversible.",
