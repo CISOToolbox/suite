@@ -26,13 +26,15 @@ jobs:
         with:
           python-version: "3.12"
       - name: outillage
-        run: pip install --quiet "ruff==0.6.9" pytest pydantic fastapi httpx
+        run: pip install --quiet "ruff==0.6.9" pytest pytest-asyncio pydantic fastapi httpx
       - name: noms non définis (F821) — la classe « import manquant → 500 »
         run: ruff check --select F821 */src
       - name: sentinelle auth (§4.4)
         run: pytest tests/test_auth_sentinel.py -q
       - name: migrations de schéma exporté (FEAT-36)
-        run: pytest tests/test_schema_migrations.py -q
+        # Script à main stdlib (0 test collecté par pytest → exit 5) : on
+        # l'exécute comme le pre-commit le fait.
+        run: python3 tests/test_schema_migrations.py
       - name: contrats de suite (prompts, add-ons, secrets, SSRF…)
         run: pytest tests/test_suite_contracts.py -q
 
@@ -51,13 +53,17 @@ jobs:
           cache: pip
           cache-dependency-path: ${{ matrix.module }}/requirements.txt
       - name: dépendances du module
-        run: pip install --quiet pytest -r ${{ matrix.module }}/requirements.txt
+        run: pip install --quiet pytest pytest-asyncio -r ${{ matrix.module }}/requirements.txt
       - name: tests unitaires
         # access/asset portent des échecs préexistants documentés (modules en
         # développement) : leurs suites tournent mais ne bloquent pas ENCORE.
         # Retirer cette tolérance dès qu'elles passent.
         run: |
           cd ${{ matrix.module }}
+          if [ ! -d tests/unit ]; then
+            echo "aucun tests/unit — module sans backend testé unitairement (audit)"
+            exit 0
+          fi
           if [ "${{ matrix.module }}" = "access" ] || [ "${{ matrix.module }}" = "asset" ]; then
             pytest tests/unit/ -q || echo "::warning::échecs préexistants tolérés (${{ matrix.module }})"
           else
