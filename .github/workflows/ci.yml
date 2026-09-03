@@ -53,7 +53,9 @@ jobs:
           cache: pip
           cache-dependency-path: ${{ matrix.module }}/requirements.txt
       - name: dépendances du module
-        run: pip install --quiet pytest pytest-asyncio -r ${{ matrix.module }}/requirements.txt
+        # aiosqlite : les tests unitaires substituent SQLite à PostgreSQL —
+        # dépendance de TEST, volontairement absente des requirements d'image.
+        run: pip install --quiet pytest pytest-asyncio aiosqlite -r ${{ matrix.module }}/requirements.txt
       - name: tests unitaires
         # access/asset portent des échecs préexistants documentés (modules en
         # développement) : leurs suites tournent mais ne bloquent pas ENCORE.
