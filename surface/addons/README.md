@@ -17,15 +17,16 @@ and propagation rules.
     every image** (the standard Dockerfile COPYs `addons/core` into
     `/app/addons`) and **synced to `backend-standalone`**. Removable from a slim
     client image via `--exclude-core`.
-  - **`generic/<name>/`** — optional, shareable add-ons: heavier / optional
-    scanners (`nuclei`, `cve_lookup`, `shodan`, `cloud_buckets`, `screenshot`)
-    and the SMB scanners (`smb_scan`, `smb_scan_rs`). **Opt-in** per image;
-    **never** bundled by the standard Dockerfile, **never** synced to the public
-    standalone build. An optional scanner can still be default-on *when included*
-    by declaring `SURFACE_DEFAULT_SCANNERS` (e.g. `nuclei` / `cve_lookup` re-add
-    themselves to the host defaults).
-  - **`custom/<client>/`** — client-specific add-ons. Opt-in, baked into a
-    client image only.
+  - **`generic/<name>/`** — shareable optional scanners (`nuclei`,
+    `cve_lookup`, `shodan`, `cloud_buckets`, `screenshot`, `smb_scan_rs`) and
+    connectors (`defender`). **Bundled in every published image since 2026-09**
+    (the standard Dockerfile COPYs `addons/generic` and runs each add-on's own
+    `apt-packages.txt` / `requirements.txt` / `install.sh`) and **synced to the
+    standalone tree**. Bundled ≠ active: a scanner still only runs on assets
+    that enable it, unless it declares `SURFACE_DEFAULT_SCANNERS` (e.g. `nuclei`
+    / `cve_lookup` re-add themselves to the host defaults).
+  - **`custom/<client>/`** — client-specific add-ons. The only opt-in tier,
+    baked into a client image via `Dockerfile.addons`.
 - **The tier is also a licensing boundary.** `core` and `generic` add-ons are
   open source (MIT) and maintained in this tree — an add-on of general use
   belongs in `generic`, where every deployment benefits from it. A `custom`
@@ -139,44 +140,48 @@ contain **zero** add-on doc text; the client image with the add-on serves it.
 
 ## 6. Build & packaging
 
-- The **standard `Dockerfile`** is **lean** (~286 MB): it bundles `addons/core`
-  (`COPY addons/core/ addons/core/`) and `requirements.txt`, plus `nmap`, but
-  **no** heavy/optional binaries (no nuclei, no Playwright/Chromium). Every image
-  (suite, public standalone, client) ships the always-on core scanner set only.
-- `Dockerfile.addons` overlays **optional** add-ons on top of the core image:
+- The **standard `Dockerfile`** bundles **both** `addons/core` and
+  `addons/generic`, and installs each generic add-on's own `apt-packages.txt`,
+  `requirements.txt` and `install.sh` — so the nuclei binary + templates, the
+  Playwright Chromium and `libsmbclient` are in the image. Every published image
+  (standalone, suite, and any client image derived from them) therefore carries
+  the **full** scanner set. Add-on packaging hooks, all optional and picked up
+  automatically: `bin/ciso-*-<arch>` binaries, `apt-packages.txt`,
+  `requirements.txt`, `install.sh`.
+  > **Artefacts built outside the image.** `smb_scan_rs`'s Rust worker is
+  > gitignored and cross-compiled per arch **before** the build
+  > (`generic/smb_scan_rs/rust/build.sh amd64 arm64`) — it cannot be a builder
+  > stage, rustc segfaults under qemu. The Dockerfile aborts if
+  > `bin/ciso-smb-scan-<arch>` is missing, and `publish-images.sh` produces it
+  > automatically. Both guards were added after the step was forgotten and the
+  > published images shipped the add-on with an empty `bin/`.
+- `Dockerfile.addons` overlays **client** add-ons on top of that image:
   `FROM <core>`, `USER root`, `COPY .client-addons/ /app/addons/`, then in one
   layer: drop any `ARG EXCLUDE_CORE` dirs, install each add-on's
   `apt-packages.txt` (system libs), `requirements.txt` (pip), run each add-on's
-  **`install.sh`** (heavy binaries — e.g. `nuclei/install.sh` downloads the
-  arch-correct nuclei binary + templates via python; `screenshot/install.sh`
-  runs `playwright install chromium`), `chmod` bundled `bin/*`, `chown`, `USER
-  surface`, `ENV SURFACE_ADDON_PATHS=/app/addons`. **So a scanner's heavy deps
-  exist only in images that include its add-on** — e.g. nuclei/Chromium are
-  absent from the lean base and from a client image that doesn't select them.
-  Add-on packaging hooks (all optional, picked up automatically): `bin/<arch>`
-  binaries, `apt-packages.txt`, `requirements.txt`, `install.sh`.
-- `shared/build-client-image.sh <client> --module surface --addons generic/smb_scan_rs`
-  builds the core (with `addons/core` baked in) then overlays the selected
-  optional add-ons → `ciso-surface-<client>:<tag>`.
-- **Suite vs client policy:**
-  - **Suite image** (the integrated governance / test environment) = **the most
-    complete**: build it with **all** generic add-ons. Since `build-client-image.sh`
-    defaults `--addons` to `generic` (all) when omitted, the suite is simply
-    `build-client-image.sh suite --module surface` → core + every generic scanner
-    (nuclei, cve_lookup, shodan, cloud_buckets, screenshot, smb_scan, smb_scan_rs)
-    with their heavy deps installed by the overlay. `docker-compose.yml`
-    references `ciso-surface-suite:latest`.
-  - **Client images** = **strictly what the client needs** — pass an explicit,
-    minimal `--addons` (and optionally `--exclude-core`). e.g. acme below.
-  - The **public standalone** stays lean/core-only (synced `addons/core`); add
-    generic add-ons only if a standalone deployment wants them.
+  **`install.sh`**, `chmod` bundled `bin/*`, `chown`, `USER surface`,
+  `ENV SURFACE_ADDON_PATHS=/app/addons`.
+- `shared/build-client-image.sh <client> --module surface` is needed **only** to
+  layer a client's own `custom/` add-ons, or to slim an image with
+  `--exclude-core` → `ciso-surface-<client>:<tag>`. Passing
+  `--addons generic/<name>` is a harmless no-op: the base already has it.
+- **Packaging policy** — one rule: *every published image carries the full
+  scanner set*. `ciso-surface` (standalone), `ciso-surface-suite` and every
+  `ciso-surface-<client>` derived from them all ship `core` + `generic`; only
+  `custom/<client>` distinguishes a client image.
+  > Don't trust the pipeline, read the image — the two are exactly what drifted
+  > apart before 2026-09:
+  > ```
+  > podman run --rm --entrypoint sh ghcr.io/cisotoolbox/ciso-surface-suite:vX \
+  >   -c 'ls /app/addons/core /app/addons/generic'
+  > ```
 - **Slim client builds** — drop unwanted core scanners with `--exclude-core`:
   ```
   shared/build-client-image.sh acme --module surface \
-      --addons generic/smb_scan_rs --exclude-core shodan,cloud_buckets --tag v0.1.2
+      --exclude-core shodan,cloud_buckets --tag v0.1.2
   ```
   → `ciso-surface-acme:v0.1.2` = all core scanners **except** `shodan` +
-  `cloud_buckets`, **plus** the SMB add-on. Excluded scanners simply don't
+  `cloud_buckets`. Excluded scanners simply don't
   register, so the add-target UI / catalog never offers them (they are opt-in
   scanners, never in `DEFAULT_SCANNERS_BY_KIND`, so nothing dangles). The dir
   name passed to `--exclude-core` is the `addons/core/<name>` folder, which may
@@ -189,11 +194,12 @@ contain **zero** add-on doc text; the client image with the add-on serves it.
 
 ## 7. Propagation rules (important)
 
-- **`addons/core` IS synced** to `backend-standalone/<module>/addons/core` by
-  `sync-backend-modules.sh` (they are built-ins the standalone image needs).
-- **`addons/generic` and `addons/custom` are NEVER synced** — they are opt-in
-  and must not leak into the public standalone build. Propagate them only by
-  building a client/suite image.
+- **`addons/core` AND `addons/generic` are synced** to the standalone tree by
+  the propagation engine — both tiers are open source and both ship in every
+  published image.
+- **`addons/custom` is NEVER synced**: it belongs to its organization and lives
+  in that organization's private repo, staged at build time via
+  `build-client-image.sh --custom-dir`.
 - Edit add-on source here (`backend-clients/demo-docker/surface/addons/…`) —
   the source of truth. `src/scan_common.py` (shared helpers) is synced via the
   normal `src/` path.

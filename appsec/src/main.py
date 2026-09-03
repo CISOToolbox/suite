@@ -39,6 +39,17 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
         csp = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://api.anthropic.com https://api.openai.com https://services.nvd.nist.gov; font-src 'self'; frame-ancestors 'none'"
         response.headers["Content-Security-Policy"] = csp
+        # Même politique de cache que le proxy de la suite (nginx $cache_policy) :
+        # sans Cache-Control, un déploiement standalone (sans proxy) laisse le
+        # navigateur au cache heuristique — vieux JS sur nouveau backend, la
+        # classe de panne la plus déroutante qui soit (formats d'API croisés).
+        # Ne touche pas aux routes qui posent déjà leur propre politique.
+        if "cache-control" not in response.headers:
+            ct = response.headers.get("content-type", "")
+            if ct.startswith(("image/", "font/")):
+                response.headers["Cache-Control"] = "public, max-age=3600"
+            else:
+                response.headers["Cache-Control"] = "no-cache, must-revalidate"
         return response
 
 

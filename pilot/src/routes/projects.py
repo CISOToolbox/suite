@@ -83,8 +83,12 @@ def _can_access(p: Project, user: Optional[User]) -> bool:
 
 
 def _project_to_dict(p: Project, measures: list[dict] | None = None) -> dict:
-    total = len(measures) if measures else 0
-    completed = sum(1 for m in (measures or []) if m.get("status") in ("completed", "Terminé", "termine")) if measures else 0
+    # Une mesure abandonnée ne compte ni comme faite ni comme à faire : la
+    # laisser au dénominateur plomberait le % du projet pour toujours.
+    actives = [m for m in (measures or [])
+               if m.get("status") not in ("cancelled", "annule", "Annulé", "abandonne")]
+    total = len(actives)
+    completed = sum(1 for m in actives if m.get("status") in ("completed", "Terminé", "termine"))
     return {
         "id": str(p.id),
         "name": p.name,

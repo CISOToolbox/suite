@@ -450,8 +450,12 @@ def test_every_proxy_validator_delegates_to_the_guard() -> list[str]:
 # generic optionnel (scanners lourds, superposes par build-client-image.sh).
 # Elle est : tout palier non vide doit etre soit embarque, soit declare optionnel
 # ici, avec sa raison.
+# Paliers d'add-ons qu'une image publiee n'embarque PAS. Seul `custom` en fait
+# partie : il est par definition propre a un client et superpose par
+# Dockerfile.addons. `generic` a quitte cette liste en 2026-09 — les images
+# publiees (standalone, suite, et les images clientes qui en derivent) portent
+# desormais le jeu complet de scanners/connecteurs.
 OPTIONAL_ADDON_TIERS = {
-    ("surface", "generic"): "scanners lourds/optionnels, superposes par build-client-image.sh",
     ("surface", "custom"): "add-ons specifiques client",
     ("access", "custom"): "connecteurs specifiques client",
 }
@@ -511,9 +515,13 @@ def test_bundled_addons_get_their_dependencies() -> list[str]:
         dockerfile = REPO_ROOT / module / "Dockerfile"
         if not dockerfile.is_file():
             continue
-        src = dockerfile.read_text(encoding="utf-8")
-        installs = re.search(r'addons?[^\n]*requirements\.txt|requirements\.txt[^\n]*addons', src) \
-            or re.search(r'find\s+\S*addons\S*\s+-name\s+requirements\.txt', src)
+        # Les commentaires ne comptent pas : un Dockerfile qui DÉCRIT
+        # l'installation sans la faire satisfaisait la recherche.
+        src = "\n".join(l for l in dockerfile.read_text(encoding="utf-8").splitlines()
+                        if not l.lstrip().startswith("#"))
+        installs = (re.search(r'addons?[^\n]*requirements\.txt|requirements\.txt[^\n]*addons', src)
+                    or re.search(r'find\s+\S*addons\S*\s+-name\s+requirements\.txt', src)) \
+            and re.search(r'pip install[^\n]*-r\b', src)
         if not installs:
             names = ", ".join(sorted(r.parent.name for r in reqs))
             problems.append(
@@ -524,8 +532,115 @@ def test_bundled_addons_get_their_dependencies() -> list[str]:
     return problems
 
 
+def test_externally_built_artefacts_are_verified_at_build() -> list[str]:
+    """Un artefact compile HORS de l'image doit etre controle par le Dockerfile.
+
+    Cas reel : addons/generic/smb_scan_rs porte un worker Rust cross-compile par
+    rust/build.sh, gitignore, impossible a produire dans un stage builder (rustc
+    segfaute sous qemu). Il a ete oublie, et les images publiees avant 2026-09
+    embarquaient l'add-on avec un bin/ vide : le scanner echouait a la premiere
+    utilisation, chez un client, sans que rien ne l'ait signale au build.
+
+    Un COPY qui reussit ne prouve pas que le repertoire copie n'est pas vide.
+    """
+    problems = []
+    for addons in sorted(REPO_ROOT.glob("*/addons")):
+        module = addons.parent.name
+        dockerfile = REPO_ROOT / module / "Dockerfile"
+        if not dockerfile.is_file():
+            continue
+        src = dockerfile.read_text(encoding="utf-8")
+        for build_dir in sorted(addons.glob("*/*/rust")):
+            addon = build_dir.parent
+            if (module, addon.parent.name) in OPTIONAL_ADDON_TIERS:
+                continue
+            # Le Dockerfile doit nommer l'artefact ET savoir echouer.
+            names_it = re.search(rf'{re.escape(addon.name)}/bin/', src)
+            fails = re.search(r'\bexit\s+1\b', src)
+            if not (names_it and fails):
+                problems.append(
+                    f"{module}: {addon.name} ships an artefact built outside the image "
+                    f"({build_dir.relative_to(REPO_ROOT)}) but the Dockerfile does not "
+                    f"verify it — the image would ship the add-on with an empty bin/ "
+                    f"and the scanner would fail at first use."
+                )
+    return problems
+
+
+def test_ai_requests_carry_no_precomposed_prompt() -> list[str]:
+    """FEAT-41 / CLAUDE.md §5.1 — le frontend envoie des champs structurés.
+
+    Un modele de requete d'un endpoint IA qui declare un champ `user`,
+    `prompt` ou `user_prompt` de type `str` est la signature d'un prompt
+    deja compose par le navigateur, que le backend se contenterait de
+    relayer. Une garantie ne peut etre tenue que la ou le prompt est
+    construit : FEAT-40 exige que le modele voie tout le plan de mesures,
+    ce qui est invérifiable si le client decide de l'inclure ou non.
+
+    C'est invisible en relecture de diff — d'ou ce controle.
+    """
+    suspects = {"user", "prompt", "user_prompt", "system_prompt", "messages"}
+    # Modules dont TOUS les prompts sont composés côté serveur. Chaque
+    # nouvelle migration FEAT-41 s'ajoute ICI : c'est ce qui impose la
+    # coupure du proxy générique et interdit tout modèle à prompt pré-composé.
+    migrated = {"risk", "compliance", "vendor"}
+    # AICompleteRequest EST un prompt pré-composé — c'est le contrat du proxy
+    # générique /api/ai/complete. La classe existe dans TOUS les modules
+    # (ai_proxy_common l'importe au chargement), mais dans un module migré la
+    # route qui la lit est coupée (generic_complete=False, vérifié plus bas) :
+    # c'est la coupure qui porte la garantie, pas l'absence de la classe.
+    tolerated_class = "AICompleteRequest"
+    problems = []
+    for route in sorted(list(REPO_ROOT.glob("*/src/routes/ai.py"))
+                        + list(REPO_ROOT.glob("*/src/schemas.py"))
+                        + list(REPO_ROOT.glob("*/src/ai_proxy_common.py"))):
+        module = route.parts[route.parts.index("src") - 1]
+        rel = "/".join(route.parts[route.parts.index(module) + 1:])
+        try:
+            tree = ast.parse(route.read_text(encoding="utf-8"))
+        except SyntaxError as e:
+            problems.append(f"{module}: {rel} does not parse ({e})")
+            continue
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.ClassDef):
+                continue
+            # Toute classe avec une base est candidate : exiger `BaseModel`
+            # dans les bases DIRECTES laissait passer l'héritage indirect
+            # (class X(AICompleteRequest)) — et schemas.py n'était pas scanné
+            # du tout, alors que la violation vivante y logeait.
+            if not node.bases:
+                continue
+            if node.name == tolerated_class:
+                continue
+            for stmt in node.body:
+                if not isinstance(stmt, ast.AnnAssign) or not isinstance(stmt.target, ast.Name):
+                    continue
+                name = stmt.target.id
+                if name not in suspects:
+                    continue
+                annot = ast.unparse(stmt.annotation)
+                if "str" not in annot:
+                    continue
+                problems.append(
+                    f"{module}: {rel}: {node.name}.{name}: {annot} looks like a "
+                    f"pre-composed prompt. The frontend must send structured fields "
+                    f"and routes/ai.py must build the prompt (CLAUDE.md 5.1)."
+                )
+    # Un module migré doit COUPER le proxy générique : sans cela, un client
+    # modifié contourne toutes les garanties métier par /api/ai/complete.
+    for module in sorted(migrated):
+        route = REPO_ROOT / module / "src" / "routes" / "ai.py"
+        if route.exists() and "generic_complete=False" not in route.read_text(encoding="utf-8"):
+            problems.append(
+                f"{module}: routes/ai.py must call make_ai_router(generic_complete=False) "
+                f"— every prompt is composed server-side, the generic proxy is a bypass.")
+    return problems
+
+
 CHECKS = (
     ("canonical field names", test_every_receiver_uses_the_canonical_fields),
+    ("no pre-composed prompt", test_ai_requests_carry_no_precomposed_prompt),
+    ("external artefacts verified", test_externally_built_artefacts_are_verified_at_build),
     ("a push can clear a field", test_every_receiver_can_clear_a_field),
     ("no legacy storage key", test_no_module_reintroduces_a_legacy_key),
     ("every send validates the host", test_every_surface_send_validates_the_host),

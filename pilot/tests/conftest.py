@@ -20,6 +20,7 @@ os.environ["DATABASE_URL"] = "sqlite+aiosqlite://"
 
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import event as sa_event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
@@ -37,6 +38,16 @@ test_engine = create_async_engine(
     poolclass=StaticPool,
     connect_args={"check_same_thread": False},
 )
+
+
+# SQLite ignore les FK (donc les ON DELETE CASCADE du DDL) tant que le pragma
+# n'est pas armé par connexion — les tests de cascade passaient à côté du
+# comportement qu'ils vérifient, et échouaient sur un DDL pourtant correct.
+@sa_event.listens_for(test_engine.sync_engine, "connect")
+def _enable_sqlite_fks(dbapi_conn, _record):
+    cursor = dbapi_conn.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
 TestSessionLocal = async_sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
 
 

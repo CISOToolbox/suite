@@ -80,7 +80,7 @@ async def list_measures(
 
 
 class MeasureUpdate(BaseModel):
-    status: Literal["planned", "in_progress", "completed", "backlog"] | None = None
+    status: Literal["planned", "in_progress", "completed", "backlog", "cancelled"] | None = None
     assignee: str | None = None
     due_date: str | None = None
     title: str | None = None
@@ -90,7 +90,7 @@ class MeasureUpdate(BaseModel):
 
 class MeasureCreate(BaseModel):
     title: str
-    status: Literal["planned", "in_progress", "completed", "backlog"] = "planned"
+    status: Literal["planned", "in_progress", "completed", "backlog", "cancelled"] = "planned"
     assignee: str = ""
     due_date: str = ""
     description: str = ""

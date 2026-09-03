@@ -26,7 +26,7 @@ OPTIONAL = "Phishing - Module avancé"
 
 def _cfg():
     return {
-        "email_domains": ["acme.com"],
+        "email_domains": ["acme.example"],
         "tracked_campaigns": [MANDATORY, OPTIONAL],
         "mandatory_campaigns": [MANDATORY],
     }
@@ -79,29 +79,35 @@ def _users():
     }
 
 
-def test_access_payload_domain_and_mandatory_filter():
-    payload = _build_access_payload(_users(), _cfg())
+def test_access_payload_domain_filter_and_full_snapshot():
+    # Sémantique actuelle (awareness-sync) : TOUS les utilisateurs du domaine,
+    # avec le relevé complet de leurs formations (y compris incomplètes) —
+    # c'est Access qui possède la machine à états de conformité. L'ancienne
+    # version ne poussait que les conformes ; les tests étaient restés dessus.
+    payload = _build_access_payload(_users(), _cfg(), today="2026-06-01")
     emails = {p["email"] for p in payload}
-    # ok@acme.example: domain + mandatory done -> included
     assert "ok@acme.example" in emails
-    # partial@acme.example: domain but mandatory NOT done -> excluded
-    assert "partial@acme.example" not in emails
-    # ext@other.com: mandatory done but OUT of domain -> excluded
-    assert "ext@other.com" not in emails
+    assert "partial@acme.example" in emails      # domaine ok, snapshot complet
+    assert "ext@other.com" not in emails         # hors domaine
     entry = next(p for p in payload if p["email"] == "ok@acme.example")
-    assert entry["completed"] is True
-    assert entry["completion_date"] == "2026-05-01"
-    assert MANDATORY in entry["justification"]
+    done = {t["campaign"]: t for t in entry["trainings"]}
+    assert done[MANDATORY]["completed"] is True
+    assert done[MANDATORY]["completion_date"] == "2026-05-01"
+    partial = next(p for p in payload if p["email"] == "partial@acme.example")
+    mand = next(t for t in partial["trainings"] if t["campaign"] == MANDATORY)
+    assert mand["completed"] is False
 
 
-def test_access_payload_empty_when_no_mandatory():
+def test_access_payload_empty_without_domains_matching():
     cfg = _cfg()
-    cfg["mandatory_campaigns"] = []
-    assert _build_access_payload(_users(), cfg) == []
+    cfg["email_domains"] = ["nowhere.invalid"]
+    assert _build_access_payload(_users(), cfg, today="2026-06-01") == []
 
 
 def test_reporting_is_tenant_wide_per_campaign():
-    rep = _build_reporting(_users(), _cfg())
+    cfg = _cfg()
+    rep = _build_reporting(_users(), cfg["tracked_campaigns"],
+                           cfg["mandatory_campaigns"], today="2026-06-01")
     # 3 users total (tenant — NO domain filter); 2 completed the mandatory
     assert rep["users_total"] == 3
     assert rep["users_compliant"] == 2  # ok@ + ext@ (ext is tenant-wide)

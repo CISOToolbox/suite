@@ -298,7 +298,7 @@ _registerTranslations("fr", {
         + "<li>Reconstruire régulièrement pour intégrer les correctifs de l'image de base</li></ul>"
 
         + "<h3>Détection de secrets</h3>"
-        + "<div class=\"help-tip\"><strong>Doctrine :</strong> un secret présent dans l'historique Git est considéré comme compromis, même supprimé dans un commit ultérieur. La seule remédiation valable est la <strong>rotation</strong> du secret ; l'effacer du code ne suffit pas.</div>"
+        + "<div class=\"ct-help-tip\"><strong>Doctrine :</strong> un secret présent dans l'historique Git est considéré comme compromis, même supprimé dans un commit ultérieur. La seule remédiation valable est la <strong>rotation</strong> du secret ; l'effacer du code ne suffit pas.</div>"
         + "<ul><li>Externaliser les secrets (fichiers <code>.env</code> gitignorés, gestionnaire de secrets type Vault)</li>"
         + "<li>Bloquer les commits contenant des secrets via un hook pre-commit</li></ul>"
 
@@ -349,7 +349,7 @@ _registerTranslations("fr", {
         + "<h2>8. Intégration à la suite CISO Toolbox</h2>"
         + "<p>En déploiement suite, les <strong>remédiations</strong> de ce module remontent automatiquement dans le <strong>plan d'action de Pilot</strong> (hub de gouvernance), y sont consolidées avec les items des autres modules sous le terme commun <strong>Action</strong>, et peuvent être regroupées en <strong>projets</strong> pour piloter l'avancement transverse. Le module reste l'autorité de son domaine — Pilot ne fait que consolider.</p>",
 
-    "help.usage_html": "<h1 class=\"heading-blue\">AppSec (SAST/SCA) — Guide d'utilisation</h1>\n\n<h2>Fonctionnalités nécessitant l'IA</h2>\n<p>Ces fonctionnalités appellent un modèle de langage et ne sont disponibles qu'une fois l'IA configurée. Elles sont <strong>optionnelles</strong> : sans configuration, elles sont masquées ou inactives et le reste du module fonctionne normalement.</p>\n<ul>\n<li><strong>Analyse IA d'un finding</strong> : recommandation de triage, avec une option d'<em>analyse approfondie</em> qui fournit davantage de contexte au modèle</li>\n</ul>\n<p class=\"help-tip\">Où configurer : dans une installation autonome, via <strong>Réglages &rarr; IA</strong> du module (votre propre clé API). Dans la suite, les clés sont centralisées par <strong>Pilot</strong> et poussées aux modules &mdash; rien à saisir ici, et l'accès à l'IA se donne par utilisateur dans les habilitations.</p>"
+    "help.usage_html": "<h1 class=\"heading-blue\">AppSec (SAST/SCA) — Guide d'utilisation</h1>\n\n<h2>Fonctionnalités nécessitant l'IA</h2>\n<p>Ces fonctionnalités appellent un modèle de langage et ne sont disponibles qu'une fois l'IA configurée. Elles sont <strong>optionnelles</strong> : sans configuration, elles sont masquées ou inactives et le reste du module fonctionne normalement.</p>\n<ul>\n<li><strong>Analyse IA d'un finding</strong> : recommandation de triage, avec une option d'<em>analyse approfondie</em> qui fournit davantage de contexte au modèle</li>\n</ul>\n<p class=\"ct-help-tip\">Où configurer : dans une installation autonome, via <strong>Réglages &rarr; IA</strong> du module (votre propre clé API). Dans la suite, les clés sont centralisées par <strong>Pilot</strong> et poussées aux modules &mdash; rien à saisir ici, et l'accès à l'IA se donne par utilisateur dans les habilitations.</p>"
         + "<p class=\"text-muted\">Pages, boutons et flux de travail du module. La navigation se fait par la barre latérale ; la barre d'application propose la langue (FR/EN), le thème clair/sombre et les réglages (assistant IA).</p>"
 
         + "<h2>1. Tableau de bord</h2>"
@@ -361,11 +361,11 @@ _registerTranslations("fr", {
         + "<ul><li><strong>Nom, description, criticité, fréquence de scan</strong> (heures entre deux scans automatiques)</li>"
         + "<li><strong>Analyse du code source</strong> : URL du dépôt Git, branche (défaut <code>main</code>), token d'accès PAT pour dépôts privés (chiffré en base), <strong>Répertoires à scanner</strong> (monorepo — un chemin par ligne relatif à la racine, <code>..</code> interdit), cases Dépendances / Secrets / SAST</li>"
         + "<li><strong>Scan d'images Docker</strong> : case d'activation, liste d'images (une par ligne, GHCR / Docker Hub / registre privé), token registre pour images privées (chiffré en base)</li></ul>"
-        + "<div class=\"help-tip\"><strong>Attention :</strong> supprimer une application supprime aussi tous ses findings.</div>"
+        + "<div class=\"ct-help-tip\"><strong>Attention :</strong> supprimer une application supprime aussi tous ses findings.</div>"
 
         + "<h2>3. Findings</h2>"
         + "<p>Liste de toutes les détections. Filtres en pills : <strong>sévérité</strong> (Critique, Élevé, Moyen, Faible, Info), <strong>statut</strong>, <strong>scanner</strong> (Dépendances, Images Docker, Secrets, SAST), <strong>patch</strong> (Avec patch / Sans patch) ; plus liste déroulante d'application et recherche textuelle (titre, cible, CVE).</p>"
-        + "<div class=\"help-tip\"><strong>Astuce :</strong> à l'ouverture, la liste est filtrée sur le statut <strong>Nouveau</strong>. Cliquez sur « Tous les statuts » pour voir aussi les findings déjà triés.</div>"
+        + "<div class=\"ct-help-tip\"><strong>Astuce :</strong> à l'ouverture, la liste est filtrée sur le statut <strong>Nouveau</strong>. Cliquez sur « Tous les statuts » pour voir aussi les findings déjà triés.</div>"
         + "<p><strong>Colonnes :</strong> sévérité, titre (+ CVE), cible, application, scanner, patch (badge vert avec la version corrigée, rouge « Sans patch »), statut.</p>"
         + "<p><strong>Détail d'un finding :</strong> cliquez sur une ligne — description, preuves (evidence), version installée / version corrigée, dates de première et dernière détection, remédiation liée éventuelle, boutons de triage et assistant IA.</p>"
         + "<p><strong>Triage en masse :</strong> cochez plusieurs lignes puis utilisez la barre d'actions en bas :</p>"
