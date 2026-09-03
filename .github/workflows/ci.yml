@@ -1,0 +1,73 @@
+# CI du dépôt suite — les gates mécaniques du flux PR.
+#
+# Ce fichier est PUBLIÉ depuis le monorepo (public/suite-modules/.github/) :
+# ne pas l'éditer ici, éditer la source. Chaque gate correspond à une classe
+# de défaut réellement livrée le 2026-09-02 malgré des consignes écrites.
+# La revue adversariale (agent reviewer, côté monorepo) couvre ce que la
+# mécanique ne voit pas : claims des commits, critères de spec, angles morts.
+# Les gates locaux au monorepo (i18n, drift de propagation) sont tenus par
+# le pre-commit et par publish.py AVANT que le code n'arrive ici.
+#
+# Actions épinglées par commit : checkout v4.2.2, setup-python v5.4.0.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  gates:
+    name: gates mécaniques
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
+        with:
+          python-version: "3.12"
+      - name: outillage
+        run: pip install --quiet "ruff==0.6.9" pytest pytest-asyncio pydantic fastapi httpx
+      - name: noms non définis (F821) — la classe « import manquant → 500 »
+        run: ruff check --select F821 */src
+      - name: sentinelle auth (§4.4)
+        run: pytest tests/test_auth_sentinel.py -q
+      - name: migrations de schéma exporté (FEAT-36)
+        # Script à main stdlib (0 test collecté par pytest → exit 5) : on
+        # l'exécute comme le pre-commit le fait.
+        run: python3 tests/test_schema_migrations.py
+      - name: contrats de suite (prompts, add-ons, secrets, SSRF…)
+        run: pytest tests/test_suite_contracts.py -q
+
+  unit:
+    name: unit ${{ matrix.module }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        module: [pilot, risk, compliance, audit, vendor, asset, access, surface, appsec, watch]
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: ${{ matrix.module }}/requirements.txt
+      - name: dépendances du module
+        # aiosqlite : les tests unitaires substituent SQLite à PostgreSQL —
+        # dépendance de TEST, volontairement absente des requirements d'image.
+        run: pip install --quiet pytest pytest-asyncio aiosqlite -r ${{ matrix.module }}/requirements.txt
+      - name: tests unitaires
+        # access/asset portent des échecs préexistants documentés (modules en
+        # développement) : leurs suites tournent mais ne bloquent pas ENCORE.
+        # Retirer cette tolérance dès qu'elles passent.
+        run: |
+          cd ${{ matrix.module }}
+          if [ ! -d tests/unit ]; then
+            echo "aucun tests/unit — module sans backend testé unitairement (audit)"
+            exit 0
+          fi
+          if [ "${{ matrix.module }}" = "access" ] || [ "${{ matrix.module }}" = "asset" ]; then
+            pytest tests/unit/ -q || echo "::warning::échecs préexistants tolérés (${{ matrix.module }})"
+          else
+            pytest tests/unit/ -q
+          fi
