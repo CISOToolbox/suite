@@ -4,7 +4,12 @@ review per application in ONE grouped query, not a SELECT per app.
 The endpoint (polled by Pilot every 30s) looped over every Application and ran
 a per-app "latest closed review" query (N+1). It now groups with MAX(closed_at)
 once. This test locks the apps-needing-review count the rewrite must preserve:
-one up-to-date app, one overdue, one never reviewed → 2 needing review.
+one up-to-date app, one overdue, one never-reviewed-and-old → 2 needing review.
+
+BUG-27 update: a never-reviewed perimeter is due at created_at + frequency,
+no longer instantly overdue — APP-3 is therefore aged past its monthly window
+to stay in the count, and a fourth, freshly created perimeter asserts the new
+grace behaviour (NOT counted).
 """
 import datetime
 import os
@@ -50,10 +55,14 @@ async def test_apps_needing_review_count_after_n1_fix():
         today = datetime.date.today().isoformat()
         async with _Session() as db:
             db.add(Project(id=pid, name="MedSecure"))
+            old = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=60)
             db.add_all([
                 Application(project_id=pid, id="APP-1", nom="Up to date", frequence_revue="mensuelle"),
                 Application(project_id=pid, id="APP-2", nom="Overdue", frequence_revue="mensuelle"),
-                Application(project_id=pid, id="APP-3", nom="Never reviewed", frequence_revue="mensuelle"),
+                # Never reviewed AND older than its monthly window → counted.
+                Application(project_id=pid, id="APP-3", nom="Never reviewed", frequence_revue="mensuelle", created_at=old),
+                # BUG-27: freshly created, never reviewed → grace period, NOT counted.
+                Application(project_id=pid, id="APP-4", nom="Fresh", frequence_revue="mensuelle"),
             ])
             db.add_all([
                 # APP-1: closed today → within the monthly window (not needing).

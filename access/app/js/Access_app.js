@@ -155,6 +155,22 @@ function _updateSidebarAccordion(id) { document.querySelectorAll(".ct-rail-item"
     el.setAttribute("aria-current", "page");
 else
     el.removeAttribute("aria-current"); }); }
+// BUG-25: renderPanel() replaces the whole #content subtree, search input
+// included, so typing lost focus and caret on every keystroke. Re-render,
+// then re-focus the same input (found by id) and restore the caret.
+function _renderKeepingFocus(inputId) {
+    var prev = document.getElementById(inputId);
+    var caret = prev && prev === document.activeElement ? prev.selectionStart : null;
+    renderPanel();
+    var next = document.getElementById(inputId);
+    if (next && caret !== null) {
+        next.focus();
+        try {
+            next.setSelectionRange(caret, caret);
+        }
+        catch (e) { /* type=email etc. */ }
+    }
+}
 // ═══════════════════════════════════════════════════════════════
 // HELPERS
 // ═══════════════════════════════════════════════════════════════
@@ -243,7 +259,30 @@ function _accountTag(enabled) {
 }
 function _statusLabel(s) { return t("user.statut." + s) || s; }
 function _freqLabel(f) { return t("app.freq." + f) || f; }
-function _freqDays(f) { return { trimestrielle: 90, semestrielle: 180, annuelle: 365 }[f] || 180; }
+// BUG-27: aligned on the backend table (routes/internal.py _freq_days) so the
+// dashboard and the Pilot alert agree on what "overdue" means.
+function _freqDays(f) { return { mensuelle: 31, trimestrielle: 92, semestrielle: 183, annuelle: 365 }[f] || 183; }
+// BUG-27: a perimeter with no closed review is due at created_at + frequency —
+// not instantly overdue the moment it is created. Unknown creation date (legacy
+// blob rows) = treat as fresh, never as overdue. A MALFORMED closed_at counts
+// as overdue (the data claims a review happened but its date is unusable) —
+// same contract as the backend review_overdue().
+function _isReviewOverdue(app, lastClosedAt) {
+    var freq = _freqDays(app.frequence_revue);
+    if (lastClosedAt) {
+        var ms = new Date(lastClosedAt).getTime();
+        if (isNaN(ms))
+            return true;
+        return (Date.now() - ms) / 86400000 > freq;
+    }
+    var anchor = app.created_at || "";
+    if (!anchor)
+        return false;
+    var ms2 = new Date(anchor).getTime();
+    if (isNaN(ms2))
+        return false;
+    return (Date.now() - ms2) / 86400000 > freq;
+}
 function _decisionLabel(d) { return t("review.decision." + d) || d; }
 function _card(val, label, cls) {
     var tone = cls === "warning" ? "high" : (cls === "critical" || cls === "high" || cls === "medium" || cls === "low" ? cls : "");
@@ -318,12 +357,7 @@ function renderDashboard() {
                     lastClosed = r.closed_at;
             }
         });
-        if (!lastClosed) {
-            overdue.push(app);
-            return;
-        }
-        var days = Math.floor((Date.now() - new Date(lastClosed).getTime()) / 86400000);
-        if (days > _freqDays(app.frequence_revue))
+        if (_isReviewOverdue(app, lastClosed))
             overdue.push(app);
     });
     if (overdue.length) {
@@ -342,7 +376,7 @@ var _userFilter = "";
 function renderUserList() {
     var h = '<div class="ct-row ct-row-wrap ct-mb-3">';
     h += '<h2 class="ct-m-0">' + t("nav.users") + ' (' + D.si_users.length + ')</h2>';
-    h += '<input type="text" placeholder="' + esc(t("user.search") || "Rechercher...") + '" value="' + esc(_userFilter) + '" class="ct-flex-1 ct-maxw-300 ct-py-1 ct-px-2 ct-bordered ct-r-sm ct-text-meta" data-input="_filterUsers" data-pass-value>';
+    h += '<input type="text" id="user-search" placeholder="' + esc(t("user.search") || "Rechercher...") + '" value="' + esc(_userFilter) + '" class="ct-flex-1 ct-maxw-300 ct-py-1 ct-px-2 ct-bordered ct-r-sm ct-text-meta" data-input="_filterUsers" data-pass-value>';
     // When an HR connector is active, HR (via Access) is the source of
     // identities and self-syncs to Pilot — pulling FROM Pilot is the wrong
     // direction, so the "Sync Pilot" button is hidden (no bidirectional sync).
@@ -422,7 +456,7 @@ function renderUserList() {
     }, 0);
     return h;
 }
-window._filterUsers = function (val) { _userFilter = val || ""; renderPanel(); };
+window._filterUsers = function (val) { _userFilter = val || ""; _renderKeepingFocus("user-search"); };
 var _syncPilotInFlight = false;
 window.syncUsersFromPilot = function () {
     if (_syncPilotInFlight)
@@ -1009,7 +1043,7 @@ var _appFilter = "";
 function renderAppList() {
     var h = '<div class="ct-row ct-row-wrap ct-mb-3">';
     h += '<h2 class="ct-m-0">' + t("nav.apps") + ' (' + D.applications.length + ')</h2>';
-    h += '<input type="text" placeholder="' + esc(t("app.search") || "Rechercher...") + '" value="' + esc(_appFilter) + '" style="flex:1;max-width:280px;padding:var(--ct-s1) var(--ct-s2);border:1px solid var(--ct-line);border-radius:var(--ct-r-sm);font-size:var(--ct-text-meta)" data-input="_filterApps" data-pass-value>';
+    h += '<input type="text" id="app-search" placeholder="' + esc(t("app.search") || "Rechercher...") + '" value="' + esc(_appFilter) + '" style="flex:1;max-width:280px;padding:var(--ct-s1) var(--ct-s2);border:1px solid var(--ct-line);border-radius:var(--ct-r-sm);font-size:var(--ct-text-meta)" data-input="_filterApps" data-pass-value>';
     h += '<div class="ct-flex ct-gap-1">';
     h += '<button class="ct-btn mt-8" data-write data-variant="primary" data-click="addApp">' + t("app.add") + '</button>';
     h += '<button class="ct-btn mt-8" data-write data-click="importAppsCsv">' + t("app.import_csv") + '</button>';
@@ -1081,7 +1115,7 @@ function renderAppList() {
     }, 0);
     return h;
 }
-window._filterApps = function (val) { _appFilter = val || ""; renderPanel(); };
+window._filterApps = function (val) { _appFilter = val || ""; _renderKeepingFocus("app-search"); };
 window._openAppRow = function (row) {
     var idx = D.applications.findIndex(function (a) { return a.id === row.id; });
     if (idx >= 0) {
@@ -1111,7 +1145,7 @@ window._bulkDeleteApps = function (scope) {
 function openApp(i) { _selectedApp = parseInt(i); renderPanel(); }
 window.openApp = openApp;
 function addApp() {
-    D.applications.push({ id: _genId("APP-", D.applications), nom: "", url: "", reviewers: [], frequence_revue: "semestrielle", owner_email: "", type: "application", roles: [] });
+    D.applications.push({ id: _genId("APP-", D.applications), nom: "", url: "", reviewers: [], frequence_revue: "semestrielle", owner_email: "", type: "application", roles: [], created_at: new Date().toISOString().slice(0, 10) });
     _selectedApp = D.applications.length - 1;
     renderPanel();
     _save();
@@ -1161,8 +1195,10 @@ function renderAppDetail() {
     if (a.url)
         h += '<a href="' + esc(a.url) + '" target="_blank" rel="noopener noreferrer" class="access-link ct-text-label ct-no-underline" title="Ouvrir l\'application">&#x2197;</a>';
     h += '<span class="ct-flex-1"></span>';
-    h += '<button class="ct-btn mt-8" data-write data-variant="primary" data-size="xs" style="margin-right:var(--ct-s1)" data-click="startReview" data-args=\'' + _da(a.id) + '\'>' + t("review.start") + '</button>';
-    h += '<button class="ct-btn mt-8" data-write data-variant="danger" data-click="deleteApp">' + t("btn_delete") + '</button></div>';
+    // BUG-24: no mt-8 inside a .ct-row (flex align-center) and one data-size
+    // for both buttons — otherwise they sit at different heights/offsets.
+    h += '<button class="ct-btn" data-write data-variant="primary" data-size="xs" style="margin-right:var(--ct-s1)" data-click="startReview" data-args=\'' + _da(a.id) + '\'>' + t("review.start") + '</button>';
+    h += '<button class="ct-btn" data-write data-variant="danger" data-size="xs" data-click="deleteApp">' + t("btn_delete") + '</button></div>';
     // Stat cards
     h += '<div class="app-stats">';
     h += _card(appReviews.length, t("review.entries"));
@@ -1459,12 +1495,7 @@ function _appsToStart() {
         var lastClosed = D.reviews
             .filter(function (r) { return r.application_id === app.id && r.status === "cloturee" && r.closed_at; })
             .sort(function (a, b) { return (b.closed_at || "").localeCompare(a.closed_at || ""); })[0];
-        if (!lastClosed) {
-            out.push(app);
-            return;
-        }
-        var days = Math.floor((Date.now() - new Date(lastClosed.closed_at).getTime()) / 86400000);
-        if (days > _freqDays(app.frequence_revue))
+        if (_isReviewOverdue(app, lastClosed ? lastClosed.closed_at : null))
             out.push(app);
     });
     return out;
@@ -2161,7 +2192,10 @@ function renderSAList() {
         h += '<div class="ct-empty-state">' + t("svc.empty") + '</div>';
         return h;
     }
-    h += '<table><thead><tr><th>' + t("svc.name") + '</th><th>' + t("svc.identifier") + '</th><th>' + t("svc.platform") + '</th><th>' + t("svc.application") + '</th><th>' + t("svc.secret_storage") + '</th><th>' + t("svc.rotation_policy") + '</th><th>' + t("svc.date_expiration") + '</th><th>' + t("svc.risk_level") + '</th><th></th></tr></thead><tbody>';
+    // BUG-26: without .ct-table the global `th,td` rule applies
+    // (text-align:left + vertical-align:top) — badges and the delete button
+    // sat at odd corners. .ct-table brings the shared middle alignment.
+    h += '<table class="ct-table"><thead><tr><th>' + t("svc.name") + '</th><th>' + t("svc.identifier") + '</th><th>' + t("svc.platform") + '</th><th>' + t("svc.application") + '</th><th>' + t("svc.secret_storage") + '</th><th>' + t("svc.rotation_policy") + '</th><th>' + t("svc.date_expiration") + '</th><th>' + t("svc.risk_level") + '</th><th></th></tr></thead><tbody>';
     D.service_accounts.forEach(function (sa, i) {
         var app = _findApp(sa.application_id);
         var overdue = _isRotationOverdue(sa);
@@ -2178,7 +2212,7 @@ function renderSAList() {
         h += '</td>';
         h += '<td class="ct-text-meta">' + esc(sa.date_expiration || "-") + _expiryBadge(sa) + '</td>';
         h += '<td><span class="ct-badge" data-fill data-tone="' + _accessTone(sa.risk_level) + '">' + esc(_riskLabel(sa.risk_level)) + '</span></td>';
-        h += '<td class="ct-ta-r"><button class="ct-btn mt-8 ct-py-1 ct-px-2 ct-text-label" data-write data-variant="danger" data-click="deleteServiceAccount" data-args=\'' + _da(i) + '\' data-stop>' + t("btn_delete") + '</button></td>';
+        h += '<td class="ct-ta-r"><button class="ct-btn ct-py-1 ct-px-2 ct-text-label" data-write data-variant="danger" data-click="deleteServiceAccount" data-args=\'' + _da(i) + '\' data-stop>' + t("btn_delete") + '</button></td>';
         h += '</tr>';
     });
     h += '</tbody></table>';
@@ -2242,7 +2276,7 @@ function renderSADetail() {
         h += '<span class="ct-badge" data-tone="critical">' + t("svc.rotation_overdue") + '</span>';
     h += _expiryBadge(sa);
     h += '<span class="ct-flex-1"></span>';
-    h += '<button class="ct-btn mt-8" data-write data-variant="danger" data-click="deleteServiceAccount" data-args=\'' + _da(_selectedSA) + '\'>' + t("btn_delete") + '</button></div>';
+    h += '<button class="ct-btn" data-size="xs" data-write data-variant="danger" data-click="deleteServiceAccount" data-args=\'' + _da(_selectedSA) + '\'>' + t("btn_delete") + '</button></div>';
     h += '<div class="ct-tprm-form"><div class="ct-form-grid">';
     h += _saField("name", t("svc.name"), "text", sa.name);
     h += _saField("identifier", t("svc.identifier"), "text", sa.identifier);

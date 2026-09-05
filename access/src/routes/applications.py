@@ -279,6 +279,9 @@ def _to_dict(a: Application) -> dict:
         "reviewers": a.reviewers or [],
         "frequence_revue": a.frequence_revue,
         "owner_email": a.owner_email or "",
+        # BUG-27: anchor for the first review's due date (fresh perimeter =
+        # due at created_at + frequency, not instantly overdue).
+        "created_at": a.created_at.date().isoformat() if a.created_at else "",
         "type": a.type or "application",
         "roles": a.roles or [],
     }
