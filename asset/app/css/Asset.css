@@ -12,14 +12,6 @@
 /* ── Dashboard sections ───────────────────────────────────── */
 .dash-section { background: var(--ct-surface); border: 1px solid var(--ct-line); border-radius: 8px; padding: 14px; margin-bottom: 12px; }
 
-/* ── Type breakdown bar ───────────────────────────────────── */
-.type-breakdown { display: flex; flex-direction: column; gap: 6px; }
-.type-bar-row { display: flex; align-items: center; gap: 8px; font-size: 0.85em; }
-.type-bar-label { min-width: 140px; font-weight: 600; }
-.type-bar-track { flex: 1; height: 8px; background: var(--ct-canvas); border-radius: 4px; overflow: hidden; }
-.type-bar-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }
-.type-bar-count { min-width: 24px; text-align: right; font-weight: 700; color: var(--ct-ink-2); }
-
 /* ── Type badge ───────────────────────────────────────────── */
 
 /* ── Groupe card ──────────────────────────────────────────── */
@@ -38,7 +30,6 @@
 /* ── Empty state ──────────────────────────────────────────── */
 /* ── Responsive ───────────────────────────────────────────── */
 @media (max-width: 768px) {
-    .type-bar-label { min-width: 100px; font-size: 0.8em; }
     .ct-tprm-form { padding: 12px; }
     .ct-form-grid { grid-template-columns: 1fr; }
     .vendor-tabs { flex-direction: column; }

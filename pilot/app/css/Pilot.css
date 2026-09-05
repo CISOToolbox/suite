@@ -86,11 +86,8 @@
 .dash-measures-bar { height: 6px; background: var(--ct-canvas); border-radius: 3px; overflow: hidden; }
 .dash-measures-fill { height: 100%; background: var(--ct-accent); border-radius: 3px; transition: width 0.3s; }
 
-/* ── SVG helpers used by the cards ──────────────────────────── */
-.ct-donut-wrap { display: flex; flex-direction: column; align-items: center; gap: 10px; }
-.ct-donut-legend { display: flex; flex-wrap: wrap; gap: 4px 10px; justify-content: center; font-size: 0.72em; color: var(--ct-ink-2); }
-.ct-donut-legend-item { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
-.ct-donut-dot { width: 8px; height: 8px; border-radius: 2px; display: inline-block; flex-shrink: 0; }
+/* The .ct-donut-* legend rules moved into the shared stylesheet: they are
+   emitted by the shared _svgDonut helper, so every module gets them. */
 /* .ct-empty is no longer redefined here: it is emitted by the shared components
    (ct_table, cisotoolbox) and the socle turns it into a centered icon / title /
    text column. The local override reduced it to an italic line — in Pilot only.
