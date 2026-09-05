@@ -131,6 +131,31 @@ def sa_expiry_bucket(date_expiration, today=None):
     return None
 
 
+# Review frequency → days. Aligned with the frontend _freqDays (BUG-27).
+FREQ_DAYS = {"mensuelle": 31, "trimestrielle": 92, "semestrielle": 183, "annuelle": 365}
+
+
+def review_overdue(last_closed_str, created_at, frequence_revue) -> bool:
+    """Is a perimeter's periodic review overdue?
+
+    BUG-27: a perimeter with no closed review is due at created_at +
+    frequency — not instantly overdue the moment it is created. Unknown
+    creation date = treat as fresh, never as overdue (mirrors the frontend
+    _isReviewOverdue). A malformed closed_at still counts as overdue: the
+    data claims a review happened but its date is unusable.
+    """
+    from datetime import date as _date, timedelta
+    days = FREQ_DAYS.get(frequence_revue, 183)
+    if not last_closed_str:
+        if not created_at:
+            return False
+        return _date.today() > created_at.date() + timedelta(days=days)
+    try:
+        return _date.today() > _date.fromisoformat(last_closed_str) + timedelta(days=days)
+    except (ValueError, TypeError):
+        return True
+
+
 def _normalize_status(s: str) -> str:
     mapping = {
         "termine": "completed", "Termine": "completed", "Terminé": "completed", "completed": "completed",
@@ -183,7 +208,6 @@ async def internal_stats(request: Request, db: AsyncSession = Depends(get_db)):
     ]
 
     # Apps without any review or with an overdue review.
-    _freq_days = {"mensuelle": 31, "trimestrielle": 92, "semestrielle": 183, "annuelle": 365}
     from datetime import timedelta
     # Latest closed review per application in ONE grouped query (was a SELECT
     # per application — an N+1 on a 30s-polled endpoint). closed_at is an ISO
@@ -196,20 +220,11 @@ async def internal_stats(request: Request, db: AsyncSession = Depends(get_db)):
 
     # Project only the columns the loop needs — no full Application hydration.
     app_rows = (await db.execute(
-        select(Application.id, Application.frequence_revue)
+        select(Application.id, Application.frequence_revue, Application.created_at)
     )).all()
     apps_needing_review = 0
-    for app_id, frequence_revue in app_rows:
-        last_closed_str = latest_by_app.get(app_id)
-        if not last_closed_str:
-            apps_needing_review += 1
-            continue
-        try:
-            last_closed = _date.fromisoformat(last_closed_str)
-            days = _freq_days.get(frequence_revue, 183)
-            if _date.today() > last_closed + timedelta(days=days):
-                apps_needing_review += 1
-        except (ValueError, TypeError):
+    for app_id, frequence_revue, created_at in app_rows:
+        if review_overdue(latest_by_app.get(app_id), created_at, frequence_revue):
             apps_needing_review += 1
 
     # Service accounts stats

@@ -67,6 +67,8 @@ type AccessApplication = {
     type?: string;
     /** Free-text role names defined for this perimeter. */
     roles?: string[];
+    /** BUG-27 — ISO creation date, anchor for the first review's due date. */
+    created_at?: string;
 };
 
 type AccessEntitlement = {
