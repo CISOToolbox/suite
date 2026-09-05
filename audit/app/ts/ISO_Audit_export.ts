@@ -233,7 +233,7 @@ function _buildWordDoc(CONTROLS: AuditControl[], DOMAINS: AuditDomain[], imageMa
     body += p("Confidentiel — usage interne", null, { sz: "16", color: "999999", align: "center", italic: true });
     body += pageBreak();
 
-    // ═══ SYNTHÈSE EXECUTIVE ═══
+    // ═══ EXECUTIVE SUMMARY ═══
     body += heading("Synthèse exécutive", 1);
     body += hrLine();
     body += pEmpty();
@@ -271,7 +271,7 @@ function _buildWordDoc(CONTROLS: AuditControl[], DOMAINS: AuditDomain[], imageMa
     body += pEmpty();
     body += pageBreak();
 
-    // ═══ DÉTAIL PAR DOMAINE ═══
+    // ═══ DETAIL BY DOMAIN ═══
     DOMAINS.forEach(function(dom) {
         var ctrls = CONTROLS.filter(function(c) { return c.d === dom.id; });
         if (ctrls.length === 0) return;
@@ -319,14 +319,14 @@ function _buildWordDoc(CONTROLS: AuditControl[], DOMAINS: AuditDomain[], imageMa
         body += pageBreak();
     });
 
-    // ═══ NON-CONFORMITÉS ═══
+    // ═══ NON-CONFORMITIES ═══
     var ncSeverityOrder: Record<string, number> = { ncmaj: 0, ncmin: 1, ps: 2, pp: 3 };
     var ncs = CONTROLS.filter(function(c) {
         var s = readFinding(c.id).status;
         return s === "ncmaj" || s === "ncmin" || s === "ps" || s === "pp";
     }).sort(function(a, b) {
-        // BUG FIX (portage TS) : l'original utilisait `|| 99` — ncmaj (0, falsy)
-        // était trié en dernier au lieu de premier. `??` préserve le 0.
+        // BUG FIX (TS port): the original used `|| 99` — ncmaj (0, falsy)
+        // was sorted last instead of first. `??` preserves the 0.
         var sa = ncSeverityOrder[readFinding(a.id).status] ?? 99;
         var sb = ncSeverityOrder[readFinding(b.id).status] ?? 99;
         return sa - sb;

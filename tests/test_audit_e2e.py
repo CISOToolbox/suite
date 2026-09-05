@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
-"""E2E HTTP du module Audit (sans navigateur) — parcours complet validé.
+"""HTTP E2E for the Audit module (no browser) — full validated journey.
 
-Couvre le comportement validé manuellement (process step 8) :
-  1. Santé, index, login servis via le proxy
-  2. Cycle de vie d'un audit stocké : création, autosave (PUT blob),
-     liste, duplication, suppression — avec nom/organisation/date
-     dérivés de D.meta
-  3. Import d'un fichier JSON de la version frontend (multipart)
-  4. Actions correctives : création avec responsable + control_id,
-     patch de statut, journal
-  5. Intégration Pilot : /internal/stats et /internal/measures exigent
-     le service token, source_id composite (MES-NNN@project), write-back
-  6. Garde-fous : import JSON invalide → 422, /internal bloqué au proxy
+Covers the manually validated behavior (process step 8):
+  1. Health, index and login served through the proxy
+  2. Life cycle of a stored audit: creation, autosave (PUT blob),
+     listing, duplication, deletion — with name/organization/date
+     derived from D.meta
+  3. Import of a JSON file from the frontend version (multipart)
+  4. Corrective actions: creation with owner + control_id,
+     status patch, progress log
+  5. Pilot integration: /internal/stats and /internal/measures require
+     the service token, composite source_id (MES-NNN@project), write-back
+  6. Guardrails: invalid JSON import → 422, /internal blocked at the proxy
 
-Usage :
+Usage:
   AUDIT_JWT=$(podman exec ciso2-audit python3 -c "import sys; sys.path.insert(0,'/app'); \
       from src.auth_common import create_jwt; \
       print(create_jwt('<uuid>', '<email>', 'admin', {'audit': 'admin'}))") \
@@ -94,7 +94,7 @@ def main():
         print("AUDIT_JWT manquant — voir l'usage en tête de fichier")
         sys.exit(2)
 
-    # ── 1. Servi via le proxy ──
+    # ── 1. Served through the proxy ──
     st, _ = req("GET", "/audit/api/health", auth=False)
     check("santé via proxy", st == 200)
     st, _ = req("GET", "/audit/", auth=False)
@@ -102,7 +102,7 @@ def main():
     st, _ = req("GET", "/audit/login.html", auth=False)
     check("login servi", st == 200)
 
-    # ── 2. Cycle de vie d'un audit stocké ──
+    # ── 2. Life cycle of a stored audit ──
     st, created = req("POST", "/audit/api/projects", {"name": "", "data": FRONTEND_EXPORT})
     check("création (meta dérivée)", st == 201 and created and created["name"] == "E2E MedSecure — AUD-E2E-001"
           and created["audit_date"] == "2026-08-01", str(created)[:120])
@@ -124,7 +124,7 @@ def main():
     st, _ = req("DELETE", f"/audit/api/projects/{dup['id']}")
     check("suppression (admin)", st == 204)
 
-    # ── 3. Import d'un fichier frontend ──
+    # ── 3. Import of a frontend file ──
     body, ctype = multipart("file", "ISO_Audit_export.json", json.dumps(FRONTEND_EXPORT).encode())
     st, imported = req("POST", "/audit/api/projects/import", body, ctype)
     check("import fichier frontend", st == 201 and imported["organization"] == "E2E MedSecure")
@@ -133,8 +133,8 @@ def main():
     st, _ = req("POST", "/audit/api/projects/import", body, ctype)
     check("import JSON invalide → 422", st == 422)
 
-    # Régression (revue sécurité) : un rôle viewer ne peut pas créer
-    # d'audit par import — même garde que la création.
+    # Regression (security review): a viewer role cannot create an audit
+    # through import — same guard as creation.
     viewer_jwt = os.environ.get("AUDIT_VIEWER_JWT", "")
     if viewer_jwt:
         body, ctype = multipart("file", "t.json", json.dumps(FRONTEND_EXPORT).encode())
@@ -142,7 +142,7 @@ def main():
                     headers={"Cookie": "audit_token=" + viewer_jwt}, auth=False)
         check("import interdit au viewer → 403", st == 403)
 
-    # ── 4. Actions correctives ──
+    # ── 4. Corrective actions ──
     st, m = req("POST", f"/audit/api/projects/{pid}/measures",
                 {"title": "Déployer un KMS", "control_id": "A.8.24",
                  "responsable": "E2E Owner", "echeance": "2026-12-31"})
@@ -155,8 +155,8 @@ def main():
     check("patch statut + journal", st == 200 and m2["statut"] == "en_cours"
           and len(m2["progress_log"]) == 1)
 
-    # ── 5. Intégration Pilot (accès direct conteneur exclu : via proxy = bloqué,
-    #       via BASE_DIRECT si fourni) ──
+    # ── 5. Pilot integration (direct container access excluded: through the
+    #       proxy = blocked, through BASE_DIRECT when provided) ──
     st, _ = req("GET", "/audit/api/internal/stats", auth=False)
     check("/internal bloqué au proxy (404)", st == 404)
 
@@ -189,7 +189,7 @@ def main():
         st, m3 = req("GET", f"/audit/api/projects/{pid}/measures")
         check("write-back appliqué", st == 200 and m3[0]["statut"] == "termine")
 
-    # ── 6. Nettoyage ──
+    # ── 6. Cleanup ──
     st, _ = req("DELETE", f"/audit/api/projects/{pid}")
     check("nettoyage audit e2e", st == 204)
     st, _ = req("DELETE", f"/audit/api/projects/{imported['id']}")

@@ -31,37 +31,37 @@ def check(label, ok, detail=""):
 
 for module, app_rev in sorted(sm.MODULE_REVS.items()):
     fdir = FIXTURES / module
-    # 1. chaque rev < courante doit avoir sa fixture archivée
+    # 1. every rev < current must have its archived fixture
     for rev in range(0, app_rev):
         fixture = fdir / f"rev{rev}.json"
         if rev == 0:
             check(f"{module}: fixture rev0 archivée", fixture.exists())
-        # les revs intermédiaires n'existent que pour les modules déjà bumpés :
-        # vendor rev1 = format V1 — couvert par la fixture rev0 (pré-versioning)
-    # 2. chaque fixture existante migre jusqu'à la rev courante
+        # intermediate revs only exist for modules that have already been bumped:
+        # vendor rev1 = V1 format — covered by the rev0 fixture (pre-versioning)
+    # 2. every existing fixture migrates up to the current rev
     for fixture in sorted(fdir.glob("rev*.json")):
         data = json.loads(fixture.read_text())
         before = copy.deepcopy(data)
         out = sm.migrate_blob(module, data)
         check(f"{module}/{fixture.name}: migre vers rev {app_rev}",
               out["meta"]["schema_rev"] == app_rev)
-        # préservation : toute clé métier de la fixture survit
+        # preservation: every business key of the fixture survives
         for k, v in before.items():
             if k == "meta":
                 continue
             check(f"{module}/{fixture.name}: préserve {k}", out.get(k) == v,
                   f"{out.get(k)!r} != {v!r}")
-        # normalisation : les collections de base existent
+        # normalization: the baseline collections exist
         for k in sm._BASELINE_KEYS[module]:
             check(f"{module}/{fixture.name}: baseline {k}", isinstance(out.get(k), list))
-    # 3. refus sec des revs futures
+    # 3. flat refusal of future revs
     try:
         sm.migrate_blob(module, {"meta": {"schema_rev": app_rev + 1}})
         check(f"{module}: rev future refusée", False)
     except sm.FutureRevError as exc:
         check(f"{module}: rev future refusée", str(app_rev + 1) in str(exc) and str(app_rev) in str(exc))
 
-# 4. idempotence : migrer deux fois = même résultat
+# 4. idempotence: migrating twice = same result
 d1 = json.loads((FIXTURES / "vendor" / "rev0.json").read_text())
 sm.migrate_blob("vendor", d1)
 d2 = copy.deepcopy(d1)

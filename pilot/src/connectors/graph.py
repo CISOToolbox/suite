@@ -300,11 +300,11 @@ _RESOLVERS = {
 # credentials are configured, so the indicators populate offline. Real
 # credentials switch every metric back to live Microsoft Graph queries.
 _DEMO = {
-    "m365_secure_score": 82.0,        # >= target 80 → vert
-    "defender_exposure_score": 16.0,  # <= target 20 → vert
-    "intune_device_compliance": 96.0, # >= target 95 → vert
-    "entra_mfa_coverage": 100.0,      # >= target 100 → vert
-    "entra_risky_users": 3.0,         # > target 0 (< amber 5) → ambre (réaliste)
+    "m365_secure_score": 82.0,        # >= target 80 → green
+    "defender_exposure_score": 16.0,  # <= target 20 → green
+    "intune_device_compliance": 96.0, # >= target 95 → green
+    "entra_mfa_coverage": 100.0,      # >= target 100 → green
+    "entra_risky_users": 3.0,         # > target 0 (< amber 5) → amber (realistic)
 }
 
 

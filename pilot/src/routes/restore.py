@@ -1,4 +1,4 @@
-"""Point-in-time restore orchestration (FEAT-30 phase 2, étage 3).
+"""Point-in-time restore orchestration (FEAT-30 phase 2, stage 3).
 
 Pilot drives the backup agent's recovery API and the modules' recovery
 export endpoints to let an admin restore ONE object as it was at instant T

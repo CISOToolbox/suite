@@ -1,7 +1,7 @@
 /**
- * ISO Audit — modèle de données D + globals app (fichier de types pur).
- * Déduit de ISO_AUDIT_INIT_DATA (ISO_Audit_data.ts), des fichiers de
- * référentiel (controls/docreview) et des usages dans l'app.
+ * ISO Audit — data model D + app globals (pure types file).
+ * Derived from ISO_AUDIT_INIT_DATA (ISO_Audit_data.ts), the referential
+ * files (controls/docreview) and the usages in the app.
  */
 
 interface AuditControl {
@@ -12,7 +12,7 @@ interface AuditControl {
     desc: string;
     desc_en?: string;
     hds: boolean;
-    /** Posé temporairement par l'export Word (ISO_Audit_export.ts). */
+    /** Set temporarily by the Word export (ISO_Audit_export.ts). */
     _ctrlImages?: AuditImageEntry[];
 }
 
@@ -88,7 +88,7 @@ interface AuditMeta {
     hds: string;
 }
 
-/** Entrée image stockée dans IndexedDB (et embarquée dans D._images à l'export JSON). */
+/** Image entry stored in IndexedDB (and embedded in D._images on JSON export). */
 interface AuditImageEntry {
     id: string;
     ctrlId: string;
@@ -104,13 +104,13 @@ interface AuditData {
     planning: { params: AuditPlanningParams; slots: AuditSlot[] };
     journal: AuditJournalEntry[];
     timers: Record<string, unknown>;
-    /** Transitoire : images embarquées lors de la sérialisation/du chargement JSON. */
+    /** Transient: images embedded during JSON serialization/loading. */
     _images?: AuditImageEntry[];
 }
 
-/* ── Statistiques ─────────────────────────────────────────────── */
+/* ── Statistics ───────────────────────────────────────────────── */
 
-/** Clés de statut comptées dans les stats (cf. STATUS_MAP). */
+/** Status keys counted in the stats (cf. STATUS_MAP). */
 type AuditStatusKey = "c" | "ncmaj" | "ncmin" | "ps" | "pp" | "na";
 
 interface AuditStatusCounts {
@@ -143,7 +143,7 @@ interface AuditHDSCount {
     other: number;
 }
 
-/* ── Export Word (OOXML) ──────────────────────────────────────── */
+/* ── Word export (OOXML) ──────────────────────────────────────── */
 
 interface AuditWordPOpts {
     sz?: string;
@@ -151,10 +151,10 @@ interface AuditWordPOpts {
     italic?: boolean;
     color?: string;
     align?: string;
-    /** Variante app (rapport IA) : espacement à plat. */
+    /** App variant (AI report): flat spacing. */
     after?: number;
     before?: number;
-    /** Variante export : espacement imbriqué. */
+    /** Export variant: nested spacing. */
     spacing?: { before?: number; after?: number };
     indent?: number;
 }
@@ -178,11 +178,11 @@ interface AuditWordImgRel {
     base64: string;
 }
 
-/* ── Globals ai_common exposés via window (assignés par ai_common.js,
- *    donc accessibles en appel nu dans le scope global du navigateur).
- *    Mêmes signatures que dans gen-ai_common.d.ts ; _aiOpenPanel accepte
- *    un titre optionnel (ignoré par l'implémentation partagée — l'app
- *    l'a toujours passé). ─────────────────────────────────────── */
+/* ── ai_common globals exposed via window (assigned by ai_common.js,
+ *    hence callable bare in the browser's global scope).
+ *    Same signatures as in gen-ai_common.d.ts; _aiOpenPanel accepts an
+ *    optional title (ignored by the shared implementation — the app
+ *    has always passed it). ─────────────────────────────────────── */
 
 declare function _aiIsEnabled(): boolean;
 declare function _aiGetApiKey(): string;
@@ -192,7 +192,7 @@ declare function _aiOpenPanel(title?: string): void;
 declare function _aiShowLoading(title: string): void;
 declare function _aiShowError(title: string, errMsg: string): void;
 
-/* ── Globals window (référentiels + dispatch data-click) ──────── */
+/* ── Window globals (referentials + data-click dispatch) ──────── */
 
 interface Window {
     ISO_AUDIT_INIT_DATA?: AuditData;
@@ -202,7 +202,7 @@ interface Window {
     ISO_AUDIT_QUESTIONS_EN?: Record<string, string[]>;
     ISO_AUDIT_DOC_REVIEW?: AuditDocItem[];
     _lastAIReport?: string;
-    /** Hooks surchargés par ISO_Audit_images.ts (sérialisation avec images). */
+    /** Hooks overridden by ISO_Audit_images.ts (serialization with images). */
     _serializeForSave?: typeof _serializeForSave;
     _initDataAndRender?: (afterFn?: () => void) => void;
 
@@ -244,7 +244,7 @@ interface Window {
     renderImages?: (ctrlId: string) => void;
 }
 
-/* Fonctions exposées par ISO_Audit_images.ts (IIFE) — utilisées en appel nu
- * par ISO_Audit_app.ts / ISO_Audit_export.ts via le scope global window. */
+/* Functions exposed by ISO_Audit_images.ts (IIFE) — called bare by
+ * ISO_Audit_app.ts / ISO_Audit_export.ts via the global window scope. */
 declare function renderImages(ctrlId: string): void;
 declare function _imgGetAll(ctrlId: string, cb: (imgs: AuditImageEntry[]) => void): void;

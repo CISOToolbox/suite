@@ -1,14 +1,14 @@
-# CI du dépôt suite — les gates mécaniques du flux PR.
+# CI for this repository — the mechanical gates of the PR flow.
 #
-# Ce fichier est PUBLIÉ depuis le monorepo (public/suite-modules/.github/) :
-# ne pas l'éditer ici, éditer la source. Chaque gate correspond à une classe
-# de défaut réellement livrée le 2026-09-02 malgré des consignes écrites.
-# La revue adversariale (agent reviewer, côté monorepo) couvre ce que la
-# mécanique ne voit pas : claims des commits, critères de spec, angles morts.
-# Les gates locaux au monorepo (i18n, drift de propagation) sont tenus par
-# le pre-commit et par publish.py AVANT que le code n'arrive ici.
+# This file is GENERATED: do not edit it here, edit the upstream source.
+# Each gate matches a class of defect that was actually shipped on 2026-09-02
+# despite written instructions. The adversarial review covers what the
+# mechanical gates cannot see: commit claims, spec criteria, blind spots.
+# The gates that run before the code reaches this repository (i18n,
+# source-tree consistency) are held upstream, by the pre-commit hook and by
+# the publishing step.
 #
-# Actions épinglées par commit : checkout v4.2.2, setup-python v5.4.0.
+# Actions pinned by commit: checkout v4.2.2, setup-python v5.4.0.
 name: ci
 
 on:
@@ -32,8 +32,8 @@ jobs:
       - name: sentinelle auth (§4.4)
         run: pytest tests/test_auth_sentinel.py -q
       - name: migrations de schéma exporté (FEAT-36)
-        # Script à main stdlib (0 test collecté par pytest → exit 5) : on
-        # l'exécute comme le pre-commit le fait.
+        # Hand-written stdlib script (0 tests collected by pytest → exit 5):
+        # run it the way the pre-commit hook does.
         run: python3 tests/test_schema_migrations.py
       - name: contrats de suite (prompts, add-ons, secrets, SSRF…)
         run: pytest tests/test_suite_contracts.py -q
@@ -53,13 +53,13 @@ jobs:
           cache: pip
           cache-dependency-path: ${{ matrix.module }}/requirements.txt
       - name: dépendances du module
-        # aiosqlite : les tests unitaires substituent SQLite à PostgreSQL —
-        # dépendance de TEST, volontairement absente des requirements d'image.
+        # aiosqlite: the unit tests substitute SQLite for PostgreSQL — a TEST
+        # dependency, deliberately absent from the image requirements.
         run: pip install --quiet pytest pytest-asyncio aiosqlite -r ${{ matrix.module }}/requirements.txt
       - name: tests unitaires
-        # access/asset portent des échecs préexistants documentés (modules en
-        # développement) : leurs suites tournent mais ne bloquent pas ENCORE.
-        # Retirer cette tolérance dès qu'elles passent.
+        # access/asset carry documented pre-existing failures (modules under
+        # development): their suites run but do NOT block YET.
+        # Remove this tolerance as soon as they pass.
         run: |
           cd ${{ matrix.module }}
           if [ ! -d tests/unit ]; then

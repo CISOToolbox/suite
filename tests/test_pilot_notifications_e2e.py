@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
-"""E2E HTTP — FEAT-34 : prefs de notification + digest d'échéances (Pilot).
+"""HTTP E2E — FEAT-34: notification prefs + due-date digest (Pilot).
 
-Couvre le comportement validé manuellement (process step 8) :
-  0. Mise à l'état neutre (répétabilité quel que soit l'état laissé avant)
-  1. GET prefs → défauts opt-in (enabled=false, prefix [CISO Toolbox])
-  2. PUT prefs complet (jour, fenêtre, périmètre admin, préfixe
-     personnalisé, langue) → écho fidèle + persistance relue
-  3. Garde-fous : fenêtre hors 7|14|30 → 422, langue inconnue → 422,
-     appel non authentifié → 401
-  4. POST /test (aperçu forcé) → status sent (chemin SMTP complet ;
-     envoie UN email réel au porteur du JWT)
-  5. Remise à l'état neutre (opt-in off) en fin de test
+Covers the manually validated behavior (process step 8):
+  0. Reset to the neutral state (repeatability whatever state was left behind)
+  1. GET prefs → opt-in defaults (enabled=false, prefix [CISO Toolbox])
+  2. Full PUT prefs (day, window, admin scope, custom prefix, language)
+     → faithful echo + persistence read back
+  3. Guardrails: window outside 7|14|30 → 422, unknown language → 422,
+     unauthenticated call → 401
+  4. POST /test (forced preview) → status sent (full SMTP path; sends ONE
+     real email to the JWT bearer)
+  5. Reset to the neutral state (opt-in off) at the end of the test
 
-Usage :
+Usage:
   PILOT_JWT=$(podman exec ciso2-pilot python3 -c "import sys; sys.path.insert(0,'/app'); \
       from src.auth import create_jwt; \
       print(create_jwt('<uuid>', '<email>', 'admin', []))") \
@@ -72,12 +72,12 @@ def subset_ok(echo, wanted):
 if not JWT:
     print("PILOT_JWT manquant"); sys.exit(2)
 
-# 0. état neutre reproductible (le test doit passer quel que soit l'état
-# laissé par une session précédente)
+# 0. reproducible neutral state (the test must pass whatever state a
+# previous session left behind)
 st, _ = req("PUT", P, NEUTRAL)
 check("mise à neutre initiale", st == 200, str(st))
 
-# 1. lecture des défauts opt-in
+# 1. read the opt-in defaults
 st, prefs = req("GET", P)
 check("GET prefs -> 200", st == 200, str(st))
 check("défaut opt-in: enabled=false", bool(prefs) and prefs.get("enabled") is False)
@@ -85,7 +85,7 @@ check("défaut préfixe [CISO Toolbox]",
       bool(prefs) and prefs.get("subject_prefix") == "[CISO Toolbox]",
       json.dumps(prefs, ensure_ascii=False) if prefs else "vide")
 
-# 2. PUT complet + persistance
+# 2. full PUT + persistence
 wanted = {"enabled": True, "day_of_week": 2, "upcoming_days": 30,
           "include_overdue": False, "scope": "all", "modules": ["risk", "compliance"],
           "lang": "en", "subject_prefix": "[E2E Prefix]"}
@@ -95,11 +95,11 @@ check("écho fidèle", subset_ok(echo, wanted), json.dumps(echo, ensure_ascii=Fa
 st, back = req("GET", P)
 check("persistance relue", st == 200 and subset_ok(back, wanted))
 
-# préfixe vide -> retombe sur le défaut
+# empty prefix -> falls back to the default
 st, echo = req("PUT", P, {**wanted, "subject_prefix": "   "})
 check("préfixe vide -> défaut", st == 200 and echo.get("subject_prefix") == "[CISO Toolbox]")
 
-# 3. garde-fous
+# 3. guardrails
 st, _ = req("PUT", P, {**wanted, "upcoming_days": 9})
 check("fenêtre invalide -> 422", st == 422, str(st))
 st, _ = req("PUT", P, {**wanted, "lang": "de"})
@@ -107,9 +107,9 @@ check("langue invalide -> 422", st == 422, str(st))
 st, _ = req("GET", P, auth=False)
 check("non authentifié -> 401", st == 401, str(st))
 
-# 4. test multi-modules (envoie de vrais emails pour chaque module activé ;
-# ici tout est désactivé côté digest pilot -> skipped, appsec activé par
-# défaut -> sent)
+# 4. multi-module test (sends real emails for every enabled module; here
+# everything is disabled on the pilot digest side -> skipped, appsec enabled
+# by default -> sent)
 st, res = req("POST", P + "/test")
 results = (res or {}).get("results") or {}
 check("POST /test -> results par module", st == 200 and "pilot" in results,
@@ -117,7 +117,7 @@ check("POST /test -> results par module", st == 200 and "pilot" in results,
 check("statuts valides", all(str(v) == "sent" or str(v).startswith("skipped")
                              for v in results.values()), str(results))
 
-# 5. retour à l'état neutre
+# 5. back to the neutral state
 st, echo = req("PUT", P, NEUTRAL)
 check("remise à neutre", st == 200 and subset_ok(echo, NEUTRAL))
 

@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
-"""E2E HTTP — FEAT-35 : notifications multi-modules (Pilot ⇄ AppSec ⇄ Surface).
+"""HTTP E2E — FEAT-35: multi-module notifications (Pilot ⇄ AppSec ⇄ Surface).
 
-Couvre le comportement validé manuellement (process step 8) :
-  1. Écriture des prefs DEPUIS AppSec (proxy) → relecture identique DEPUIS
-     Pilot et DEPUIS Surface (stockage unique)
-  2. Bloc surface : opt-in défaut off ; activation + seuil depuis Surface
-  3. Garde-fous : sévérité invalide → 422 (via proxy), non authentifié → 401
-  4. « Lancer un test » depuis la cloche Surface → orchestration Pilot,
-     un statut par module respectant les flags enabled (emails réels)
-  5. Remise à l'état neutre
+Covers the manually validated behavior (process step 8):
+  1. Writing the prefs FROM AppSec (proxy) → identical read back FROM
+     Pilot and FROM Surface (single storage)
+  2. Surface block: opt-in default off; enabling + threshold from Surface
+  3. Guardrails: invalid severity → 422 (through the proxy), unauthenticated → 401
+  4. « Lancer un test » from the Surface bell → Pilot orchestration,
+     one status per module honouring the enabled flags (real emails)
+  5. Reset to the neutral state
 
-Usage :
+Usage:
   PILOT_JWT=… APPSEC_JWT=… SURFACE_JWT=… \
   python3 tests/test_suite_notifications_e2e.py https://localhost:8443
-  (JWTs forgés in-container : src.auth.create_jwt côté pilot,
-   src.auth_common.create_jwt côté modules)
+  (JWTs minted in-container: src.auth.create_jwt on the pilot side,
+   src.auth_common.create_jwt on the module side)
 """
 import json
 import os
@@ -73,11 +73,11 @@ NEUTRAL = {"enabled": False, "day_of_week": 0, "upcoming_days": 14,
                "surface": {"alert_enabled": False, "alert_min_severity": "low",
                            "subject_prefix": "[Surface]"}}}
 
-# 0. état neutre
+# 0. neutral state
 st, _ = req("pilot", "PUT", body=NEUTRAL)
 check("mise à neutre initiale", st == 200, str(st))
 
-# 1. écriture depuis AppSec → relue partout (stockage unique)
+# 1. write from AppSec → read back everywhere (single storage)
 wanted = json.loads(json.dumps(NEUTRAL))
 wanted["module_prefs"]["appsec"].update({"alert_enabled": True, "alert_min_severity": "high"})
 wanted["module_prefs"]["surface"].update({"alert_enabled": True, "alert_min_severity": "critical",
@@ -89,9 +89,9 @@ for m in ("pilot", "surface"):
     check(f"relecture via {m}", st == 200 and back.get("module_prefs") == wanted["module_prefs"],
           json.dumps((back or {}).get("module_prefs"), ensure_ascii=False))
 
-# 2. opt-in surface : défaut off vérifié sur l'état neutre plus bas (étape 5)
+# 2. surface opt-in: default off, checked on the neutral state below (step 5)
 
-# 3. garde-fous
+# 3. guardrails
 bad = json.loads(json.dumps(wanted))
 bad["module_prefs"]["surface"]["alert_min_severity"] = "apocalyptic"
 st, _ = req("surface", "PUT", body=bad)
@@ -99,7 +99,7 @@ check("sévérité invalide -> 422", st == 422, str(st))
 st, _ = req("surface", "GET", auth=False)
 check("non authentifié -> 401", st == 401, str(st))
 
-# 4. test orchestré depuis Surface : pilot désactivé, appsec+surface activés
+# 4. test orchestrated from Surface: pilot disabled, appsec+surface enabled
 st, res = req("surface", "POST", "/test")
 results = (res or {}).get("results") or {}
 check("test-all -> 3 modules", st == 200 and set(results) == {"pilot", "appsec", "surface"},
@@ -108,7 +108,7 @@ check("pilot ignoré (désactivé)", str(results.get("pilot", "")).startswith("s
 check("appsec testé", results.get("appsec") == "sent", str(results))
 check("surface testé", results.get("surface") == "sent", str(results))
 
-# 5. remise à neutre + opt-in off par défaut
+# 5. reset to neutral + opt-in off by default
 st, echo = req("pilot", "PUT", body=NEUTRAL)
 check("remise à neutre", st == 200 and echo.get("module_prefs") == NEUTRAL["module_prefs"])
 

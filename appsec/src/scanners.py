@@ -274,23 +274,22 @@ def fetch_file_window(repo_url: str, branch: str, commit: str, token_encrypted: 
 # ═══════════════════════════════════════════════════════════════
 
 def _synthesize_nuget_manifests(repo_dir: str) -> int:
-    """Trivy ne lit les dépendances NuGet que depuis packages.lock.json,
-    *.deps.json ou packages.config. Un projet .NET moderne déclare ses
-    PackageReference dans le .csproj sans lockfile → 0 vuln et SBOM vide,
-    silencieusement. On synthétise un packages.config par .csproj (versions
-    exactes uniquement, ranges/variables MSBuild ignorés) quand aucun
-    manifest lisible par trivy n'existe dans le dossier du .csproj.
-    Retourne le nombre de fichiers synthétisés."""
+    """Trivy only reads NuGet dependencies from packages.lock.json,
+    *.deps.json or packages.config. A modern .NET project declares its
+    PackageReference entries in the .csproj with no lockfile → 0 vulns and an
+    empty SBOM, silently. We synthesize one packages.config per .csproj
+    (exact versions only, ranges/MSBuild variables ignored) when no
+    trivy-readable manifest exists in the .csproj directory.
+    Returns the number of synthesized files."""
     import xml.etree.ElementTree as ET
 
     import xml.parsers.expat as _expat
 
     def _safe_parse(path: str) -> ET.ElementTree | None:
-        # Contenu non fiable (repo cloné) : DTD interdite (XXE /
-        # billion-laughs) via un préflight expat dont les handlers lèvent —
-        # comme defusedxml, et contrairement à un test de sous-chaîne sur
-        # les octets, insensible à l'encodage (UTF-16…). Taille plafonnée,
-        # symlinks ignorés.
+        # Untrusted content (cloned repo): DTDs are forbidden (XXE /
+        # billion-laughs) through an expat preflight whose handlers raise —
+        # like defusedxml, and unlike a byte-substring check, insensitive to
+        # the encoding (UTF-16…). Size capped, symlinks ignored.
         def _reject_dtd(*_a: object) -> None:
             raise ValueError("DTD forbidden in project file")
         try:

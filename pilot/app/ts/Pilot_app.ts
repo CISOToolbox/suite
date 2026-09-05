@@ -47,16 +47,15 @@ window._fetch = _fetch;
 // ═══════════════════════════════════════════════════════════════
 
 
-// Badges Pilot — deux natures, deux primitives (spec §2).
+// Pilot badges — two natures, two primitives (spec §2).
 //
-// L'IDENTITÉ d'un module est une référence, pas une alerte : .ct-ref, avec les
-// couleurs d'identité que le socle définit déjà par module. L'ancienne table
-// locale faisait porter critical-tint à access, surface ET risk — trois modules
-// qui s'affichaient en rouge, donc trois modules qui se lisaient comme un
-// incident.
+// A module's IDENTITY is a reference, not an alert: .ct-ref, with the identity
+// colours the core already defines per module. The old local table gave
+// critical-tint to access, surface AND risk — three modules displayed in red,
+// so three modules that read like an incident.
 //
-// Un ÉTAT se mappe sur un ton sémantique fermé, jamais sur une classe par
-// valeur : c'est ce qui permet d'ajouter un statut sans ajouter de CSS.
+// A STATE maps onto a closed set of semantic tones, never onto a per-value
+// class: that is what allows adding a status without adding CSS.
 var _PILOT_TONES: Record<string, string> = {
     completed: "low", termine: "low",
     in_progress: "info", en_cours: "info",
@@ -100,7 +99,7 @@ window._logout = function() {
     fetch("/auth/logout", { method: "POST", credentials: "same-origin" }).then(function() { window.location.href = "/login.html"; });
 };
 
-// FEAT-34/35 — préférences de notification : modale partagée ct_notifprefs
+// FEAT-34/35 — notification preferences: shared ct_notifprefs modal
 window._openNotifPrefs = function() {
     if (!window.ct_notifprefs) return;
     var isAdmin = !!(window._currentUser && window._currentUser.role === "admin");
@@ -181,7 +180,7 @@ function _renderDashboard(c: HTMLElement) {
     var kpis = d.kpis || {};
     var h = '<h2 class="ct-mb-4">' + t("pilot.dashboard.title") + '</h2>';
 
-    // ── Zone 2: KPIs consolidés ──
+    // ── Zone 2: consolidated KPIs ──
     h += '<div class="ct-kpigrid">';
     // Global posture (gauge) — ct-kpi shell holds the SVG gauge in the value
     // slot; the local .dash-kpi-gauge wrapper is kept purely to centre the SVG.
@@ -248,7 +247,7 @@ function _renderDashboard(c: HTMLElement) {
     h += '</div>';
     h += '</div></div>';
 
-    // ── Santé sauvegardes (FEAT-30 phase 3) — tuile compacte ──
+    // ── Backup health (FEAT-30 phase 3) — compact tile ──
     var bk = (d as any).backups;
     if (bk) {
         var bkStale = (bk.stanzas_stale || []).length;
@@ -258,8 +257,8 @@ function _renderDashboard(c: HTMLElement) {
         h += '<div class="ct-kpi-label">' + esc(t("pilot.dashboard.backups")) + '</div>';
         h += '<div class="ct-kpi-value">' + ((bk.stanzas_total || 0) - bkStale) + '/' + (bk.stanzas_total || 0) + '</div>';
         h += '<div class="ct-kpi-split">';
-        // Badges compacts (la tuile KPI est étroite) : le détail — noms de
-        // modules, date du dernier test — vit dans l'infobulle.
+        // Compact badges (the KPI tile is narrow): the detail — module names,
+        // last test date — lives in the tooltip.
         if (bkStale > 0) {
             h += '<span class="ct-badge" data-tone="critical" title="' + esc(bk.stanzas_stale.join(", ")) + '">' + esc(t("pilot.dashboard.backups_stale_n", { n: bkStale })) + '</span>';
         }
@@ -292,7 +291,7 @@ function _renderDashboard(c: HTMLElement) {
     }
     h += '</div></div>';
 
-    // ── Zone 3: Grille modules riches ──
+    // ── Zone 3: rich module grid ──
     var MODULE_ORDER = ["risk", "vendor", "compliance", "access", "surface", "asset", "appsec", "watch", "audit"];
     var sortedModules = (d.modules || []).slice().sort(function(a, b) {
         var ia = MODULE_ORDER.indexOf(a.id), ib = MODULE_ORDER.indexOf(b.id);
@@ -444,9 +443,9 @@ function _moduleUrl(modId: string) {
 // Status order used by both views (list status select, kanban columns,
 // drop-zone whitelist). Keep this single source of truth in sync with the
 // backend Literal in src/routes/measures.py::MeasureUpdate.
-// « cancelled » vient des modules : une mesure qu'on renonce a mener
-// (libellee « Abandonne » cote Vendor). Elle reste visible et filtrable
-// ici — sans cette entree elle remonterait avec un statut sans libelle.
+// « cancelled » comes from the modules: a measure we give up on carrying out
+// (labelled « Abandonne » on the Vendor side). It stays visible and filterable
+// here — without this entry it would show up with a status that has no label.
 var _MEASURE_STATUSES = ["backlog", "planned", "in_progress", "completed", "cancelled"];
 var _measureView = (function() {
     try { return localStorage.getItem("pilot_measures_view") || "list"; }
@@ -486,8 +485,8 @@ function _renderMeasures(c: HTMLElement) {
         h += '<option value="' + esc(mod) + '"' + (_measureFilter.module === mod ? ' selected' : '') + '>' + esc(mod) + '</option>';
     });
     h += '</select>';
-    // Project dropdown — alimenté par _projects + valeurs spéciales
-    // "" = tous projets, "__none__" = actions non rattachées.
+    // Project dropdown — fed by _projects plus the special values
+    // "" = all projects, "__none__" = unattached actions.
     h += '<select id="filter-project" data-change="_filterMeasures" data-pass-value class="ct-filter">';
     h += '<option value="">' + t("pilot.filter.all_projects") + '</option>';
     h += '<option value="__none__"' + (_measureFilter.project === "__none__" ? ' selected' : '') + '>' + t("pilot.filter.no_project") + '</option>';
@@ -549,11 +548,11 @@ function _renderMeasures(c: HTMLElement) {
     // list/kanban; the group renders as ONE consolidated row/card.
     var memberOf: Record<string, PilotMeasureGroup> = {};
     _groups.forEach(function(g) { (g.members || []).forEach(function(mm) { memberOf[mm.id] = g; }); });
-    // Un groupe passe les memes filtres que les mesures : il n'en subissait
-    // que celui du module, si bien qu'une recherche sans resultat affichait
-    // « 0 / 90 » au compteur pendant que les lignes de groupe restaient au
-    // tableau. Un groupe est retenu des qu'un de ses membres correspond —
-    // c'est ce qu'on attend d'une ligne consolidee.
+    // A group goes through the same filters as the measures: it was only
+    // subject to the module one, so a search with no result displayed
+    // « 0 / 90 » in the counter while the group rows stayed in the
+    // table. A group is kept as soon as one of its members matches —
+    // that is what one expects from a consolidated row.
     var groupsShown = _groups.filter(function(g) {
         var membres = g.members || [];
         if (_measureFilter.module
@@ -579,9 +578,9 @@ function _renderMeasures(c: HTMLElement) {
     });
     filtered = filtered.filter(function(m) { return !memberOf[m.id]; });
 
-    // Le compteur parle d'ACTIONS, pas de lignes : une ligne de groupe en
-    // represente plusieurs. Sans ce report, il annoncait « 79 / 90 » alors
-    // qu'aucun filtre n'etait pose — les 11 membres de groupes manquaient.
+    // The counter speaks of ACTIONS, not of rows: one group row stands for
+    // several of them. Without this carry-over it announced « 79 / 90 » while
+    // no filter was set at all — the 11 group members were missing.
     var shownCount = filtered.length
         + groupsShown.reduce(function(n, g) { return n + (g.members || []).length; }, 0);
     var orphanCount = filtered.filter(function(m) { return !measureProject[m.id]; }).length
@@ -1376,8 +1375,8 @@ function _renderProjects(c: HTMLElement) {
         h += '<span class="pilot-card-title ct-flex-1">' + esc(p.name) + '</span>';
         if (prioCls) h += '<span class="ct-badge" data-tone="' + _pilotTone(prioCls) + '" style="margin-right:var(--ct-s1)">' + tEsc("pilot.project.priority." + p.priority) + '</span>';
         h += '<span class="ct-badge" data-tone="' + _pilotTone(statusCls) + '">' + tEsc("pilot.project.status." + p.status) + '</span>';
-        // Suppression en ligne : bouton icône fantôme, qui vire au critique au survol.
-            // C'était déjà le bon dessin, sous un nom local — la primitive le porte.
+        // Inline delete: ghost icon button that turns critical on hover.
+            // It was already the right design, under a local name — the primitive carries it.
             h += '<button class="ct-btn" data-variant="danger" data-icon data-size="sm" title="' + t("pilot.action.delete") + '" data-click="_deleteProject" data-args=\'' + _da(p.id) + '\' data-stop>' + _icon("trash", 14) + '</button>';
         h += '</div>';
         if (p.responsible || p.due_date) {
@@ -1412,9 +1411,9 @@ function _renderProjectEdit(c: HTMLElement) {
     var h = '<div class="ct-flex ct-items-center ct-gap-3 ct-mb-4">';
     h += '<button class="ct-btn" data-variant="ghost" data-size="sm" data-click="_backToProjects">&larr; ' + t("pilot.action.back") + '</button>';
     h += '<h2 class="ct-m-0">' + (p.id ? esc(p.name) : t("pilot.projects.new")) + '</h2>';
-    // Action destructrice : la variante danger du socle — teintée au repos,
-    // rouge plein au survol. En .btn + color inline elle n'annonçait rien et
-    // ne suivait pas le thème.
+    // Destructive action: the core danger variant — tinted at rest, solid red
+    // on hover. As .btn + inline color it announced nothing and did not follow
+    // the theme.
     if (p.id) h += '<button class="ct-btn ct-ml-auto" data-variant="danger" data-click="_deleteProject" data-args=\'' + _da(p.id) + '\'>' + t("pilot.action.delete") + '</button>';
     h += '</div>';
 
@@ -1564,11 +1563,11 @@ window._searchMeasuresToAdd = function(val: string) {
     if (!el) return;
     var existingIds = (_editingProject!.measures || []).map(function(m) { return m.id; });
 
-    // Les groupes d'abord. Sur le plan d'action ils apparaissent comme UNE
-    // ligne consolidee, donc on les cherchait ici sous leur titre de groupe —
-    // en vain, la liste ne proposait que des mesures individuelles. Ajouter un
-    // groupe rattache ses membres : le modele lie un projet a des mesures
-    // (ProjectMeasure), un groupe n'est pas une entite rattachable.
+    // Groups first. On the action plan they appear as ONE consolidated
+    // row, so they were being looked for here under their group title —
+    // in vain, the list only offered individual measures. Adding a group
+    // attaches its members: the model links a project to measures
+    // (ProjectMeasure), a group is not an attachable entity.
     var groupResults = _groups.filter(function(g) {
         var membres = (g.members || []).filter(function(mm) { return existingIds.indexOf(mm.id) < 0; });
         if (!membres.length) return false;
@@ -1580,8 +1579,8 @@ window._searchMeasuresToAdd = function(val: string) {
 
     var results = _measures.filter(function(m) {
         if (existingIds.indexOf(m.id) >= 0) return false;
-        // Un membre de groupe s'ajoute avec son groupe, pas isolement : le
-        // proposer deux fois laisserait rattacher la moitie d'un groupe.
+        // A group member is added along with its group, never on its own:
+        // offering it twice would let half a group be attached.
         if (memberOfGroup(m.id)) return false;
         if (!q) return true;
         return ((m.title || "") + " " + (m.source_id || "") + " " + (m.module || "") + " " + (m.entity_name || "")).toLowerCase().indexOf(q) >= 0;
@@ -1620,7 +1619,7 @@ window._addSelectedMeasures = function() {
     var ids: string[] = [];
     var lines: string[] = [];
     cbs.forEach(function(cb) {
-        // Une case de groupe porte les identifiants de tous ses membres.
+        // A group checkbox carries the ids of all its members.
         cb.value.split(",").forEach(function(id) { if (id) ids.push(id); });
         lines.push("[" + cb.getAttribute("data-module") + "] " + cb.getAttribute("data-ref") + " — " + cb.getAttribute("data-title"));
     });
@@ -2127,8 +2126,8 @@ function _dirOpenPersonModal(idx: number | null) {
                 showStatus(t("pilot.directory.required_fields"), true);
                 return false;
             }
-            // Manager : le ct_userpicker rend un libellé ; on le résout en e-mail
-            // contre l'annuaire (une personne ne peut être son propre manager).
+            // Manager: ct_userpicker returns a label; resolve it to an email
+            // against the directory (a person cannot be their own manager).
             var mgrLabel = (typeof ct_userpicker !== "undefined" && ct_userpicker.getValue) ? (ct_userpicker.getValue("pdm-manager") || "").trim() : "";
             var mgrPerson = _directory.find(function(x: any) {
                 return x.email !== p.email && (((x.prenom + " " + x.nom).trim() === mgrLabel) || (!!x.email && String(x.email).toLowerCase() === mgrLabel.toLowerCase()));
@@ -2307,10 +2306,10 @@ function _doRenderUsers(c: HTMLElement) {
         var perms = u.permissions || {};
         h += '<tr>';
         h += '<td><div class="ct-flex ct-items-center ct-gap-1">';
-        // L'avatar vient du fournisseur d'identite. La CSP le bloque, donc
-        // l'image ne s'est jamais affichee : il ne restait qu'une requete vers
-        // l'IdP depuis le navigateur de l'administrateur a chaque rendu de ce
-        // tableau. On ne rend que ce que la suite sert elle-meme.
+        // The avatar comes from the identity provider. The CSP blocks it, so
+        // the image never actually displayed: all that was left was a request
+        // to the IdP from the administrator's browser on every render of this
+        // table. We only render what the suite serves itself.
         if (u.picture && /^(\/|data:)/.test(u.picture)) {
             h += '<img src="' + esc(u.picture) + '" style="width:20px;height:20px;border-radius:50%">';
         }
@@ -2417,7 +2416,7 @@ function _renderBackups(c: HTMLElement) {
         c.innerHTML = '<h2>' + t("pilot.backups.title") + '</h2><div class="ct-p-5 ct-muted">' + t("pilot.common.admin_only") + '</div>';
         return;
     }
-    // Une seule entrée « Sauvegardes » : deux onglets internes.
+    // A single "Sauvegardes" entry: two internal tabs.
     var h = '<h2>' + t("pilot.backups.title") + '</h2>';
     h += '<div class="ct-btngroup ct-mb-4">';
     h += '<button class="ct-btn"' + (_bkTab === "backups" ? ' data-variant="primary"' : '') + ' data-click="_bkSelectTab" data-args=\'' + _da("backups") + '\'>' + t("pilot.backups.tab_backups") + '</button>';
@@ -2511,8 +2510,8 @@ function _renderBackupsInner(c: HTMLElement) {
         h += '<div class="ct-muted ct-text-meta">' + t("pilot.backups.empty") + '</div>';
     } else {
         var shown = _backupList.filter(function(b) { return _bkFilter === "all" || b.module === _bkFilter; });
-        // Groupé par module (puis plus récent d'abord) — la clé backup_<mod>_<ts>
-        // trie naturellement par date dans un même module.
+        // Grouped by module (then newest first) — the backup_<mod>_<ts> key
+        // sorts naturally by date within a module.
         shown.sort(function(a, b2) { return a.module === b2.module ? (a.key < b2.key ? 1 : -1) : (a.module < b2.module ? -1 : 1); });
         // Only what is on screen counts as "all": ticking the header while a
         // module filter is active must not select rows the user cannot see.
@@ -2616,8 +2615,8 @@ window._restoreBackup = function(key: string, mod: string) {
     if (!confirm(t("pilot.backups.restore_confirm", { mod: mod }))) return;
     showStatus(t("pilot.backups.restoring"));
     _fetch("/backups/restore/" + encodeURIComponent(key), { method: "POST" }).then(function(r) {
-        // Confirmation bloquante : une restauration peut être longue et le
-        // toast de 3 s se rate — l'admin doit savoir que c'est TERMINÉ.
+        // Blocking confirmation: a restore can take a while and the 3 s toast
+        // is easy to miss — the admin must know it is DONE.
         alert(t("pilot.backups.restored_confirm", { mod: r.module, n: r.restored })
             + (r.errors ? "\n" + t("pilot.backups.restore_errors", { n: r.errors }) : ""));
         _backupList = null;
@@ -2977,7 +2976,7 @@ function _renderEvidences(c: HTMLElement) {
     // Transverse expiration summary — the cross-module alert.
     var counts: Record<string, number> = { expiree: 0, bientot: 0, valide: 0, na: 0 };
     _evidences.forEach(function(e) { var s = e.status || "na"; counts[s] = (counts[s] || 0) + 1; });
-    // Tuiles ct-kpi partagées (cohérence dashboard / watch).
+    // Shared ct-kpi tiles (dashboard / watch consistency).
     var evTones: Record<string, string> = { expiree: "critical", bientot: "medium", valide: "low", na: "" };
     h += '<div class="ct-kpigrid ct-mb-3">';
     ["expiree", "bientot", "valide", "na"].forEach(function(st) {
@@ -2996,8 +2995,8 @@ function _renderEvidences(c: HTMLElement) {
         c.innerHTML = h; return;
     }
 
-    // Filtres : module + recherche libre (libellé, entité, responsable,
-    // tags, objets liés) — même patron que la page Actions.
+    // Filters: module + free-text search (label, entity, owner, tags, linked
+    // objects) — same pattern as the Actions page.
     h += '<div class="pilot-actions ct-row-wrap ct-gap-2 ct-mb-2">';
     h += '<input type="text" id="ev-filter-search" placeholder="' + t("pilot.common.search") + '" value="' + esc(_evidenceFilter.search) + '" data-input="_filterEvidences" data-pass-value class="ct-py-1 ct-px-2 ct-bordered ct-r-sm ct-text-meta ct-minw-180">';
     h += '<select id="ev-filter-module" data-change="_filterEvidences" data-pass-value class="ct-filter"><option value="">' + t("pilot.filter.all_modules") + '</option>';
@@ -3030,8 +3029,8 @@ function _renderEvidences(c: HTMLElement) {
         var evStatus = _EV_STATUS_META[e.status] ? e.status : "na";
         var sm = _EV_STATUS_META[evStatus];
         var linked = (e.linked || []).map(function(l: any) { return l.object_id; }).join(", ");
-        // Cohérence tableaux : clic ligne = édition ; le lien vers la preuve
-        // vit dans la dernière colonne.
+        // Table consistency: row click = edit; the link to the proof lives in
+        // the last column.
         h += '<tr class="ct-clickable ct-border-bottom" data-click="_editEvidence" data-args=\'' + _da(e.module, e.source_id) + '\'>';
         h += '<td class="ct-py-1 ct-px-2"><span class="ct-ref" data-module="' + esc(e.module || "") + '">' + esc(e.module || "") + '</span></td>';
         h += '<td class="ct-py-1 ct-px-2">' + esc(e.label || e.source_id || "") + '</td>';
@@ -3069,8 +3068,8 @@ window._filterEvidences = function() {
 window._editEvidence = function(module: string, sourceId: string) {
     var e = _evidences.find(function(x) { return x.module === module && x.source_id === sourceId; });
     if (!e) return;
-    // Modules qui supportent le write-back d'évidence (FEAT-08) — le backend
-    // renvoie de toute façon un 400 clair pour les autres.
+    // Modules supporting evidence write-back (FEAT-08) — the backend returns
+    // a clear 400 for the others anyway.
     if (module !== "compliance" && module !== "vendor") {
         showStatus(t("pilot.evidences.edit_unsupported"), true);
         return;
@@ -3221,8 +3220,8 @@ function _rstRender(c: HTMLElement) {
     }
     h += '</div>';
 
-    // ── Activité récente du module (journal serveur) : choisir un
-    // ÉVÉNEMENT plutôt que deviner une heure ──
+    // ── Recent module activity (server journal): pick an EVENT rather than
+    // guessing a timestamp ──
     if (_rstJournal === null) {
         _fetch("/restore/journal/" + encodeURIComponent(mod)).then(function(d: any) {
             _rstJournal = d || [];

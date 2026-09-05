@@ -23,9 +23,9 @@ RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 # addons/custom/<client>/ stays out, and is layered by Dockerfile.addons via
 # shared/build-client-image.sh.
 COPY addons/generic/ /tmp/addons/
-# `find -exec … \;` renvoie 0 même si pip échoue : un connecteur aux deps
-# cassées produisait une image verte avec l'add-on inutilisable. La boucle
-# échoue franchement à la première installation ratée.
+# `find -exec … \;` returns 0 even when pip fails: a connector with broken
+# deps produced a green image with an unusable add-on. The loop fails
+# outright on the first failed install.
 RUN for r in $(find /tmp/addons -name requirements.txt | sort); do \
       echo "── add-on deps: $r ──"; \
       pip install --no-cache-dir --prefix=/install -r "$r" || exit 1; \

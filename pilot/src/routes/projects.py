@@ -83,8 +83,8 @@ def _can_access(p: Project, user: Optional[User]) -> bool:
 
 
 def _project_to_dict(p: Project, measures: list[dict] | None = None) -> dict:
-    # Une mesure abandonnée ne compte ni comme faite ni comme à faire : la
-    # laisser au dénominateur plomberait le % du projet pour toujours.
+    # A cancelled measure counts neither as done nor as to-do: leaving it
+    # in the denominator would drag the project's % down forever.
     actives = [m for m in (measures or [])
                if m.get("status") not in ("cancelled", "annule", "Annulé", "abandonne")]
     total = len(actives)

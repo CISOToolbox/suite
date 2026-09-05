@@ -1,9 +1,9 @@
 // @ts-check
 const { defineConfig, devices } = require("@playwright/test");
 
-// Contrairement aux suites webapp/e2e de l'opensource, qui servent elles-mêmes
-// une application statique, celle-ci vise la stack suite derrière son proxy :
-// il faut une session, et le certificat est auto-signé en local.
+// Unlike the browser-local webapp e2e suites, which serve a static application
+// themselves, this one targets the suite stack behind its proxy: a session is
+// required, and the certificate is self-signed locally.
 module.exports = defineConfig({
     testDir: ".",
     fullyParallel: false,

@@ -23,8 +23,9 @@ logger = logging.getLogger("audit-backend")
 SERVICE_TOKEN = os.getenv("SERVICE_TOKEN", "")
 
 # Statuses of the audit frontend (STATUS_MAP in ISO_Audit_app):
-# c=conforme, ncmaj/ncmin=non-conformité, ps=point sensible,
-# pp=piste de progrès, na=non applicable.
+# c=compliant (conforme), ncmaj/ncmin=major/minor non-conformity,
+# ps=sensitive point (point sensible), pp=improvement opportunity
+# (piste de progrès), na=not applicable.
 _CONFORME = {"c"}
 _NON_CONFORME = {"ncmaj", "ncmin"}
 

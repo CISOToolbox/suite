@@ -369,7 +369,7 @@ async def get_dashboard(user: User = Depends(get_current_user), db: AsyncSession
         .where(MeasureCache.data["due_date"].astext >= today_str)
         .where(MeasureCache.data["status"].astext.notin_(
             ["completed", "termine", "Terminé",
-             # Une mesure abandonnée n'a plus d'échéance à tenir.
+             # A cancelled measure no longer has a deadline to meet.
              "cancelled", "annule", "Annulé", "abandonne"]))
         .order_by(MeasureCache.data["due_date"].astext.asc())
         .limit(5)

@@ -1,10 +1,10 @@
-/* Primitives partagées : NE PAS redéfinir ici.
-   Les feuilles de module se chargent après cisotoolbox.css, donc à spécificité
-   égale c'est celle-ci qui gagnait. Un composant partagé — ct_finding_view.js,
-   ct_modal.js — émet le même balisage partout et se peignait différemment selon
-   le module, sans erreur ni test rouge. Le focus d'un champ était rouge ici et
-   indigo ailleurs : un champ actif se lisait comme un champ en erreur.
-   Les besoins de géométrie passent par les attributs prévus (data-width). */
+/* Shared primitives: do NOT redefine them here.
+   Module stylesheets load after cisotoolbox.css, so at equal specificity this
+   one used to win. A shared component — ct_finding_view.js, ct_modal.js —
+   emits the same markup everywhere and got painted differently depending on
+   the module, with no error and no red test. A field's focus was red here and
+   indigo elsewhere: an active field read as a field in error.
+   Geometry needs go through the attributes provided for it (data-width). */
 /* AppSec-specific styles — uses shared cisotoolbox.css variables */
 
 /* ═════════════════════════════════════════════════════════
@@ -128,8 +128,8 @@ fieldset.app-section legend {
     font-size: 0.78em;
     color: var(--ct-ink-2);
 }
-/* Modificateur de .ct-badge : le ton vient du socle, cette regle ne garde que
-   la typographie propre aux pastilles d'application. */
+/* .ct-badge modifier: the tone comes from the socle, this rule only keeps the
+   typography specific to the application pills. */
 .app-badge { font-size: 0.68em; text-transform: uppercase; letter-spacing: 0.3px; }
 
 @keyframes ct-modal-in {
@@ -180,8 +180,8 @@ fieldset.app-section legend {
 }
 .filter-pill:hover { border-color: var(--ct-ink-2); }
 .filter-pill.active { background: var(--ct-accent); color: var(--ct-onaccent); border-color: var(--ct-accent); }
-/* Actives de ton : paires tint/ink + bordure base — mêmes codes que les
-   sev-badges et que Surface, lisible dans les deux thèmes. */
+/* Tone actives: tint/ink pairs + base border — same codes as the sev-badges
+   and as Surface, readable in both themes. */
 .filter-pill.active.pill-critical { background: var(--ct-critical-tint); color: var(--ct-critical-ink); border-color: var(--ct-critical-ink); }
 .filter-pill.active.pill-high { background: var(--ct-high-tint); color: var(--ct-high-ink); border-color: var(--ct-high-ink); }
 .filter-pill.active.pill-medium { background: var(--ct-medium-tint); color: var(--ct-medium-ink); border-color: var(--ct-medium-ink); }
@@ -298,11 +298,11 @@ fieldset.app-section legend {
    color can follow the theme. Declared last so the dark rule outranks the
    .ct-btn:not([data-variant]) override above. */
 
-/* Bouton de fermeture des modales — local au module, PAS une primitive du socle.
-   Renommé hors du préfixe ct- : ce préfixe est réservé aux primitives partagées,
-   et un nom local qui l'emprunte finit par entrer en collision. L'encre suit
-   désormais le texte courant : elle était blanche ici parce que l'en-tête de
-   modale était violet plein, en-tête supprimé avec les collisions. */
+/* Modal close button — module-local, NOT a socle primitive.
+   Renamed out of the ct- prefix: that prefix is reserved for shared primitives,
+   and a local name that borrows it ends up colliding. The ink now follows the
+   current text: it was white here because the modal header was solid purple,
+   a header that was removed along with the collisions. */
 .appsec-modal-close {
     background: none;
     border: none;
@@ -315,15 +315,15 @@ fieldset.app-section legend {
 }
 .appsec-modal-close:hover { opacity: 1; }
 
-/* Extrait du balisage : la classe existait, son style vivait a cote. */
+/* Extracted from the markup: the class existed, its style lived next to it. */
 .ir-app-cb { margin-right:6px; }
 .ir-crit-row { display:flex; gap:6px; align-items:center; margin-bottom:var(--ct-s1); }
 
-/* ── Triager = tier d'écriture en AppSec (viewer < triager < admin) ──
-   La règle générique de cisotoolbox.css masque [data-write] pour role-triager
-   (correct dans les modules où triager est un alias de viewer). Ici le backend
-   autorise le triager à créer/modifier une application, lancer un scan et
-   triager les findings (require_min_role "triager") : on ré-affiche les
-   contrôles data-write. Le :not(.ct-admin-only) préserve le masquage des actions
-   admin-only (ignore rules, suppression) portées par la classe dans le markup. */
+/* ── Triager = write tier in AppSec (viewer < triager < admin) ──
+   The generic rule in cisotoolbox.css hides [data-write] for role-triager
+   (correct in the modules where triager is an alias of viewer). Here the backend
+   lets the triager create/modify an application, launch a scan and triage the
+   findings (require_min_role "triager"): so we show the data-write controls
+   again. The :not(.ct-admin-only) preserves the hiding of admin-only actions
+   (ignore rules, deletion) carried by that class in the markup. */
 body.ct-role-triager [data-write]:not(.ct-admin-only) { display: inline-flex !important; }

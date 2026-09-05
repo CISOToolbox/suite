@@ -1,5 +1,5 @@
 #!/bin/bash
-# ciso-backup-agent — pgBackRest scheduler (FEAT-30 étage 1).
+# ciso-backup-agent — pgBackRest scheduler (FEAT-30 stage 1).
 #
 # Per module <m>, the compose mounts:
 #   /pg/<m>    ← <m>-pgdata   (read-only PGDATA)
@@ -18,13 +18,13 @@ CONF_DIR="$REPO/agent"
 CONF="$CONF_DIR/pgbackrest.conf"
 STATUS="$CONF_DIR/status.json"
 BACKUP_HOUR="${BACKUP_HOUR:-2}"
-# Dépôt hors site (FEAT-29). Positionné par docker-compose.s3.yml, qui fournit
-# aussi les PGBACKREST_REPO2_* : la configuration de repo2 arrive donc par
-# l'environnement, pas par $CONF — les variables priment sur le fichier.
+# Off-site repository (FEAT-29). Set by docker-compose.s3.yml, which also
+# provides the PGBACKREST_REPO2_*: repo2's configuration therefore comes from
+# the environment, not from $CONF — the variables take precedence over the file.
 S3="${BACKUP_S3_ENABLED:-0}"
-# Test de restauration hors site : mensuel, un module à la fois. Restaurer
-# depuis S3 télécharge une base entière ; le faire pour dix modules chaque
-# semaine coûterait en transfert sans rien prouver de plus.
+# Off-site restore test: monthly, one module at a time. Restoring from S3
+# downloads a whole database; doing it for ten modules every week would cost
+# in transfer without proving anything more.
 S3_TEST_DAY="${BACKUP_S3_TEST_DAY:-01}"
 export PGBACKREST_CONFIG="$CONF"
 
@@ -55,14 +55,14 @@ write_conf() {
 }
 
 wait_socket() {
-    # L'EXISTENCE du socket ne prouve rien : l'entrypoint de l'image postgres
-    # démarre un serveur temporaire pendant l'initialisation, socket compris.
-    # L'agent partait alors trop tôt, stanza-create et la sauvegarde initiale
-    # échouaient — et comme la boucle ne repasse qu'à l'heure planifiée, la
-    # stanza restait SANS sauvegarde de base, donc sans fenêtre PITR, jusqu'au
-    # lendemain et sans que rien ne le signale.
+    # The EXISTENCE of the socket proves nothing: the postgres image entrypoint
+    # starts a temporary server during initialization, socket included. The
+    # agent then started too early, stanza-create and the initial backup
+    # failed — and since the loop only comes back at the scheduled hour, the
+    # stanza stayed WITHOUT a base backup, hence without a PITR window, until
+    # the next day and with nothing flagging it.
     #
-    # On attend donc que la base RÉPONDE, pas qu'un fichier apparaisse.
+    # So we wait for the database to ANSWER, not for a file to appear.
     local m="$1" i=0
     while [ $i -lt 60 ]; do
         if [ -S "/sock/$m/.s.PGSQL.5432" ] \
@@ -79,10 +79,10 @@ ensure_stanza() {
     if ! pgbackrest --stanza="$m" info --output=json 2>/dev/null | grep -q '"status"'; then
         log "stanza-create $m"
     fi
-    # stanza-create traite TOUS les dépôts configurés en un appel — et
-    # refuse l'option --repo (« option 'repo' not valid for command
-    # 'stanza-create' »). Contrairement à backup, il n'y a donc rien à
-    # répéter pour repo2.
+    # stanza-create handles ALL configured repositories in one call — and
+    # refuses the --repo option (« option 'repo' not valid for command
+    # 'stanza-create' »). Unlike backup, there is therefore nothing to repeat
+    # for repo2.
     pgbackrest --stanza="$m" stanza-create 2>&1 | sed "s/^/[$m] /" || true
 }
 
@@ -97,20 +97,20 @@ run_backup() {
     pgbackrest --stanza="$m" --type="$type" backup 2>&1 | tail -2 | sed "s/^/[$m] /"
     rc="${PIPESTATUS[0]}"
 
-    # Une sauvegarde de base ne va QU'AU dépôt prioritaire : « When multiple
+    # A base backup only goes TO the highest-priority repository: « When multiple
     # repositories are configured, pgBackRest will backup to the highest
-    # priority repository unless the --repo option is specified. » Seul
-    # l'archivage WAL est diffusé à tous. D'où ce second appel explicite.
+    # priority repository unless the --repo option is specified. » Only WAL
+    # archiving is fanned out to all of them. Hence this second explicit call.
     if [ "$S3" = "1" ]; then
         local t2="$type"
-        # Un diff sans full sur CE dépôt n'a rien sur quoi s'appuyer : les
-        # dépôts ont leurs propres cycles, repo2 peut être plus jeune.
+        # A diff with no full on THIS repository has nothing to build on: the
+        # repositories have their own cycles, repo2 may be younger.
         has_full "$m" 2 || t2="full"
         log "backup $m ($t2) → hors site"
         pgbackrest --stanza="$m" --repo=2 --type="$t2" backup 2>&1 \
             | tail -2 | sed "s/^/[$m repo2] /"
-        # Un échec hors site ne doit pas masquer une sauvegarde locale réussie :
-        # ce sont deux incidents de gravité différente.
+        # An off-site failure must not mask a successful local backup: these
+        # are two incidents of different severity.
         [ "${PIPESTATUS[0]}" -eq 0 ] || log "WARN: sauvegarde hors site échouée pour $m"
     fi
     return "$rc"
@@ -158,15 +158,15 @@ run_restore_tests() {
 }
 
 run_s3_restore_test() {
-    # Un dépôt hors site jamais restauré est une hypothèse, pas une
-    # sauvegarde : c'est celui dont on ne se sert jamais jusqu'au jour où
-    # tout en dépend, et dont les défaillances — identifiants expirés, bucket
-    # déplacé, rétention imposée par l'hébergeur — sont silencieuses.
+    # An off-site repository that is never restored is an assumption, not a
+    # backup: it is the one you never use until the day everything depends on
+    # it, and whose failures — expired credentials, moved bucket, retention
+    # imposed by the host — are silent.
     #
-    # Un seul module par mois, tourné sur l'année : la preuve porte sur la
-    # chaîne (identifiants, réseau, déchiffrement, cohérence), pas sur un
-    # module en particulier. Restaurer les dix coûterait dix fois plus en
-    # transfert pour la même information.
+    # A single module per month, rotated over the year: the proof is about the
+    # chain (credentials, network, decryption, consistency), not about one
+    # module in particular. Restoring all ten would cost ten times more in
+    # transfer for the same information.
     local n mois idx m
     set -- $MODULES; n=$#
     mois=$(date -u '+%-m')
@@ -189,9 +189,9 @@ write_status() {
             [ $first -eq 0 ] && echo "  ,"
             first=0
             if [ "$S3" = "1" ]; then
-                # Deux dépôts publiés séparément : « locale fraîche, hors site
-                # en retard » est le mode de défaillance le plus probable, et
-                # il doit être lisible sans interprétation.
+                # Two repositories published separately: « fresh local, off-site
+                # lagging behind » is the most likely failure mode, and it must
+                # be readable without interpretation.
                 echo "  {\"module\": \"$m\", \"info\": $(pgbackrest --stanza="$m" info --output=json 2>/dev/null || echo 'null'), \"info_repo2\": $(pgbackrest --stanza="$m" --repo=2 info --output=json 2>/dev/null || echo 'null')}"
             else
                 echo "  {\"module\": \"$m\", \"info\": $(pgbackrest --stanza="$m" info --output=json 2>/dev/null || echo 'null')}"

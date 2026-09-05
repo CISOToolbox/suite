@@ -1,8 +1,8 @@
 /**
- * Watch (demo-docker) — modèle de données serveur + globals app.
- * Watch n'a pas de modèle D local (app 100 % pilotée par l'API REST) :
- * les interfaces décrivent les payloads renvoyés par watch_api.ts.
- * Fichier de types pur (aucun emit).
+ * Watch (demo-docker) — server data model + app globals.
+ * Watch has no local D model (app 100% driven by the REST API):
+ * the interfaces describe the payloads returned by watch_api.ts.
+ * Pure types file (no emit).
  */
 
 interface WatchRecipient {
@@ -18,7 +18,7 @@ interface WatchScope {
     owner_email?: string;
     updated_at?: string;
     recipients?: WatchRecipient[];
-    /* digest vulnérabilités */
+    /* vulnerability digest */
     digest_enabled?: boolean;
     digest_hour?: number;
     digest_minute?: number;
@@ -72,7 +72,7 @@ interface WatchAlert {
     references_json?: string[];
 }
 
-/** Analyse IA d'une alerte (cache backend). */
+/** AI analysis of an alert (backend cache). */
 interface WatchAnalysis {
     sections?: Record<string, string>;
     provider?: string;
@@ -80,7 +80,7 @@ interface WatchAnalysis {
     generated_at?: string;
 }
 
-/** Filtres client du panneau alertes. */
+/** Client-side filters of the alerts panel. */
 interface WatchAlertFilters {
     severity: string;
     status: string;
@@ -137,27 +137,27 @@ interface WatchApiType {
     getDirectory(): Promise<any>;
 }
 
-/* ── Globals shared déclarés Window-only dans les .d.ts générés ────
- * ct_modal / ct_bulkbar n'exposent leurs APIs que sur Window
- * (propriétés optionnelles). Watch_app.ts les appelle en globals nus
- * (gardés par des checks window.X / typeof comme le source) —
- * déclarations ambiantes locales, aucun impact sur le js émis. */
+/* ── Shared globals declared Window-only in the generated .d.ts ────
+ * ct_modal / ct_bulkbar expose their APIs only on Window
+ * (optional properties). Watch_app.ts calls them as bare globals
+ * (guarded by window.X / typeof checks like the source) —
+ * local ambient declarations, no impact on the emitted js. */
 declare var ct_modal: CtModalApi;
 declare var ct_bulkbar: CtBulkbarApi;
 
-/** Lu par _renderAudit via `typeof renderAuditLog === "function"` — JAMAIS
- *  défini : ct_audit.js (source watch ET master) ne définit que
- *  `_renderAuditLog(c)`. Garde morte → panneau audit = placeholder
- *  (bug pré-existant de la source, reproduit à l'identique). */
+/** Read by _renderAudit via `typeof renderAuditLog === "function"` — NEVER
+ *  defined: ct_audit.js (watch source AND master) only defines
+ *  `_renderAuditLog(c)`. Dead guard → audit panel = placeholder
+ *  (pre-existing bug of the source, reproduced identically). */
 declare var renderAuditLog: ((c: HTMLElement, opts?: { api?: unknown }) => void) | undefined;
 
-/* Globals exposés sur window (dispatch data-click + état partagé). */
+/* Globals exposed on window (data-click dispatch + shared state). */
 interface Window {
-    /* posés par watch_api.ts */
+    /* set by watch_api.ts */
     _currentUser?: { name?: string; email?: string; role?: string } | null;
     _moduleRole?: string;
     _logout?: () => void;
-    /* état du détail d'alerte (Watch_app.ts) */
+    /* alert detail state (Watch_app.ts) */
     _currentAlertId?: string | null;
     _currentAnalysis?: WatchAnalysis | null;
     _watchAlertsBulkToggle?: (alertId: string) => void;

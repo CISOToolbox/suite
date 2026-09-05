@@ -28,8 +28,8 @@
     color: var(--ct-ink-2); transition: all 0.15s; user-select: none;
 }
 .status-btn:hover { border-color: var(--ct-accent); color: var(--ct-ink); }
-/* Actif = pattern socle des badges : fond -tint, encre -ink, liseré tone
-   (AA dans les deux thèmes — plus d'aplat + blanc). */
+/* Active = base badge pattern: -tint background, -ink text, tone border
+   (AA in both themes — no more solid fill + white). */
 .status-btn[data-status="c"].active { background: var(--ct-low-tint); border-color: var(--ct-low); color: var(--ct-low-ink); }
 .status-btn[data-status="ncmaj"].active { background: var(--ct-critical-tint); border-color: var(--ct-critical); color: var(--ct-critical-ink); }
 .status-btn[data-status="ncmin"].active { background: var(--ct-high-tint); border-color: var(--ct-high); color: var(--ct-high-ink); }
@@ -91,9 +91,9 @@
     padding: 16px; text-align: center;
     display: flex; flex-direction: column;
 }
-/* Zone graphe uniforme : les 3 cartes de la rangée partagent la même
-   hauteur ; chaque SVG (viewBox) remplit la zone, quelle que soit sa
-   géométrie (jauge, donut, radar). */
+/* Uniform chart area: the 3 cards in the row share the same height;
+   each SVG (viewBox) fills the area regardless of its geometry
+   (gauge, donut, radar). */
 .dash-chart { flex: 1; min-height: 210px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .dash-chart svg { flex: 1; min-height: 0; width: 100%; max-height: 230px; display: block; }
 .dash-card h3 { font-size: 0.9em; color: var(--ct-ink); margin-bottom: 8px; }
@@ -212,8 +212,8 @@
 
 /* ── Enhanced dashboard ─────────────────────────────────────── */
 .dash-charts-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
-/* Le radar est plus dense que jauge/donut : plafond SVG relevé pour la
-   lisibilité — la rangée s'aligne sur lui, les deux autres se centrent. */
+/* The radar is denser than gauge/donut: SVG cap raised for legibility
+   — the row aligns on it, the other two center themselves. */
 .dash-radar-card .dash-chart svg { max-height: 300px; }
 .dash-card-wide { grid-column: 1 / -1; }
 .radar-svg { display: block; margin: 0 auto; }
@@ -241,7 +241,7 @@
 }
 .btn-report:hover { background: var(--ct-accent); color: var(--ct-onaccent); }
 
-/* ── Images / preuves ────────────────────────────────────────── */
+/* ── Images / evidence ───────────────────────────────────────── */
 .img-section { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--ct-line); }
 .img-section-header { font-size: 0.8em; font-weight: 600; color: var(--ct-ink-2); margin-bottom: 6px; }
 .img-thumbs { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
@@ -279,10 +279,10 @@
 
 
 /* ── Responsive ──────────────────────────────────────────────── */
-/* Trois graphes de front deviennent illisibles bien avant 768px.
-   Palier intermédiaire aligné sur le passage des KPI à ~5 par ligne :
-   2 graphes par ligne (radar pleine largeur en dessous), puis 1 par
-   ligne sous 768px. */
+/* Three charts side by side become unreadable well before 768px.
+   Intermediate step aligned with the KPIs dropping to ~5 per row:
+   2 charts per row (full-width radar below), then 1 per row
+   under 768px. */
 @media (max-width: 1100px) {
     .dash-charts-grid { grid-template-columns: 1fr 1fr; }
     .dash-radar-card { grid-column: 1 / -1; }

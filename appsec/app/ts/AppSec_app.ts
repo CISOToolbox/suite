@@ -89,20 +89,20 @@ window._appsSearch = function(value: string) {
 // HELPERS
 // ═══════════════════════════════════════════════════════════════
 
-// Le ton passe de la classe à l'attribut : une seule primitive, .ct-badge,
-// et une sémantique fermée (critical|high|medium|low|info|neutral|accent) au
-// lieu d'une classe par état.
+// The tone moves from the class to the attribute: a single primitive,
+// .ct-badge, with a closed semantics (critical|high|medium|low|info|neutral|
+// accent) instead of one class per state.
 function _sevBadge(sev?: string): string { return badgeTone(t("misc." + sev) || sev, esc(sev || "neutral")); }
-// Tons du module : statuts de finding et de scan, scanners, criticite d'appli.
-// Une seule table, pour que le meme etat porte le meme ton partout.
+// Module tones: finding and scan statuses, scanners, application criticality.
+// A single table, so that the same state carries the same tone everywhere.
 var _APPSEC_TONES: Record<string, string> = {
-    // statuts de finding
+    // finding statuses
     new: "critical", to_fix: "high", false_positive: "neutral", fixed: "low",
-    // statuts de scan
+    // scan statuses
     pending: "info", running: "info", completed: "low", failed: "critical", skipped: "neutral",
-    // scanners (identite, pas gravite)
+    // scanners (identity, not severity)
     trivy_fs: "info", trivy_image: "accent", gitleaks: "critical", semgrep: "low",
-    // criticite d'application
+    // application criticality
     low: "low", medium: "medium", high: "high", critical: "critical",
 };
 function _appsecTone(v?: string | null): string {
@@ -115,8 +115,8 @@ function _scannerBadge(s?: string): string { return badgeTone(_scannerLabel(s), 
 // Patch-availability badge for a finding. Green when Trivy reports a
 // fixed_version, red "Sans patch" for CVE findings without one, neutral
 // for non-CVE findings (secrets, SAST).
-// Compare deux versions segment par segment, numeriquement : "6.10.3" vient
-// apres "6.9.7", ce qu'un tri lexicographique inverserait.
+// Compares two versions segment by segment, numerically: "6.10.3" comes
+// after "6.9.7", which a lexicographic sort would get backwards.
 function _cmpVersion(a: string, b: string): number {
     var xs = a.split("."), ys = b.split(".");
     for (var i = 0; i < Math.max(xs.length, ys.length); i++) {
@@ -134,18 +134,18 @@ function _patchBadge(f?: AppSecFinding | null): string {
     if (!fx) {
         return '<span class="ct-badge" data-tone="critical">' + (t("findings.patch_none") || "Sans patch") + '</span>';
     }
-    // Un scanner rend la version corrigee de CHAQUE branche maintenue : jusqu'a
-    // une vingtaine pour une seule CVE. En faire une chaine unique donnait un
-    // pave illisible et volait sa largeur a la colonne Cible. Un badge par
-    // version, tries par branche croissante, et un badge de depassement qui
-    // porte la liste entiere en infobulle.
+    // A scanner returns the fixed version of EVERY maintained branch: up to
+    // a score of them for a single CVE. Turning that into one string gave an
+    // unreadable block and stole width from the Cible column. One badge per
+    // version, sorted by ascending branch, plus an overflow badge that
+    // carries the whole list in a tooltip.
     var versions = fx.split(",").map(function(v) { return v.trim(); }).filter(Boolean);
     versions.sort(_cmpVersion);
     if (versions.length === 1) {
         return '<span class="ct-badge" data-tone="low" title="' + esc(versions[0]) + '">&#10003; '
             + esc(versions[0]) + '</span>';
     }
-    // Au-dela d'un badge, la coche se repete sans rien ajouter : le ton la porte deja.
+    // Past the first badge the check mark repeats without adding anything: the tone already carries it.
     var MAX = 3;
     var html = versions.slice(0, MAX).map(function(v) {
         return '<span class="ct-badge" data-tone="low">' + esc(v) + '</span>';
@@ -160,8 +160,8 @@ function _patchBadge(f?: AppSecFinding | null): string {
 // Measure status badge — distinct colors per state, reused across
 // the Plan d'action table and the measure edit modal.
 function _measureStatusBadge(statut?: string): string {
-    // Un état métier se mappe sur un TON, pas sur un couple de couleurs posé en
-    // inline : c'est le seul moyen que la bascule de thème le suive.
+    // A domain state maps onto a TONE, not onto a pair of inline colours:
+    // that is the only way the theme switch follows it.
     var tones: Record<string, string> = {
         a_faire: "neutral", en_cours: "info", termine: "low", annule: "critical",
     };
@@ -210,9 +210,9 @@ window.selectPanel = function(id: string) {
     _loadAndRender();
 };
 
-// Re-render du panneau courant, sans re-fetch. Appelé par switchLang() lors de
-// la bascule de langue (le shell attend un renderAll global) — sans ça, la
-// traduction ne s'appliquait qu'après un rechargement de page.
+// Re-renders the current panel without re-fetching. Called by switchLang()
+// on a language switch (the shell expects a global renderAll) — without it
+// the translation only applied after a page reload.
 (window as unknown as { renderAll?: () => void }).renderAll = renderPanel;
 
 function _loadAndRender(): void {
@@ -346,10 +346,10 @@ function _renderApplications(c: HTMLElement): void {
     h += '<button class="ct-btn"' + (_appsView === "table" ? ' data-variant="primary"' : '')
        + ' data-click="_appsSetView" data-args=\'' + _da("table") + '\' title="' + t("apps.view_table") + '" data-icon>' + _icon("list", 14) + '</button>';
     h += '</div>';
-    // Pas de mt-8 : .ct-row centre verticalement, donc une marge haute
-    // decale ces deux boutons de 8px par rapport au selecteur de vue. Le
-    // gap de .ct-row espace deja les lignes quand la barre s'enroule —
-    // c'est ce qui place correctement le groupe de vues, qui n'en a pas.
+    // No mt-8: .ct-row centers vertically, so a top margin shifts these
+    // two buttons 8px away from the view selector. The .ct-row gap already
+    // spaces the lines out when the bar wraps — that is what correctly
+    // places the view group, which carries no margin.
     h += '<button class="ct-btn" data-write data-click="_scanAllApps">' + _icon("refresh", 14) + ' ' + t("apps.scan_all") + '</button>';
     h += '<button class="ct-btn" data-write data-variant="primary" data-click="showAddApp">' + _icon("plus", 14) + ' ' + t("apps.add") + '</button>';
     h += '</div>';
@@ -1176,7 +1176,7 @@ async function _renderFindingDetail(c: HTMLElement): Promise<void> {
         aiEnabled: !!(window._aiIsEnabled && window._aiIsEnabled()),
         aiHandler: "_aiTriageFinding",
         deleteHandler: "_deleteAppsecFinding",
-        // null → undefined : CtFvRenderOpts.linkedMeasure n'admet pas null (même sémantique falsy).
+        // null → undefined: CtFvRenderOpts.linkedMeasure rejects null (same falsy semantics).
         linkedMeasure: linked || undefined,
         infoRows: extraRows,
         // Share surface-card styling — appsec-card was never defined in
@@ -1218,9 +1218,9 @@ function _runAppsecTriage(finding: AppSecFinding, status: string): Promise<void>
  * If yes, open the ignore rule modal pre-filled from the finding.
  */
 function _offerIgnoreRuleFromFinding(finding: AppSecFinding, reason: string): void {
-    // Les ignore rules sont admin-only côté backend (POST /ignore-rules →
-    // require_admin) : ne pas proposer la création à un triager, il finirait
-    // sur un 403.
+    // Ignore rules are admin-only backend-side (POST /ignore-rules →
+    // require_admin): do not offer creation to a triager, they would end up
+    // on a 403.
     if (!document.body.classList.contains("ct-role-admin")) { _backToFindings(); return; }
     ct_modal.confirm({
         title: t("ignore.offer_title") || "Créer une règle d'exclusion ?",
@@ -1373,11 +1373,11 @@ window._aiTriageFinding = function() {
     el.innerHTML = h;
 };
 
-// Endpoint métier : le prompt méthodologique + l'enrichissement NVD sont
-// construits côté serveur (POST /api/ai/appsec/analyze-finding) à partir du
-// finding chargé par id — même origine, donc la CSP stricte est satisfaite.
-// La langue, le contexte analyste et l'option d'analyse approfondie (pull du
-// fichier au commit scanné) sont transmis au backend.
+// Domain endpoint: the methodology prompt and the NVD enrichment are built
+// server-side (POST /api/ai/appsec/analyze-finding) from the finding loaded
+// by id — same origin, so the strict CSP is satisfied. The language, the
+// analyst context and the deep-analysis option (pulling the file at the
+// scanned commit) are forwarded to the backend.
 window._aiTriageRun = async function() {
     if (!_selectedFinding) return;
     var el = document.getElementById("ai-triage-result");
@@ -2013,8 +2013,8 @@ async function _renderMeasures(c: HTMLElement): Promise<void> {
     });
     c.innerHTML = h;
 
-    // DELETE /measures est admin-only côté backend : ne pas proposer
-    // l'action à un triager (il finirait sur un 403).
+    // DELETE /measures is admin-only backend-side: do not offer the action
+    // to a triager (they would end up on a 403).
     var measureActions: CtBulkbarAction[] = [
         { id: "done", icon: "check", label: "Terminé", variant: "success",
           onClick: "_bulkAppsecMeasuresDone" }
@@ -2061,8 +2061,8 @@ window._editAppsecMeasureRow = function(row: any) {
             (m as Record<string, any>).progress_log = fullLog;
             return AppSecAPI.updateMeasure(m!.id, { progress_log: fullLog } as any);
         },
-        // DELETE /measures est admin-only : sans onDelete la modale
-        // n'affiche pas le bouton Supprimer.
+        // DELETE /measures is admin-only: without onDelete the modal
+        // does not show the Supprimer button.
         onDelete: !document.body.classList.contains("ct-role-admin") ? undefined : function() {
             ct_modal.confirm({
                 title: "Supprimer la remédiation",
@@ -2121,7 +2121,7 @@ if (typeof window.ct_handleMeasureDeepLink === "function") {
 }
 
 
-// FEAT-35 — préférences de notification (modale partagée ct_notifprefs)
+// FEAT-35 — notification preferences (shared ct_notifprefs modal)
 window._openNotifPrefs = function() {
     if (!window.ct_notifprefs) return;
     var isAdmin = !!(window._currentUser && window._currentUser.role === "admin");

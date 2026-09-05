@@ -1,4 +1,4 @@
-# ciso-postgres — the suite's common DB image (FEAT-30 étage 1).
+# ciso-postgres — the suite's common DB image (FEAT-30 stage 1).
 # Same base (tag AND digest) as the previous per-module postgres:16-alpine so
 # an in-place swap keeps the data directories byte-compatible (same libc/
 # collations — switching to a glibc image on existing volumes corrupts text

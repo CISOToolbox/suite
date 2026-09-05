@@ -63,7 +63,7 @@ function renderDocReview(): void {
         var s = (D.doc_review[d.ref] && D.doc_review[d.ref].status) || "";
         if (s) {
             counts.done++;
-            // Équivalent typé de l'ancien `counts[s] !== undefined`
+            // Typed equivalent of the old `counts[s] !== undefined`
             if (s === "recu" || s === "incomplet" || s === "manquant" || s === "na") counts[s]++;
         }
     });

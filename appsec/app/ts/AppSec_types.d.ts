@@ -1,14 +1,14 @@
 /**
  * AppSec — Application Security Scanner (demo-docker front).
- * Types du modèle de données (objets servis par l'API FastAPI) + globals
- * posés par appsec_api.ts / AppSec_app.ts. Fichier de types pur (aucun emit).
+ * Data-model types (objects served by the FastAPI API) + globals set by
+ * appsec_api.ts / AppSec_app.ts. Pure type file (no emit).
  *
- * Les modèles sont des alias de type (pas des interfaces) pour bénéficier
- * de la signature d'index implicite (passage à ct_table.render dont les
- * rows sont des Record<string, any>).
+ * The models are type aliases (not interfaces) so they get the implicit
+ * index signature (needed when passing rows to ct_table.render, whose rows
+ * are Record<string, any>).
  */
 
-/* ── Modèle de données (API) ───────────────────────────────────── */
+/* ── Data model (API) ──────────────────────────────────────────── */
 
 type AppSecApp = {
     id: number | string;
@@ -145,7 +145,7 @@ type AppSecSbomFilter = {
     vulnerable_only: boolean;
 };
 
-/** Paramètres de query-string génériques (sérialisés par les list*). */
+/** Generic query-string parameters (serialized by the list* helpers). */
 type AppSecQueryParams = Record<string, string | number | boolean | null | undefined>;
 
 type AppSecAppPayload = {
@@ -174,8 +174,8 @@ type AppSecBulkTriagePayload = {
     triage_notes?: string;
 };
 
-/* Réponse IA serveur-autoritative (POST /api/ai/appsec/analyze-finding).
-   Champs typés librement : JSON produit par le LLM côté serveur. */
+/* Server-authoritative AI response (POST /api/ai/appsec/analyze-finding).
+   Loosely typed fields: JSON produced by the LLM server-side. */
 type AppSecAiAnalysis = {
     is_probable_false_positive?: boolean;
     confidence?: string;
@@ -224,23 +224,23 @@ interface AppSecApiType {
     listSBOM(params?: AppSecQueryParams): Promise<{ items?: AppSecSbomEntry[]; total?: number; ecosystems?: string[] }>;
 }
 
-/* ── Globals runtime posés par les libs shared via window.* ─────── */
-/* (accédés en identifiant nu dans le code app, comme dans le source) */
+/* ── Runtime globals set by the shared libs through window.* ────── */
+/* (accessed as bare identifiers in the app code, as in the source) */
 
 declare var ct_table: CtTableApi;
 declare var ct_bulkbar: CtBulkbarApi;
 declare var ct_modal: CtModalApi;
 declare var ct_measure_modal: CtMeasureModalApi;
 declare var ct_finding_view: CtFindingViewApi;
-/** Posés par ai_common.js sur window (appels nus dans _aiTriageFinding). */
+/** Set by ai_common.js on window (bare calls in _aiTriageFinding). */
 declare function _aiCallAPI(systemPrompt: string, userPrompt: string): Promise<string>;
 declare function _aiParseJSON(raw: string): any;
 
-/** Posés via window.* par AppSec_app.ts mais appelés en identifiant nu. */
+/** Set through window.* by AppSec_app.ts but called as bare identifiers. */
 declare function selectPanel(id: string): void;
 declare function _backToFindings(): void;
 
-/* ── Window — propriétés posées par appsec_api.ts / AppSec_app.ts ── */
+/* ── Window — properties set by appsec_api.ts / AppSec_app.ts ───── */
 
 interface Window {
     ct_notifprefs?: { open: (opts: Record<string, unknown>) => void };

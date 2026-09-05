@@ -19,7 +19,7 @@ credentials (Microsoft Graph, GitHub, Okta, AWS, …). The router exposes:
     PUT  /api/connectors/{id}             — admin user updates a connector
                                             (403 when CONNECTORS_MANAGED_BY_PILOT)
     POST /api/connectors/{id}/test        — smoke probe
-    POST /api/connectors/{id}/run         — trigger metier action
+    POST /api/connectors/{id}/run         — trigger a business action
     PUT  /api/internal/connectors/{id}    — service-token push from Pilot
                                             (bypasses managed lock)
 
@@ -262,7 +262,7 @@ def _is_configured(schema: dict, raw: dict[str, str]) -> bool:
     # No required fields (optional-cred connectors like AWS): "configured" only
     # if at least one field actually holds a value. Otherwise the flag would be
     # a vacuous True — showing a Delete button with nothing to remove, and a
-    # green "Configuré" badge for a connector that is really just in demo mode.
+    # green "Configured" badge for a connector that is really just in demo mode.
     return any(raw.get(f["id"]) for f in fields)
 
 

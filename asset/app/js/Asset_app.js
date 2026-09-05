@@ -361,7 +361,7 @@ function renderEcheances() {
     h += '</tbody></table>';
     return h;
 }
-// Build an iCalendar (.ics) with one VEVENT per échéance and a VALARM
+// Build an iCalendar (.ics) with one VEVENT per due date and a VALARM
 // lead so Outlook/Google fire a real reminder. Pure vanilla, no dep.
 function exportEcheancesIcs() {
     var items = _echeances();
@@ -741,7 +741,7 @@ window._bulkAssetsEdit = function (scope) {
         return;
     if (!window.ct_modal)
         return;
-    // Built-in types + custom types defined via "Gérer les types".
+    // Built-in types + custom types defined through "Gérer les types".
     var types = _getAssetTypes();
     var statuts = ["actif", "inactif", "en_cours", "retire"];
     function row(label, fieldHtml) {
@@ -761,14 +761,14 @@ window._bulkAssetsEdit = function (scope) {
     });
     typeSel += '</select>';
     h += row("Type", checkbox("type") + typeSel);
-    // Criticité
+    // Criticality
     var critSel = '<select id="bulk-crit" class="ct-w-full">';
     for (var i = 1; i <= 5; i++) {
         critSel += '<option value="' + i + '">' + i + ' — ' + esc(t("asset.crit." + i) || "") + '</option>';
     }
     critSel += '</select>';
     h += row(t("asset.col_crit") || "Criticité", checkbox("crit") + critSel);
-    // Propriétaire
+    // Owner
     h += row(t("asset.col_proprio") || "Propriétaire", checkbox("proprio")
         + '<input type="text" id="bulk-proprio" class="ct-w-full" placeholder="Laisse vide pour effacer">');
     // Statut

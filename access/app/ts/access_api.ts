@@ -147,8 +147,8 @@ window._autoSave = function() {
 
 var _origLoadBuffer = window._loadBuffer;
 if (_origLoadBuffer) {
-    // Réassignation d'un global déclaré `declare function` → on passe par
-    // l'interface Window (cast) ; le wrapper est volontairement void (iso source).
+    // Reassigning a global declared with `declare function` → go through the
+    // Window interface (cast); the wrapper is deliberately void (iso source).
     (window as Window)._loadBuffer = function(buffer: ArrayBuffer, filename: string) {
         _origLoadBuffer!(buffer, filename);
         setTimeout(function() {

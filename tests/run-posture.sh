@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Posture de deploiement de la suite — les 10 modules, a travers le proxy.
+# Suite deployment posture — the 10 modules, through the proxy.
 #
-# Le meme fichier test_posture.py sert la suite et les depots standalone ;
-# seul le conftest de chaque arbre change (URL, posture attendue, jeton).
+# The same test_posture.py file serves both the suite and the standalone repos;
+# only each tree's conftest changes (URL, expected posture, token).
 #
 # Usage: bash tests/run-posture.sh [module...]
 #        E2E_PROXY=https://host:8443 bash tests/run-posture.sh
@@ -23,7 +23,7 @@ for m in $MODULES; do
 done
 
 echo ""
-# Meme regle que smoke-test.sh : ne rien avoir verifie n'est pas un succes.
+# Same rule as smoke-test.sh: having verified nothing is not a success.
 if [ "$CHECKED" -eq 0 ]; then
     echo "POSTURE FAILED: no module has tests/e2e — nothing was verified"; exit 1
 fi

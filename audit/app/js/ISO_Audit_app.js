@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════
-// ISO Audit — CONFIG & DONNÉES
+// ISO Audit — CONFIG & DATA
 // ═══════════════════════════════════════════════════════════════════════
 window.CT_CONFIG = {
     edition: "suite",
@@ -41,8 +41,8 @@ function statusLabel(s) { return STATUS_MAP[s] ? STATUS_MAP[s].label() : ""; }
 function statusColor(s) { return STATUS_MAP[s] ? STATUS_MAP[s].color : "var(--ct-neutral)"; }
 function statusTone(s) { return STATUS_MAP[s] ? STATUS_MAP[s].tone : "neutral"; }
 function getCtrl(id) { return CONTROLS.find(function (c) { return c.id === id; }); }
-// Référentiel bilingue : titres/descriptions des contrôles, libellés de
-// domaines et questions d'audit suivent la langue via _rt / _locale.
+// Bilingual referential: control titles/descriptions, domain labels
+// and audit questions follow the language via _rt / _locale.
 function ctrlT(c) { return _rt(c, "t"); }
 function ctrlDesc(c) { return _rt(c, "desc"); }
 function domLabel(d) { return _rt(d, "label"); }
@@ -68,7 +68,7 @@ function domainControls(domainId) {
     return CONTROLS.filter(function (c) { return c.d === domainId; });
 }
 function isEcart(status) { return status === "ncmaj" || status === "ncmin" || status === "ps" || status === "pp"; }
-/** Garde de type : statut comptabilisé dans les stats (équivalent de l'ancien `S[s] !== undefined`). */
+/** Type guard: status counted in the stats (equivalent of the old `S[s] !== undefined`). */
 function _isStatusKey(s) {
     return s === "c" || s === "ncmaj" || s === "ncmin" || s === "ps" || s === "pp" || s === "na";
 }
@@ -159,7 +159,7 @@ function cardHTML(c, f) {
         h += '<div class="ctrl-field"><label>' + t("audit.field.ecart_constat") + '</label><textarea data-change="setField" data-args=\'' + _da(c.id, "ecart_constat") + '\' data-pass-value>' + esc(f.ecart_constat) + '</textarea></div>';
         h += '<div class="ctrl-field"><label>' + t("audit.field.ecart_cause") + '</label><textarea data-change="setField" data-args=\'' + _da(c.id, "ecart_cause") + '\' data-pass-value>' + esc(f.ecart_cause) + '</textarea></div>';
         h += '<div class="ctrl-field"><label>' + t("audit.field.ecart_action") + '</label><textarea data-change="setField" data-args=\'' + _da(c.id, "ecart_action") + '\' data-pass-value>' + esc(f.ecart_action) + '</textarea></div>';
-        // Mode suite : actions correctives liées à ce contrôle (audit_api.js)
+        // Suite mode: corrective actions linked to this control (audit_api.js)
         if (typeof window._auditControlMeasuresHTML === "function")
             h += window._auditControlMeasuresHTML(c.id);
         h += '</div>';
@@ -358,7 +358,7 @@ function renderDashboard() {
     if (typeof _aiIsEnabled === "function" && _aiIsEnabled()) {
         h += '<div style="margin-bottom:16px;text-align:right"><button class="btn-report" data-click="generateReport">' + t("audit.dash.generate_report") + '</button></div>';
     }
-    // Charts row: Gauge + Donut + Radar (radar légèrement agrandi)
+    // Charts row: Gauge + Donut + Radar (radar slightly enlarged)
     h += '<div class="dash-charts-grid">';
     h += '<div class="dash-card"><h3>' + t("audit.dash.gauge_title") + '</h3>';
     h += '<div class="dash-chart">' + buildGauge(S) + '</div>';
@@ -394,8 +394,8 @@ function renderDashboard() {
     });
     // Sort by severity: ncmaj first, then ncmin, ps, pp
     var sevOrder = { ncmaj: 0, ncmin: 1, ps: 2, pp: 3 };
-    // BUG FIX (portage TS) : l'original utilisait `|| 9` — ncmaj (0, falsy) était
-    // renvoyé en fin de tri au lieu d'être premier. `??` préserve le 0.
+    // BUG FIX (TS port): the original used `|| 9` — ncmaj (0, falsy) was
+    // sorted last instead of first. `??` preserves the 0.
     ecarts.sort(function (a, b) { return (sevOrder[a.finding.status] ?? 9) - (sevOrder[b.finding.status] ?? 9); });
     if (ecarts.length > 0) {
         h += '<div class="dash-card"><h3>' + t("audit.dash.nc_table") + ' (' + ecarts.length + ')</h3>';

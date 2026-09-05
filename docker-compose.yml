@@ -1146,10 +1146,10 @@ services:
       - ciso-net
 
   # ════════════════════════════════════════════════════════════
-  # WATCH — veille CVE / avis. Réactivé sur cette stack (le bloc avait été
-  # retiré au profit du standalone). Même contrat que les autres modules :
-  # auth déléguée à pilot, secret JWT dérivé par HKDF, chiffrement des
-  # réglages via ENCRYPTION_KEY.
+  # WATCH — CVE / advisory monitoring. Re-enabled on this stack (the block had
+  # been removed in favour of the standalone). Same contract as the other
+  # modules: auth delegated to pilot, JWT secret derived by HKDF, settings
+  # encrypted via ENCRYPTION_KEY.
   watch-app:
     image: ghcr.io/cisotoolbox/ciso-watch-suite:v1.0.3@sha256:c40d5b15f1bd9e0ef237e7c3e81a95e694358c384ec712ae88383fa40285f321
     container_name: ciso-watch
@@ -1249,7 +1249,7 @@ services:
       - ciso-net
 
   # ════════════════════════════════════════════════════════════
-  # BACKUP-AGENT — pgBackRest scheduler (FEAT-30 étage 1)
+  # BACKUP-AGENT — pgBackRest scheduler (FEAT-30 stage 1)
   # ════════════════════════════════════════════════════════════
   # Shared-volume topology: read-only PGDATA + unix socket per module,
   # shared encrypted repository. Full backup weekly, diff daily,

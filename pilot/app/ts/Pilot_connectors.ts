@@ -18,7 +18,7 @@
  * Top of panel: title + recap of how many connector types are configured.
  * Below: a grid of cards, one per connector TYPE. Each card shows the
  * connector name (FR/EN from the schema), the list of consumer module
- * ids ("Utilisé par : Pilot, Access, AppSec"), the configured/not
+ * ids (the "Utilisé par : …" line), the configured/not
  * configured status, and three actions: Configurer (schema-driven modal),
  * Tester, Recalculer.
  */
@@ -273,7 +273,7 @@ window._connOpenConfig = function(id: string) {
     var currentLabel = _t(schema.name) || id;
 
     var prereqHtml = '';
-    // prereqs.graph_permissions n'est pas dans le type partagé CtConnSchema — cast localisé.
+    // prereqs.graph_permissions is not in the shared CtConnSchema type — local cast.
     var pre: any = schema.prereqs || {};
     if (pre.graph_permissions && pre.graph_permissions.length) {
         prereqHtml += '<div class="ct-bg-alt ct-bordered ct-r-lg ct-py-2 ct-px-3 ct-mb-3 ct-text-meta ct-muted">';
@@ -300,8 +300,8 @@ window._connOpenConfig = function(id: string) {
     ct_modal.open({
         title: t("pilot.connectors.modal_title") + " — " + currentLabel,
         body: body,
-        // FIX portage TS : la source historique passait `actions:` que ct_modal ignore
-        // (seul `buttons:` est lu) — les modales s'ouvraient sans bouton Enregistrer/Annuler.
+        // TS port FIX: the historical source passed `actions:`, which ct_modal ignores
+        // (only `buttons:` is read) — the modals opened with no Enregistrer/Annuler button.
         buttons: [
             { id: "cancel", label: t("pilot.action.cancel") },
             {
@@ -468,8 +468,8 @@ window._connOpenInstance = function(typeId: string, ownerModule: string, instanc
     ct_modal.open({
         title: t("pilot.connectors.configure") + " — " + currentLabel,
         body: body,
-        // FIX portage TS : la source historique passait `actions:` que ct_modal ignore
-        // (seul `buttons:` est lu) — les modales s'ouvraient sans bouton Enregistrer/Annuler.
+        // TS port FIX: the historical source passed `actions:`, which ct_modal ignores
+        // (only `buttons:` is read) — the modals opened with no Enregistrer/Annuler button.
         buttons: [
             { id: "cancel", label: t("pilot.action.cancel") },
             {
@@ -557,8 +557,8 @@ window._connNewInstance = function(typeId: string) {
     ct_modal.open({
         title: t("pilot.connectors.new_instance_title") + " — " + typeName,
         body: body,
-        // FIX portage TS : la source historique passait `actions:` que ct_modal ignore
-        // (seul `buttons:` est lu) — les modales s'ouvraient sans bouton Enregistrer/Annuler.
+        // TS port FIX: the historical source passed `actions:`, which ct_modal ignores
+        // (only `buttons:` is read) — the modals opened with no Enregistrer/Annuler button.
         buttons: [
             { id: "cancel", label: t("pilot.action.cancel") },
             {

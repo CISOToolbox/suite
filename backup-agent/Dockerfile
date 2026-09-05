@@ -1,4 +1,4 @@
-# ciso-backup-agent — pgBackRest scheduler for the suite (FEAT-30 étage 1).
+# ciso-backup-agent — pgBackRest scheduler for the suite (FEAT-30 stage 1).
 # Shared-volume topology: the agent sees every module's PGDATA (read-only)
 # and unix socket through named volumes, and drives base backups + retention
 # + verification against the shared encrypted repository. WAL archiving

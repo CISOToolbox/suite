@@ -414,7 +414,7 @@ async def _push_to_modules(db: AsyncSession) -> dict:
     return report
 
 
-# ── Connectors push helper (CHANTIER_CONNECTEURS étape 7) ──────────
+# ── Connectors push helper (CHANTIER_CONNECTEURS step 7) ──────────
 
 
 _CONNECTOR_FIELD_PREFIX = "connector_"

@@ -233,16 +233,16 @@ function _sensibilisationCard(u) {
     h += '</div>';
     return h;
 }
-// Tons du module : une seule table, pour que revue, avertissement, criticite et
-// statut de mesure parlent la meme langue que le reste de la suite.
+// Module tones: a single table, so that review, warning, criticality and
+// measure status all speak the same language as the rest of the suite.
 var _ACCESS_TONES = {
-    // niveaux de risque
+    // risk levels
     critical: "critical", high: "high", medium: "medium", low: "low",
-    // statuts de revue
+    // review statuses
     en_cours: "info", cloturee: "low", planifiee: "neutral",
-    // statuts de mesure
+    // measure statuses
     a_faire: "neutral", termine: "low", annule: "critical",
-    // codes d'avertissement
+    // warning codes
     admin: "medium", ancien: "critical", orphan: "critical", externe: "accent",
     nomfa: "high", nosensi: "high", nopol: "high", service: "info",
 };
@@ -595,16 +595,16 @@ function addUser() {
 window.addUser = addUser;
 function backToUsers() { _selectedUser = null; renderPanel(); }
 window.backToUsers = backToUsers;
-// Rien ne cascade cote base : application_id, review_entry_id et reviewers
-// sont des chaines libres, sans cle etrangere (les cascades du modele portent
-// uniquement sur project_id). Les liens se nettoient donc ici, et _save()
-// republie le blob complet.
+// Nothing cascades on the database side: application_id, review_entry_id and
+// reviewers are free-form strings, with no foreign key (the model's cascades
+// only cover project_id). So the links are cleaned up here, and _save()
+// republishes the whole blob.
 //
-// Une mesure n'est pas supprimee avec la revue qui l'a fait naitre : c'est un
-// travail assigne, avec un responsable et une echeance. On la detache.
-// Les entrees de revue, elles, ne sont jamais reecrites : une revue est un
-// enregistrement date, et l'entree porte deja email_or_login / nom / prenom
-// figes — _resolveEntryUser rend undefined et l'affichage retombe dessus.
+// A measure is not deleted along with the review that gave birth to it: it is
+// assigned work, with an owner and a due date. It gets detached instead.
+// Review entries, on the other hand, are never rewritten: a review is a dated
+// record, and the entry already carries frozen email_or_login / nom / prenom
+// — _resolveEntryUser returns undefined and the display falls back on those.
 function _detachMeasures(entryIds) {
     if (!entryIds.length)
         return 0;
@@ -626,7 +626,7 @@ function _purgeUserRefs(ids) {
     });
     return n;
 }
-// Supprime les revues de ces applications, apres avoir detache leurs mesures.
+// Deletes the reviews of these applications, after detaching their measures.
 function _purgeAppRefs(ids) {
     var doomed = (D.reviews || []).filter(function (r) { return ids.indexOf(r.application_id) >= 0; });
     _detachMeasures(_entryIdsOf(doomed));
@@ -1167,9 +1167,9 @@ function deleteApp() {
     if (appReviews.length)
         body2 += " " + t("app.confirm_delete_cascade", { r: String(appReviews.length), m: String(attached) });
     _ctConfirm(t("app.confirm_delete"), body2, function () {
-        // Les revues d'une application supprimee ne sont plus atteignables :
-        // toutes les vues les listent par application. Les garder reviendrait
-        // a les compter dans les indicateurs sans pouvoir les ouvrir.
+        // The reviews of a deleted application are no longer reachable:
+        // every view lists them by application. Keeping them would amount
+        // to counting them in the indicators without being able to open them.
         _purgeAppRefs([aid]);
         if (_selectedReview !== null)
             _selectedReview = null;
@@ -1347,8 +1347,8 @@ window.deleteReviewFromApp = function (reviewId) {
         if (_selectedReview !== null && D.reviews[_selectedReview] && D.reviews[_selectedReview].id === reviewId)
             _selectedReview = null;
         renderPanel();
-        // Le detachement des mesures n'est porte par aucune route granulaire :
-        // il faut republier le blob, y compris dans la branche API.
+        // No granular route carries the detaching of measures:
+        // the blob has to be republished, including in the API branch.
         _save();
         showStatus(t("review.deleted"));
     };
@@ -1834,12 +1834,12 @@ function renderReviewDetail() {
         h += '<td>' + _accountTag(acctEnabled) + '</td>';
         h += '<td class="ct-text-meta">';
         if (isClosed) {
-            // Revue cloturee : la decision est un constat, pas un controle.
+            // Closed review: the decision is a statement of fact, not a control.
             h += '<span class="ct-badge" data-tone="' + (e.decision === "conforme" ? "low" : e.decision === "non_conforme" ? "critical" : "neutral") + '">' + esc(_decisionLabel(e.decision)) + '</span>';
         }
         else {
-            // .ct-choice : l'etat passe par aria-pressed (annonce par les lecteurs
-            // d'ecran) et la couleur par data-tone, sur l'option retenue seulement.
+            // .ct-choice: the state goes through aria-pressed (announced by screen
+            // readers) and the color through data-tone, on the selected option only.
             h += '<div class="ct-choice" data-size="xs">';
             h += '<button type="button" data-tone="low" aria-pressed="' + (e.decision === "conforme") + '" data-click="setDecision" data-args=\'' + _da(x.idx, "conforme") + '\'>✓</button> ';
             h += '<button type="button" data-tone="critical" aria-pressed="' + (e.decision === "non_conforme") + '" data-click="setDecision" data-args=\'' + _da(x.idx, "non_conforme") + '\'>✗</button>';

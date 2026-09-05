@@ -1,13 +1,13 @@
-// Aucune erreur console, nulle part — au chargement ET pendant la traversée.
+// No console error, anywhere — on load AND while walking the navigation.
 //
-// C'est le seul contrôle qui regarde ce qui se passe entre le clic et l'écran.
-// Une exception JS qui casse la moitié d'un panneau laisse le serveur répondre
-// 200 : ni les tests unitaires, ni la posture HTTP ne peuvent la voir. Le bug
-// du toggle des critères ER de Risk (aria-pressed jamais mis à jour) vivait
-// exactement dans cet angle mort.
+// This is the only check that looks at what happens between the click and the
+// screen. A JS exception that breaks half a panel still leaves the server
+// answering 200: neither the unit tests nor the HTTP posture can see it. The
+// Risk ER-criteria toggle bug (aria-pressed never updated) lived exactly in
+// that blind spot.
 //
-// Prérequis : `bash mint-tokens.sh` (une session par module) et la stack en
-// marche. Sans tokens.json, la suite échoue au lieu de passer à vide.
+// Prerequisites: `bash mint-tokens.sh` (one session per module) and the stack
+// running. Without tokens.json, the suite fails instead of passing vacuously.
 const fs = require("fs");
 const path = require("path");
 const { test, expect } = require("@playwright/test");
@@ -20,22 +20,22 @@ const TOKENS_FILE = path.join(__dirname, "tokens.json");
 const TOKENS = fs.existsSync(TOKENS_FILE)
     ? JSON.parse(fs.readFileSync(TOKENS_FILE, "utf8")) : {};
 
-// Pilot est servi à la racine du proxy ; les autres sous /<module>/.
+// Pilot is served at the proxy root; the others under /<module>/.
 const urlOf = (m) => (m === "pilot" ? PROXY + "/" : `${PROXY}/${m}/`);
 
-// Bruit connu, sans rapport avec le code applicatif. Toute entrée ajoutée ici
-// doit dire POURQUOI : une liste d'exclusions non justifiée finit par tout
-// contenir, et le test ne regarde plus rien.
+// Known noise, unrelated to the application code. Every entry added here must
+// say WHY: an unjustified exclusion list ends up containing everything, and the
+// test no longer looks at anything.
 const IGNORED = [
-    /favicon\.ico/i,                       // pas d'icône servie en local
-    /net::ERR_CERT_AUTHORITY_INVALID/i,    // certificat auto-signé du proxy local
+    /favicon\.ico/i,                       // no icon served locally
+    /net::ERR_CERT_AUTHORITY_INVALID/i,    // self-signed certificate of the local proxy
 ];
 
-// Ces tests frappent des sessions administrateur en empruntant la cle de
-// signature a l'interieur du conteneur. C'est sans danger en local — qui peut
-// faire un `docker exec` controle deja le processus — mais il n'y a aucune
-// raison de pointer une campagne de recette vers un environnement portant des
-// donnees reelles. Le refus est explicite plutot que laisse au bon sens.
+// These tests mint administrator sessions by borrowing the signing key from
+// inside the container. That is harmless locally — whoever can run a
+// `docker exec` already controls the process — but there is no reason to point
+// an acceptance campaign at an environment holding real data. The refusal is
+// explicit rather than left to common sense.
 const IS_LOCAL = /^https?:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/.test(PROXY);
 if (!IS_LOCAL && process.env.E2E_ALLOW_REMOTE !== "1") {
     throw new Error(
@@ -46,9 +46,9 @@ if (!IS_LOCAL && process.env.E2E_ALLOW_REMOTE !== "1") {
 
 const isNoise = (text) => IGNORED.some((rx) => rx.test(text));
 
-// Reprend une fois en re-resolvant le localisateur : la navigation se re-rend
-// a chaque selection, donc l'element trouve n'est pas toujours celui qui recoit
-// le clic.
+// Retries once by re-resolving the locator: the navigation re-renders on every
+// selection, so the element that was found is not always the one that receives
+// the click.
 async function clickStable(page, selector) {
     for (let attempt = 0; attempt < 2; attempt++) {
         try {
@@ -81,9 +81,9 @@ test.describe("erreurs console", () => {
                 const f = r.failure();
                 note("request", `${r.url()} — ${f ? f.errorText : "failed"}`);
             });
-            // Un asset qui répond 404 ne déclenche pas requestfailed : la requête
-            // a abouti, avec un mauvais statut. C'est exactement la panne qu'on
-            // vient de trouver sur ct_schema.js.
+            // An asset answering 404 does not trigger requestfailed: the request
+            // did succeed, with a bad status. That is exactly the failure we
+            // have just found on ct_schema.js.
             page.on("response", (r) => {
                 if (r.status() >= 400) note("http", `${r.status()} ${r.url()}`);
             });
@@ -91,15 +91,15 @@ test.describe("erreurs console", () => {
             await page.goto(urlOf(module), { waitUntil: "networkidle" });
             expect(problems, `au chargement de ${module}`).toEqual([]);
 
-            // La navigation est rendue en JS, jamais présente dans index.html :
-            // on la découvre dans le DOM plutôt que de la coder en dur.
+            // The navigation is rendered in JS, never present in index.html:
+            // we discover it in the DOM rather than hard-coding it.
             const SEL = '[data-click="selectPanel"]';
-            // Chaque entrée est identifiée par ses data-args (l'identifiant du
-            // panneau), jamais par son index ni par son texte :
-            //   - l'index casse parce qu'un premier clic re-rend la navigation
-            //     et la raccourcit (Surface) ;
-            //   - le texte casse parce qu'il contient du dynamique — « ANSSI
-            //     Hygiène 38% 16 OK 26 KO » change entre deux rendus.
+            // Each entry is identified by its data-args (the panel id), never
+            // by its index nor by its text:
+            //   - the index breaks because a first click re-renders the
+            //     navigation and shortens it (Surface);
+            //   - the text breaks because it holds dynamic parts — « ANSSI
+            //     Hygiène 38% 16 OK 26 KO » changes between two renders.
             const panels = [...new Set(await page.locator(SEL).evaluateAll((els) =>
                 els.map((e) => e.getAttribute("data-args")).filter(Boolean)))];
             expect(panels.length, `${module} n'expose aucune entrée de navigation`).toBeGreaterThan(0);
@@ -111,18 +111,18 @@ test.describe("erreurs console", () => {
                     unreachable.push(label);
                     continue;
                 }
-                // Selectionner un panneau re-rend la navigation : le noeud
-                // resolu par le localisateur est detache avant que le clic
-                // n'aboutisse. Sans cette reprise, le test echouait une fois
-                // sur trois — et une suite navigateur instable finit ignoree,
-                // ce qui est pire que pas de suite du tout.
+                // Selecting a panel re-renders the navigation: the node
+                // resolved by the locator is detached before the click lands.
+                // Without this retry, the test failed one run in three — and a
+                // flaky browser suite ends up ignored, which is worse than
+                // having no suite at all.
                 await clickStable(page, `${SEL}[data-args='${label}']`);
-                await page.waitForTimeout(250);   // le rendu est synchrone, mais l'i18n est paresseuse
+                await page.waitForTimeout(250);   // the render is synchronous, but i18n is lazy
                 expect(problems, `${module} — après « ${label} »`).toEqual([]);
             }
-            // Une entrée devenue introuvable est signalée, jamais avalée : sans
-            // cela, un panneau qui disparaît ferait baisser la couverture sans
-            // que rien ne le dise.
+            // An entry that has become unreachable is reported, never
+            // swallowed: without this, a panel that disappears would lower the
+            // coverage without anything saying so.
             expect(unreachable, `${module} — entrées de navigation devenues introuvables`).toEqual([]);
         });
     }

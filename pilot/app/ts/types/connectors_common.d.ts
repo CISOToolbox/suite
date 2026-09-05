@@ -3,7 +3,7 @@
 // DO NOT EDIT HERE - changes will be overwritten by the next propagation run.
 // Fix the master in the shared repository and re-propagate. See CONTRIBUTING.md.
 // -----------------------------------------------------------------------------
-/** Libellé bilingue { fr, en } ou chaîne brute. */
+/** Bilingual label { fr, en } or a raw string. */
 type CtConnLabel = string | {
     fr?: string;
     en?: string;

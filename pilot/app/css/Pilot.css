@@ -1,6 +1,7 @@
-/* Sur une teinte, l'encre est le grade -ink du MÊME ton. La couleur de base y
-   passe de justesse ou échoue selon le ton — medium tombe à 4,49:1 en clair — et
-   l'écart ne se voit qu'à la mesure. Règle uniforme plutôt que cas par cas. */
+/* On a tint, the ink is the -ink grade of the SAME tone. The base color barely
+   passes there, or fails, depending on the tone — medium drops to 4.49:1 in
+   light — and the gap only shows up when measured. A uniform rule rather than
+   a case-by-case one. */
 .pilot-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin-bottom: 24px; }
 .pilot-card { background: var(--ct-surface); border: 1px solid var(--ct-line); border-radius: 10px; padding: 20px; transition: box-shadow 0.2s; }
 .pilot-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
@@ -25,7 +26,7 @@
 
 
 .pilot-actions { display: flex; gap: 8px; margin-bottom: 16px; }
-/* .pilot-btn supprimé — migré vers le système .btn/.btn-primary standard. */
+/* .pilot-btn removed — migrated to the standard .btn/.btn-primary system. */
 
 .pilot-label { display: block; font-size: 0.78em; font-weight: 600; color: var(--ct-ink-2); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.3px; }
 
@@ -90,10 +91,10 @@
 .ct-donut-legend { display: flex; flex-wrap: wrap; gap: 4px 10px; justify-content: center; font-size: 0.72em; color: var(--ct-ink-2); }
 .ct-donut-legend-item { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
 .ct-donut-dot { width: 8px; height: 8px; border-radius: 2px; display: inline-block; flex-shrink: 0; }
-/* .ct-empty n'est plus redéfini ici : il est émis par les composants partagés
-   (ct_table, cisotoolbox) et le socle en fait une colonne centrée icône / titre /
-   texte. L'override local le réduisait à une ligne italique — dans Pilot seulement.
-   L'état vide y prend désormais la même forme que dans les neuf autres modules. */
+/* .ct-empty is no longer redefined here: it is emitted by the shared components
+   (ct_table, cisotoolbox) and the socle turns it into a centered icon / title /
+   text column. The local override reduced it to an italic line — in Pilot only.
+   The empty state now takes the same shape there as in the nine other modules. */
 
 /* ── Activity feed ───────────────────────────────────────────── */
 .dash-activity {
@@ -220,9 +221,9 @@
     display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: 12px;
 }
-/* La tuile KPI est migrée sur la primitive socle .ct-kpi-adv (liseré de ton,
-   valeur encrée, statut, seuils). Les sous-classes .kpi-card-* ci-dessous
-   restent utilisées par la vue détail (_renderDetailBody). */
+/* The KPI tile is migrated to the .ct-kpi-adv socle primitive (tone border,
+   inked value, status, thresholds). The .kpi-card-* subclasses below are still
+   used by the detail view (_renderDetailBody). */
 
 .kpi-card-src {
     padding: 1px 6px; border-radius: 3px;
@@ -248,8 +249,8 @@
 .kpi-card-meta-amber { color: var(--ct-high); }
 .kpi-card-meta-red   { color: var(--ct-critical); }
 
-/* Modificateur de .ct-badge : chip rectangulaire compacte. Le fond et l'encre
-   viennent du ton, cette regle ne garde que la forme. */
+/* .ct-badge modifier: compact rectangular chip. The background and the ink
+   come from the tone, this rule only keeps the shape. */
 .kpi-fw-badge { font-size: 0.68em; padding: 1px 5px; border-radius: 3px; white-space: nowrap; }
 
 .kpi-history-table { width: 100%; font-size: 0.85em; margin-top: 8px; }
@@ -443,7 +444,7 @@
 }
 
 /* Toolbar count badge on the "+ KPI automatique" button */
-/* Modificateur de .ct-badge : pastille de comptage sur un bouton. */
+/* .ct-badge modifier: count pill on a button. */
 .kpi-btn-badge { min-width: 18px; padding: 0 5px; margin-left: 4px; border-radius: 9px;
     font-size: 0.78em; font-weight: 700; line-height: 16px; text-align: center;
     justify-content: center; vertical-align: middle; }
@@ -502,12 +503,12 @@
 
 /* Kanban: hard-coded light-mode blues/greens/reds. */
 
-/* (SVG partagés : désormais thémés à la source via variables — plus d'overrides.) */
+/* (Shared SVGs: now themed at the source through variables — no more overrides.) */
 
-/* Extrait des styles inline : la classe portait deja le nom, la mise en
-   forme vivait a cote dans un attribut style. Rendu identique. */
+/* Extracted from inline styles: the class already carried the name, the
+   formatting lived next to it in a style attribute. Identical rendering. */
 .conn-card { background:var(--ct-surface); border:1px solid var(--ct-line); border-radius:12px; padding:18px; display:flex; flex-direction:column; gap:10px; }
 .pilot-view-toggle { margin-left:auto; display:inline-flex; border:1px solid var(--ct-line); border-radius:6px; overflow:hidden; }
 
-/* Extrait du balisage : la classe existait, son style vivait a cote. */
+/* Extracted from the markup: the class existed, its style lived next to it. */
 .conn-result { margin-left:auto; font-size:var(--ct-text-meta); align-self:center; color:var(--ct-ink-2); }

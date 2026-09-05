@@ -1,9 +1,9 @@
 /**
- * Asset Management (variante demo-docker) — modèle de données D + globals app.
- * Base : port opensource (frontend-ts/opensource/asset/app/ts/Asset_types.d.ts),
- * enrichi des champs backend : licence, connecteurs (sources/manual locks,
- * ip_address, last_login_at), types personnalisés, échéances, plugins,
- * couche API (asset_api.ts). Fichier de types pur (aucun emit).
+ * Asset Management (demo-docker variant) — data model D + app globals.
+ * Base: opensource port (frontend-ts/opensource/asset/app/ts/Asset_types.d.ts),
+ * extended with the backend fields: licence, connectors (sources/manual locks,
+ * ip_address, last_login_at), custom types, renewal deadlines, plugins,
+ * API layer (asset_api.ts). Pure type file (no emit).
  */
 
 interface AssetRaciCells {
@@ -17,8 +17,8 @@ interface AssetRaciRow extends AssetRaciCells {
     activite: string;
 }
 
-/** Ancien format RACI objet { installation: {r,a,c,i}, mco: …, mcs: … } —
- *  migré vers AssetRaciRow[] par _ensureRaciArray(). */
+/** Legacy RACI object format { installation: {r,a,c,i}, mco: …, mcs: … } —
+ *  migrated to AssetRaciRow[] by _ensureRaciArray(). */
 type AssetRaciLegacy = Record<string, Partial<AssetRaciCells>>;
 
 interface AssetPolSauvegarde {
@@ -47,10 +47,10 @@ interface AssetPolMaj {
     notes?: string;
 }
 
-/** Cycle licence / contrat de support (variante backend). */
+/** License / support contract cycle (backend variant). */
 interface AssetLicence {
     date_renouvellement?: string;
-    /** Préavis en jours — number à la création, string possible après édition formulaire. */
+    /** Notice period in days — number at creation, may be a string after form edits. */
     preavis_jours?: number | string;
     cout?: string;
     devise?: string;
@@ -58,7 +58,7 @@ interface AssetLicence {
     contact?: string;
 }
 
-/** Provenance des champs (connecteurs) — sources.fields[champ] = "manual" | <plugin>. */
+/** Field provenance (connectors) — sources.fields[field] = "manual" | <plugin>. */
 interface AssetSources {
     fields?: Record<string, string>;
     [k: string]: any;
@@ -82,7 +82,7 @@ interface AssetItem {
     notes?: string;
     groupe_ids?: string[];
     depends_on?: string[];
-    /* ── champs variante backend ── */
+    /* ── backend-variant fields ── */
     ip_address?: string;
     last_login_at?: string;
     licence?: AssetLicence;
@@ -108,7 +108,7 @@ interface AssetMetadata {
     created?: string;
 }
 
-/** Type d'actif personnalisé (D.custom_asset_types). */
+/** Custom asset type (D.custom_asset_types). */
 interface AssetCustomType {
     id: string;
     label: string;
@@ -123,7 +123,7 @@ interface AssetData {
     custom_asset_types?: AssetCustomType[];
 }
 
-/** Vue d'une dépendance (asset ou groupe) résolue pour l'affichage. */
+/** Dependency view (asset or group) resolved for display. */
 interface AssetDepView {
     id: string;
     nom: string;
@@ -131,7 +131,7 @@ interface AssetDepView {
     kind: string;
 }
 
-/* ── Échéances (licence / fin support / fin de vie) ────────────── */
+/* ── Renewal deadlines (licence / end of support / end of life) ── */
 
 type AssetEcheanceKind = "licence" | "support" | "vie";
 type AssetEcheanceBucket = "expired" | "due" | "upcoming";
@@ -144,13 +144,13 @@ interface AssetEcheance {
     bucket: AssetEcheanceBucket;
 }
 
-/** État de tri client de la liste d'actifs. */
+/** Client-side sort state of the asset list. */
 interface AssetSortState {
     key: string;
     direction: "asc" | "desc";
 }
 
-/* ── Connecteurs (plugins AD / Intune / EDR…) ──────────────────── */
+/* ── Connectors (AD / Intune / EDR… plugins) ───────────────────── */
 
 interface AssetPluginConfigField {
     key: string;
@@ -161,7 +161,7 @@ interface AssetPluginConfigField {
     default?: boolean;
 }
 
-/** Définition d'un type de connecteur disponible (GET /plugins/available). */
+/** Definition of an available connector type (GET /plugins/available). */
 interface AssetPluginTypeDef {
     type: string;
     label: string;
@@ -169,7 +169,7 @@ interface AssetPluginTypeDef {
     config_schema?: AssetPluginConfigField[];
 }
 
-/** Connecteur configuré sur le projet. */
+/** Connector configured on the project. */
 interface AssetPlugin {
     id: string;
     plugin_type: string;
@@ -183,7 +183,7 @@ interface AssetPlugin {
     last_sync_at?: string;
 }
 
-/** Payload du formulaire add/edit connecteur (_collectPluginForm). */
+/** Payload of the connector add/edit form (_collectPluginForm). */
 interface AssetPluginForm {
     plugin_type: string;
     label: string;
@@ -192,13 +192,13 @@ interface AssetPluginForm {
     schedule: string;
     config: Record<string, any>;
     filters: Record<string, any>;
-    /** Id du connecteur en cours d'édition (vide à la création) — posé par
-     *  _collectPluginForm depuis le champ caché aplg-id, lu par _testCurrentForm
-     *  pour rouvrir la modale sur le même connecteur. */
+    /** Id of the connector being edited (empty at creation) — set by
+     *  _collectPluginForm from the hidden aplg-id field, read by _testCurrentForm
+     *  to reopen the modal on the same connector. */
     plugin_id?: string;
 }
 
-/** Résultat d'une synchro connecteur. */
+/** Result of one connector sync. */
 interface AssetSyncResult {
     assets_found?: number;
     assets_created?: number;
@@ -210,7 +210,7 @@ interface AssetSyncResult {
     connector_errors_count?: number;
 }
 
-/** Entrée d'historique de synchro. */
+/** Sync history entry. */
 interface AssetPluginJob {
     status?: string;
     started_at?: string;
@@ -221,7 +221,7 @@ interface AssetPluginJob {
     error_message?: string;
 }
 
-/* ── Couche API (asset_api.ts) ─────────────────────────────────── */
+/* ── API layer (asset_api.ts) ──────────────────────────────────── */
 
 interface AssetFetchOpts {
     method?: string;
@@ -287,12 +287,12 @@ interface AssetApiClient {
     updateUser(id: string, data: Record<string, string>): Promise<any>;
 }
 
-/* ── Globals shared déclarés Window-only dans les .d.ts générés ────
+/* ── Shared globals declared Window-only in the generated .d.ts ────
  * ai_common / ct_table / ct_bulkbar / ct_modal / directory_picker
- * n'exposent leurs APIs que sur l'interface Window (propriétés
- * optionnelles). Asset_app.ts les appelle en globals nus (gardés par
- * des checks window.X comme le source) — déclarations ambiantes
- * locales, aucun impact sur le js émis (pattern du port vendor). */
+ * expose their APIs only on the Window interface (optional
+ * properties). Asset_app.ts calls them as bare globals (guarded by
+ * window.X checks like the source) — local ambient declarations,
+ * no impact on the emitted js (vendor-port pattern). */
 declare function _aiIsEnabled(): boolean;
 declare function _aiGetContext(): string;
 declare function _aiCallAPI(systemPrompt: string, userPrompt: string): Promise<string>;
@@ -305,18 +305,18 @@ declare function _aiShowError(title: string, errMsg: string): void;
 declare var ct_table: CtTableApi;
 declare var ct_bulkbar: CtBulkbarApi;
 declare var ct_modal: CtModalApi;
-/** Posé par directory_picker.js (window._dirPicker) — decl générée vide (IIFE). */
+/** Set by directory_picker.js (window._dirPicker) — generated decl is empty (IIFE). */
 declare var _dirPicker: (currentValue: string | null | undefined, handler: string, argsJson: string) => string;
-/** Couche per-entity PATCH — n'existe PAS dans asset (blob autosave only) ; gardé par typeof. */
+/** Per-entity PATCH layer — does NOT exist in asset (blob autosave only); guarded by typeof. */
 declare var _persist: ((entityType: string, id: string, patch: Record<string, any>) => void) | undefined;
-/** Posés par asset_api.ts sur window ; appelés en globals nus après guard. */
+/** Set by asset_api.ts on window; called as bare globals after a guard. */
 declare var AssetAPI: AssetApiClient;
 declare function getActiveProjectId(): string | null;
 declare var _setDataReady: (() => void) | undefined;
 
-/* Globals exposés sur window (dispatch data-click + hooks persistence). */
+/* Globals exposed on window (data-click dispatch + persistence hooks). */
 interface Window {
-    /* hooks de persistance redéfinis par asset_api.ts */
+    /* persistence hooks redefined by asset_api.ts */
     _autoSave?: () => void;
     _cancelAutosave?: () => void;
     _debouncedSave?: () => void;
@@ -383,7 +383,7 @@ interface Window {
     aiSuggestPrincipe?: typeof aiSuggestPrincipe;
     aiSuggestRaci?: typeof aiSuggestRaci;
     aiSuggestPolitiques?: typeof aiSuggestPolitiques;
-    /* connecteurs */
+    /* connectors */
     showPluginModal?: (pluginId?: string) => void;
     _aplgTypeChanged?: (val: string) => void;
     testAssetPlugin?: (pluginId: string) => void;

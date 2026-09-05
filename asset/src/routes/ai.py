@@ -23,7 +23,7 @@ from src.auth import get_current_user
 from src.database import get_db
 from src.models import User
 
-# Common /api/ai endpoints; the métier endpoints below are appended to it.
+# Common /api/ai endpoints; the domain endpoints below are appended to it.
 router = make_ai_router()
 
 

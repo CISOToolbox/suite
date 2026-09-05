@@ -60,7 +60,7 @@
 }
 :root[data-theme="dark"] .ct-btn-add.btn-neutral:hover { background: var(--ct-surface-2) !important; opacity: 1; }
 
-/* Destructive: tinted at rest, solid red on hover (spec bouton Supprimer). */
+/* Destructive: tinted at rest, solid red on hover (Supprimer button spec). */
 
 /* Small edit pill on connector cards — accent family (action, not status). */
 
@@ -75,10 +75,10 @@
 .nav-badge { display: inline-block; margin-left: 6px; min-width: 16px; padding: 0 5px; border-radius: 9px; background: var(--ct-high); color: var(--ct-onsolid); font-size: 0.72em; font-weight: 700; line-height: 16px; text-align: center; vertical-align: middle; }
 
 
-/* Extrait des styles inline : la classe portait deja le nom, la mise en
-   forme vivait a cote dans un attribut style. Rendu identique. */
+/* Extracted from the inline styles: the class already carried the name, the
+   formatting lived next to it in a style attribute. Identical rendering. */
 .manual-lock-banner { background:var(--ct-medium-tint); border:1px solid var(--ct-medium); border-radius:6px; padding:8px 12px; margin-bottom:var(--ct-s3); font-size:var(--ct-text-meta); display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
 
-/* Pastille de conformite : Asset l'emet depuis toujours sans la definir,
-   les trois occurrences etaient rendues sans style. Meme regle qu'Access
-   et Compliance. */
+/* Compliance pill: Asset has always emitted it without defining it, so the
+   three occurrences were rendered unstyled. Same rule as Access and
+   Compliance. */

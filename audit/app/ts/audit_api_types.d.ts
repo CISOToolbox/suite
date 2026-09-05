@@ -1,5 +1,5 @@
 /**
- * Types du couche API backend (audit_api.ts) — variante suite uniquement.
+ * Types for the backend API layer (audit_api.ts) — suite variant only.
  */
 
 interface CtAuthUser {
@@ -63,8 +63,8 @@ declare var ct_measure_modal: CtMeasureModalApi;
 declare var ct_userpicker: CtUserpickerApi;
 declare function onMetaChange(field: string, value: string): void;
 
-/* Fournis par cisotoolbox_local.js en frontend ; absents (ou stubs) dans
-   cisotoolbox_backend.js — l'app garde des appels guardés par typeof. */
+/* Provided by cisotoolbox_local.js on the frontend; absent (or stubs) in
+   cisotoolbox_backend.js — the app keeps typeof-guarded calls. */
 declare var _renderSnapshotsPanel: ((opts: any) => Promise<void>) | undefined;
 declare var _demoSettingsHTML: (() => string) | undefined;
 declare var _wireDemoSettings: (() => void) | undefined;

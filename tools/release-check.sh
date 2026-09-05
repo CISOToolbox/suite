@@ -82,7 +82,7 @@ if [ -n "$SUITE_V" ]; then
     else
         i=0
         bad=0
-        # colonnes après la version de suite, dans l'ordre de l'en-tête
+        # columns after the suite version, in header order
         IFS='|' read -ra cells <<< "${row#| }"
         for m in "${MODULES[@]}"; do
             i=$((i + 1))

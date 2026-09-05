@@ -1,11 +1,11 @@
-"""Regression: le scan de dépendances d'une application C#/.NET moderne était
-silencieusement vide.
+"""Regression: the dependency scan of a modern C#/.NET application was
+silently empty.
 
-Trivy ne lit les dépendances NuGet que depuis packages.lock.json, *.deps.json
-ou packages.config. Un projet SDK-style déclare ses PackageReference dans le
-.csproj sans lockfile → run_trivy_fs rendait 0 vuln et une SBOM vide.
-_synthesize_nuget_manifests() génère un packages.config par .csproj (versions
-exactes uniquement) pour que trivy voie les dépendances.
+Trivy only reads NuGet dependencies from packages.lock.json, *.deps.json
+or packages.config. An SDK-style project declares its PackageReference in the
+.csproj without a lockfile → run_trivy_fs returned 0 vulns and an empty SBOM.
+_synthesize_nuget_manifests() generates one packages.config per .csproj (exact
+versions only) so that trivy sees the dependencies.
 """
 import os
 import sys
@@ -49,7 +49,7 @@ def test_sdk_csproj_generates_packages_config(tmp_path):
     _write(tmp_path, "App/App.csproj", CSPROJ_SDK)
     assert _synthesize_nuget_manifests(str(tmp_path)) == 1
     pkgs = _read_pkgs(tmp_path / "App/packages.config")
-    # versions exactes reprises, ranges et variables MSBuild ignorés
+    # exact versions kept, ranges and MSBuild variables ignored
     assert pkgs == {"Newtonsoft.Json": "12.0.1", "Serilog": "2.10.0"}
 
 
@@ -91,19 +91,19 @@ DTD_BOMB = """<?xml version="1.0"?>
 
 
 def test_dtd_rejected(tmp_path):
-    # contenu non fiable : un .csproj avec DTD (XXE / billion-laughs) est ignoré
+    # untrusted content: a .csproj with a DTD (XXE / billion-laughs) is ignored
     _write(tmp_path, "Evil/Evil.csproj", DTD_BOMB)
     assert _synthesize_nuget_manifests(str(tmp_path)) == 0
     assert not (tmp_path / "Evil/packages.config").exists()
 
 
 def test_dtd_rejected_utf16(tmp_path):
-    # le rejet DTD doit tenir quel que soit l'encodage : en UTF-16 la
-    # sous-chaîne d'octets b"<!DOCTYPE" n'apparaît pas (audit sécurité)
+    # the DTD rejection must hold whatever the encoding: in UTF-16 the
+    # b"<!DOCTYPE" byte substring does not appear (security audit)
     p = tmp_path / "Evil16/Evil16.csproj"
     p.parent.mkdir(parents=True)
     p.write_bytes(DTD_BOMB.replace('"1.0"', '"1.0" encoding="utf-16"').encode("utf-16"))
-    assert b"<!DOCTYPE" not in p.read_bytes()  # le vecteur du contournement
+    assert b"<!DOCTYPE" not in p.read_bytes()  # the bypass vector
     assert _synthesize_nuget_manifests(str(tmp_path)) == 0
     assert not (tmp_path / "Evil16/packages.config").exists()
 

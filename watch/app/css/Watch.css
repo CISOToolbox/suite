@@ -2,13 +2,13 @@
 /* Phase 0 scaffold: layout/widgets are inherited from shared CSS. */
 /* App-specific rules will land here as phases 1+ introduce panels. */
 
-/* Modificateur de .ct-badge : identifiant de cible (cpe / purl / autre).
-   Le ton vient du socle ; seule la typographie est propre au module. */
+/* .ct-badge modifier: target identifier (cpe / purl / other).
+   The tone comes from the base; only the typography is module-specific. */
 .target-kind-badge { font-size: 0.72em; text-transform: uppercase;
     letter-spacing: 0.04em; margin-right: 8px; }
 
-/* Extrait des styles inline : la classe portait deja le nom, la mise en
-   forme vivait a cote dans un attribut style. Rendu identique. */
+/* Extracted from inline styles: the class already carried the name, the
+   formatting lived next to it in a style attribute. Identical rendering. */
 .recipient-chip { display:inline-flex; align-items:center; gap:6px; background:var(--ct-info-tint); color:var(--ct-info-ink); border-radius:14px; padding:4px 10px; font-size:var(--ct-text-meta); }
 .scope-card { background:var(--ct-surface); border:1px solid var(--ct-line); border-radius:8px; padding:14px 16px; cursor:pointer; transition:box-shadow 0.15s; }
 .scope-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:12px; }

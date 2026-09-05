@@ -1,23 +1,23 @@
 # ════════════════════════════════════════════════════════════════════════
-# Surcharge — sauvegarde externalisée vers un stockage objet S3 (FEAT-29)
+# Override — off-site backup to S3 object storage (FEAT-29)
 #
-# À ACTIVER dans le .env, jamais en éditant ce fichier :
+# ENABLE it in the .env, never by editing this file:
 #
 #   COMPOSE_FILE=docker-compose.yml:docker-compose.s3.yml
 #
-# Pourquoi un fichier séparé plutôt que des variables conditionnelles :
-# pgBackRest REFUSE une variable d'environnement vide
-# (« environment variable 'repo2-type' must have a value »). Un
-# ${BACKUP_S3_BUCKET:+s3} laissé vide empêcherait tout déploiement sans S3 de
-# démarrer. Ici, sans la surcharge, repo2 n'existe pas — pas une valeur vide,
-# pas de ligne du tout.
+# Why a separate file rather than conditional variables:
+# pgBackRest REFUSES an empty environment variable
+# ("environment variable 'repo2-type' must have a value"). A
+# ${BACKUP_S3_BUCKET:+s3} left empty would stop every S3-less deployment from
+# starting. Here, without the override, repo2 does not exist — not an empty
+# value, no line at all.
 #
-# Ce que la surcharge ajoute :
-#   · aux 10 bases  — repo2 en S3 + archivage WAL asynchrone (voir plus bas)
-#   · à backup-agent — repo2, pour les sauvegardes de base et la restauration
+# What the override adds:
+#   · to the 10 databases — repo2 on S3 + async WAL archiving (see below)
+#   · to backup-agent — repo2, for the base backups and the restore
 #
-# Les sauvegardes de base exigent un appel explicite par dépôt (l'agent s'en
-# charge) ; l'archivage WAL, lui, est diffusé automatiquement à tous.
+# Base backups require an explicit call per repository (the agent takes care
+# of it); WAL archiving, on the other hand, is broadcast to all of them.
 # ════════════════════════════════════════════════════════════════════════
 services:
 
@@ -32,25 +32,25 @@ services:
       PGBACKREST_REPO2_S3_KEY_SECRET: ${BACKUP_S3_KEY_SECRET:?BACKUP_S3_KEY_SECRET est obligatoire}
       PGBACKREST_REPO2_S3_URI_STYLE: ${BACKUP_S3_URI_STYLE:-host}
       PGBACKREST_REPO2_CIPHER_TYPE: aes-256-cbc
-      # Passphrase propre au dépôt hors site, avec repli sur celle de repo1.
-      # Le hors-site est exposé à un tiers — l'hébergeur — là où repo1 ne
-      # l'est pas : pouvoir les séparer permet de confier l'une sans l'autre.
+      # Passphrase specific to the off-site repository, falling back to repo1's.
+      # The off-site copy is exposed to a third party — the storage provider —
+      # where repo1 is not: separating them lets one be handed over alone.
       PGBACKREST_REPO2_CIPHER_PASS: ${BACKUP_S3_CIPHER_PASS:-${BACKUP_CIPHER_PASS:?BACKUP_CIPHER_PASS est obligatoire}}
-      # NON NÉGOCIABLE dès qu'un second dépôt existe. L'archivage WAL est
-      # diffusé à TOUS les dépôts ; sans archive-async, une indisponibilité de
-      # S3 empêche les autres dépôts d'avancer de plus d'un segment. Alors
-      # l'archive_command échoue, les WAL s'accumulent dans pg_wal, le disque
-      # se remplit et la base s'arrête. Autrement dit : la sauvegarde hors
-      # site, censée protéger d'une panne d'hôte, en provoquerait une — au
-      # moment choisi par l'hébergeur du stockage.
+      # NON-NEGOTIABLE as soon as a second repository exists. WAL archiving is
+      # broadcast to ALL repositories; without archive-async, an S3 outage
+      # keeps the other repositories from advancing by more than one segment.
+      # Then archive_command fails, the WAL piles up in pg_wal, the disk
+      # fills up and the database stops. In other words: the off-site backup,
+      # meant to protect against a host failure, would cause one — at a
+      # moment chosen by the storage provider.
       PGBACKREST_ARCHIVE_ASYNC: "y"
       PGBACKREST_SPOOL_PATH: /var/spool/pgbackrest
       PGBACKREST_ARCHIVE_PUSH_QUEUE_MAX: ${BACKUP_ARCHIVE_QUEUE_MAX:-1GiB}
       PGBACKREST_PROCESS_MAX: "2"
     volumes:
-      # Le spool de l'archivage asynchrone. Un volume nommé et non un tmpfs :
-      # une file d'attente qui grossit pendant une panne S3 ne doit pas
-      # consommer la mémoire de l'hôte.
+      # The spool of the asynchronous archiving. A named volume and not a tmpfs:
+      # a queue that grows during an S3 outage must not eat into the
+      # host's memory.
       - pilot-spool:/var/spool/pgbackrest
 
   risk-db:
@@ -64,25 +64,25 @@ services:
       PGBACKREST_REPO2_S3_KEY_SECRET: ${BACKUP_S3_KEY_SECRET:?BACKUP_S3_KEY_SECRET est obligatoire}
       PGBACKREST_REPO2_S3_URI_STYLE: ${BACKUP_S3_URI_STYLE:-host}
       PGBACKREST_REPO2_CIPHER_TYPE: aes-256-cbc
-      # Passphrase propre au dépôt hors site, avec repli sur celle de repo1.
-      # Le hors-site est exposé à un tiers — l'hébergeur — là où repo1 ne
-      # l'est pas : pouvoir les séparer permet de confier l'une sans l'autre.
+      # Passphrase specific to the off-site repository, falling back to repo1's.
+      # The off-site copy is exposed to a third party — the storage provider —
+      # where repo1 is not: separating them lets one be handed over alone.
       PGBACKREST_REPO2_CIPHER_PASS: ${BACKUP_S3_CIPHER_PASS:-${BACKUP_CIPHER_PASS:?BACKUP_CIPHER_PASS est obligatoire}}
-      # NON NÉGOCIABLE dès qu'un second dépôt existe. L'archivage WAL est
-      # diffusé à TOUS les dépôts ; sans archive-async, une indisponibilité de
-      # S3 empêche les autres dépôts d'avancer de plus d'un segment. Alors
-      # l'archive_command échoue, les WAL s'accumulent dans pg_wal, le disque
-      # se remplit et la base s'arrête. Autrement dit : la sauvegarde hors
-      # site, censée protéger d'une panne d'hôte, en provoquerait une — au
-      # moment choisi par l'hébergeur du stockage.
+      # NON-NEGOTIABLE as soon as a second repository exists. WAL archiving is
+      # broadcast to ALL repositories; without archive-async, an S3 outage
+      # keeps the other repositories from advancing by more than one segment.
+      # Then archive_command fails, the WAL piles up in pg_wal, the disk
+      # fills up and the database stops. In other words: the off-site backup,
+      # meant to protect against a host failure, would cause one — at a
+      # moment chosen by the storage provider.
       PGBACKREST_ARCHIVE_ASYNC: "y"
       PGBACKREST_SPOOL_PATH: /var/spool/pgbackrest
       PGBACKREST_ARCHIVE_PUSH_QUEUE_MAX: ${BACKUP_ARCHIVE_QUEUE_MAX:-1GiB}
       PGBACKREST_PROCESS_MAX: "2"
     volumes:
-      # Le spool de l'archivage asynchrone. Un volume nommé et non un tmpfs :
-      # une file d'attente qui grossit pendant une panne S3 ne doit pas
-      # consommer la mémoire de l'hôte.
+      # The spool of the asynchronous archiving. A named volume and not a tmpfs:
+      # a queue that grows during an S3 outage must not eat into the
+      # host's memory.
       - risk-spool:/var/spool/pgbackrest
 
   vendor-db:
@@ -96,25 +96,25 @@ services:
       PGBACKREST_REPO2_S3_KEY_SECRET: ${BACKUP_S3_KEY_SECRET:?BACKUP_S3_KEY_SECRET est obligatoire}
       PGBACKREST_REPO2_S3_URI_STYLE: ${BACKUP_S3_URI_STYLE:-host}
       PGBACKREST_REPO2_CIPHER_TYPE: aes-256-cbc
-      # Passphrase propre au dépôt hors site, avec repli sur celle de repo1.
-      # Le hors-site est exposé à un tiers — l'hébergeur — là où repo1 ne
-      # l'est pas : pouvoir les séparer permet de confier l'une sans l'autre.
+      # Passphrase specific to the off-site repository, falling back to repo1's.
+      # The off-site copy is exposed to a third party — the storage provider —
+      # where repo1 is not: separating them lets one be handed over alone.
       PGBACKREST_REPO2_CIPHER_PASS: ${BACKUP_S3_CIPHER_PASS:-${BACKUP_CIPHER_PASS:?BACKUP_CIPHER_PASS est obligatoire}}
-      # NON NÉGOCIABLE dès qu'un second dépôt existe. L'archivage WAL est
-      # diffusé à TOUS les dépôts ; sans archive-async, une indisponibilité de
-      # S3 empêche les autres dépôts d'avancer de plus d'un segment. Alors
-      # l'archive_command échoue, les WAL s'accumulent dans pg_wal, le disque
-      # se remplit et la base s'arrête. Autrement dit : la sauvegarde hors
-      # site, censée protéger d'une panne d'hôte, en provoquerait une — au
-      # moment choisi par l'hébergeur du stockage.
+      # NON-NEGOTIABLE as soon as a second repository exists. WAL archiving is
+      # broadcast to ALL repositories; without archive-async, an S3 outage
+      # keeps the other repositories from advancing by more than one segment.
+      # Then archive_command fails, the WAL piles up in pg_wal, the disk
+      # fills up and the database stops. In other words: the off-site backup,
+      # meant to protect against a host failure, would cause one — at a
+      # moment chosen by the storage provider.
       PGBACKREST_ARCHIVE_ASYNC: "y"
       PGBACKREST_SPOOL_PATH: /var/spool/pgbackrest
       PGBACKREST_ARCHIVE_PUSH_QUEUE_MAX: ${BACKUP_ARCHIVE_QUEUE_MAX:-1GiB}
       PGBACKREST_PROCESS_MAX: "2"
     volumes:
-      # Le spool de l'archivage asynchrone. Un volume nommé et non un tmpfs :
-      # une file d'attente qui grossit pendant une panne S3 ne doit pas
-      # consommer la mémoire de l'hôte.
+      # The spool of the asynchronous archiving. A named volume and not a tmpfs:
+      # a queue that grows during an S3 outage must not eat into the
+      # host's memory.
       - vendor-spool:/var/spool/pgbackrest
 
   compliance-db:
@@ -128,25 +128,25 @@ services:
       PGBACKREST_REPO2_S3_KEY_SECRET: ${BACKUP_S3_KEY_SECRET:?BACKUP_S3_KEY_SECRET est obligatoire}
       PGBACKREST_REPO2_S3_URI_STYLE: ${BACKUP_S3_URI_STYLE:-host}
       PGBACKREST_REPO2_CIPHER_TYPE: aes-256-cbc
-      # Passphrase propre au dépôt hors site, avec repli sur celle de repo1.
-      # Le hors-site est exposé à un tiers — l'hébergeur — là où repo1 ne
-      # l'est pas : pouvoir les séparer permet de confier l'une sans l'autre.
+      # Passphrase specific to the off-site repository, falling back to repo1's.
+      # The off-site copy is exposed to a third party — the storage provider —
+      # where repo1 is not: separating them lets one be handed over alone.
       PGBACKREST_REPO2_CIPHER_PASS: ${BACKUP_S3_CIPHER_PASS:-${BACKUP_CIPHER_PASS:?BACKUP_CIPHER_PASS est obligatoire}}
-      # NON NÉGOCIABLE dès qu'un second dépôt existe. L'archivage WAL est
-      # diffusé à TOUS les dépôts ; sans archive-async, une indisponibilité de
-      # S3 empêche les autres dépôts d'avancer de plus d'un segment. Alors
-      # l'archive_command échoue, les WAL s'accumulent dans pg_wal, le disque
-      # se remplit et la base s'arrête. Autrement dit : la sauvegarde hors
-      # site, censée protéger d'une panne d'hôte, en provoquerait une — au
-      # moment choisi par l'hébergeur du stockage.
+      # NON-NEGOTIABLE as soon as a second repository exists. WAL archiving is
+      # broadcast to ALL repositories; without archive-async, an S3 outage
+      # keeps the other repositories from advancing by more than one segment.
+      # Then archive_command fails, the WAL piles up in pg_wal, the disk
+      # fills up and the database stops. In other words: the off-site backup,
+      # meant to protect against a host failure, would cause one — at a
+      # moment chosen by the storage provider.
       PGBACKREST_ARCHIVE_ASYNC: "y"
       PGBACKREST_SPOOL_PATH: /var/spool/pgbackrest
       PGBACKREST_ARCHIVE_PUSH_QUEUE_MAX: ${BACKUP_ARCHIVE_QUEUE_MAX:-1GiB}
       PGBACKREST_PROCESS_MAX: "2"
     volumes:
-      # Le spool de l'archivage asynchrone. Un volume nommé et non un tmpfs :
-      # une file d'attente qui grossit pendant une panne S3 ne doit pas
-      # consommer la mémoire de l'hôte.
+      # The spool of the asynchronous archiving. A named volume and not a tmpfs:
+      # a queue that grows during an S3 outage must not eat into the
+      # host's memory.
       - compliance-spool:/var/spool/pgbackrest
 
   asset-db:
@@ -160,25 +160,25 @@ services:
       PGBACKREST_REPO2_S3_KEY_SECRET: ${BACKUP_S3_KEY_SECRET:?BACKUP_S3_KEY_SECRET est obligatoire}
       PGBACKREST_REPO2_S3_URI_STYLE: ${BACKUP_S3_URI_STYLE:-host}
       PGBACKREST_REPO2_CIPHER_TYPE: aes-256-cbc
-      # Passphrase propre au dépôt hors site, avec repli sur celle de repo1.
-      # Le hors-site est exposé à un tiers — l'hébergeur — là où repo1 ne
-      # l'est pas : pouvoir les séparer permet de confier l'une sans l'autre.
+      # Passphrase specific to the off-site repository, falling back to repo1's.
+      # The off-site copy is exposed to a third party — the storage provider —
+      # where repo1 is not: separating them lets one be handed over alone.
       PGBACKREST_REPO2_CIPHER_PASS: ${BACKUP_S3_CIPHER_PASS:-${BACKUP_CIPHER_PASS:?BACKUP_CIPHER_PASS est obligatoire}}
-      # NON NÉGOCIABLE dès qu'un second dépôt existe. L'archivage WAL est
-      # diffusé à TOUS les dépôts ; sans archive-async, une indisponibilité de
-      # S3 empêche les autres dépôts d'avancer de plus d'un segment. Alors
-      # l'archive_command échoue, les WAL s'accumulent dans pg_wal, le disque
-      # se remplit et la base s'arrête. Autrement dit : la sauvegarde hors
-      # site, censée protéger d'une panne d'hôte, en provoquerait une — au
-      # moment choisi par l'hébergeur du stockage.
+      # NON-NEGOTIABLE as soon as a second repository exists. WAL archiving is
+      # broadcast to ALL repositories; without archive-async, an S3 outage
+      # keeps the other repositories from advancing by more than one segment.
+      # Then archive_command fails, the WAL piles up in pg_wal, the disk
+      # fills up and the database stops. In other words: the off-site backup,
+      # meant to protect against a host failure, would cause one — at a
+      # moment chosen by the storage provider.
       PGBACKREST_ARCHIVE_ASYNC: "y"
       PGBACKREST_SPOOL_PATH: /var/spool/pgbackrest
       PGBACKREST_ARCHIVE_PUSH_QUEUE_MAX: ${BACKUP_ARCHIVE_QUEUE_MAX:-1GiB}
       PGBACKREST_PROCESS_MAX: "2"
     volumes:
-      # Le spool de l'archivage asynchrone. Un volume nommé et non un tmpfs :
-      # une file d'attente qui grossit pendant une panne S3 ne doit pas
-      # consommer la mémoire de l'hôte.
+      # The spool of the asynchronous archiving. A named volume and not a tmpfs:
+      # a queue that grows during an S3 outage must not eat into the
+      # host's memory.
       - asset-spool:/var/spool/pgbackrest
 
   audit-db:
@@ -192,25 +192,25 @@ services:
       PGBACKREST_REPO2_S3_KEY_SECRET: ${BACKUP_S3_KEY_SECRET:?BACKUP_S3_KEY_SECRET est obligatoire}
       PGBACKREST_REPO2_S3_URI_STYLE: ${BACKUP_S3_URI_STYLE:-host}
       PGBACKREST_REPO2_CIPHER_TYPE: aes-256-cbc
-      # Passphrase propre au dépôt hors site, avec repli sur celle de repo1.
-      # Le hors-site est exposé à un tiers — l'hébergeur — là où repo1 ne
-      # l'est pas : pouvoir les séparer permet de confier l'une sans l'autre.
+      # Passphrase specific to the off-site repository, falling back to repo1's.
+      # The off-site copy is exposed to a third party — the storage provider —
+      # where repo1 is not: separating them lets one be handed over alone.
       PGBACKREST_REPO2_CIPHER_PASS: ${BACKUP_S3_CIPHER_PASS:-${BACKUP_CIPHER_PASS:?BACKUP_CIPHER_PASS est obligatoire}}
-      # NON NÉGOCIABLE dès qu'un second dépôt existe. L'archivage WAL est
-      # diffusé à TOUS les dépôts ; sans archive-async, une indisponibilité de
-      # S3 empêche les autres dépôts d'avancer de plus d'un segment. Alors
-      # l'archive_command échoue, les WAL s'accumulent dans pg_wal, le disque
-      # se remplit et la base s'arrête. Autrement dit : la sauvegarde hors
-      # site, censée protéger d'une panne d'hôte, en provoquerait une — au
-      # moment choisi par l'hébergeur du stockage.
+      # NON-NEGOTIABLE as soon as a second repository exists. WAL archiving is
+      # broadcast to ALL repositories; without archive-async, an S3 outage
+      # keeps the other repositories from advancing by more than one segment.
+      # Then archive_command fails, the WAL piles up in pg_wal, the disk
+      # fills up and the database stops. In other words: the off-site backup,
+      # meant to protect against a host failure, would cause one — at a
+      # moment chosen by the storage provider.
       PGBACKREST_ARCHIVE_ASYNC: "y"
       PGBACKREST_SPOOL_PATH: /var/spool/pgbackrest
       PGBACKREST_ARCHIVE_PUSH_QUEUE_MAX: ${BACKUP_ARCHIVE_QUEUE_MAX:-1GiB}
       PGBACKREST_PROCESS_MAX: "2"
     volumes:
-      # Le spool de l'archivage asynchrone. Un volume nommé et non un tmpfs :
-      # une file d'attente qui grossit pendant une panne S3 ne doit pas
-      # consommer la mémoire de l'hôte.
+      # The spool of the asynchronous archiving. A named volume and not a tmpfs:
+      # a queue that grows during an S3 outage must not eat into the
+      # host's memory.
       - audit-spool:/var/spool/pgbackrest
 
   access-db:
@@ -224,25 +224,25 @@ services:
       PGBACKREST_REPO2_S3_KEY_SECRET: ${BACKUP_S3_KEY_SECRET:?BACKUP_S3_KEY_SECRET est obligatoire}
       PGBACKREST_REPO2_S3_URI_STYLE: ${BACKUP_S3_URI_STYLE:-host}
       PGBACKREST_REPO2_CIPHER_TYPE: aes-256-cbc
-      # Passphrase propre au dépôt hors site, avec repli sur celle de repo1.
-      # Le hors-site est exposé à un tiers — l'hébergeur — là où repo1 ne
-      # l'est pas : pouvoir les séparer permet de confier l'une sans l'autre.
+      # Passphrase specific to the off-site repository, falling back to repo1's.
+      # The off-site copy is exposed to a third party — the storage provider —
+      # where repo1 is not: separating them lets one be handed over alone.
       PGBACKREST_REPO2_CIPHER_PASS: ${BACKUP_S3_CIPHER_PASS:-${BACKUP_CIPHER_PASS:?BACKUP_CIPHER_PASS est obligatoire}}
-      # NON NÉGOCIABLE dès qu'un second dépôt existe. L'archivage WAL est
-      # diffusé à TOUS les dépôts ; sans archive-async, une indisponibilité de
-      # S3 empêche les autres dépôts d'avancer de plus d'un segment. Alors
-      # l'archive_command échoue, les WAL s'accumulent dans pg_wal, le disque
-      # se remplit et la base s'arrête. Autrement dit : la sauvegarde hors
-      # site, censée protéger d'une panne d'hôte, en provoquerait une — au
-      # moment choisi par l'hébergeur du stockage.
+      # NON-NEGOTIABLE as soon as a second repository exists. WAL archiving is
+      # broadcast to ALL repositories; without archive-async, an S3 outage
+      # keeps the other repositories from advancing by more than one segment.
+      # Then archive_command fails, the WAL piles up in pg_wal, the disk
+      # fills up and the database stops. In other words: the off-site backup,
+      # meant to protect against a host failure, would cause one — at a
+      # moment chosen by the storage provider.
       PGBACKREST_ARCHIVE_ASYNC: "y"
       PGBACKREST_SPOOL_PATH: /var/spool/pgbackrest
       PGBACKREST_ARCHIVE_PUSH_QUEUE_MAX: ${BACKUP_ARCHIVE_QUEUE_MAX:-1GiB}
       PGBACKREST_PROCESS_MAX: "2"
     volumes:
-      # Le spool de l'archivage asynchrone. Un volume nommé et non un tmpfs :
-      # une file d'attente qui grossit pendant une panne S3 ne doit pas
-      # consommer la mémoire de l'hôte.
+      # The spool of the asynchronous archiving. A named volume and not a tmpfs:
+      # a queue that grows during an S3 outage must not eat into the
+      # host's memory.
       - access-spool:/var/spool/pgbackrest
 
   surface-db:
@@ -256,25 +256,25 @@ services:
       PGBACKREST_REPO2_S3_KEY_SECRET: ${BACKUP_S3_KEY_SECRET:?BACKUP_S3_KEY_SECRET est obligatoire}
       PGBACKREST_REPO2_S3_URI_STYLE: ${BACKUP_S3_URI_STYLE:-host}
       PGBACKREST_REPO2_CIPHER_TYPE: aes-256-cbc
-      # Passphrase propre au dépôt hors site, avec repli sur celle de repo1.
-      # Le hors-site est exposé à un tiers — l'hébergeur — là où repo1 ne
-      # l'est pas : pouvoir les séparer permet de confier l'une sans l'autre.
+      # Passphrase specific to the off-site repository, falling back to repo1's.
+      # The off-site copy is exposed to a third party — the storage provider —
+      # where repo1 is not: separating them lets one be handed over alone.
       PGBACKREST_REPO2_CIPHER_PASS: ${BACKUP_S3_CIPHER_PASS:-${BACKUP_CIPHER_PASS:?BACKUP_CIPHER_PASS est obligatoire}}
-      # NON NÉGOCIABLE dès qu'un second dépôt existe. L'archivage WAL est
-      # diffusé à TOUS les dépôts ; sans archive-async, une indisponibilité de
-      # S3 empêche les autres dépôts d'avancer de plus d'un segment. Alors
-      # l'archive_command échoue, les WAL s'accumulent dans pg_wal, le disque
-      # se remplit et la base s'arrête. Autrement dit : la sauvegarde hors
-      # site, censée protéger d'une panne d'hôte, en provoquerait une — au
-      # moment choisi par l'hébergeur du stockage.
+      # NON-NEGOTIABLE as soon as a second repository exists. WAL archiving is
+      # broadcast to ALL repositories; without archive-async, an S3 outage
+      # keeps the other repositories from advancing by more than one segment.
+      # Then archive_command fails, the WAL piles up in pg_wal, the disk
+      # fills up and the database stops. In other words: the off-site backup,
+      # meant to protect against a host failure, would cause one — at a
+      # moment chosen by the storage provider.
       PGBACKREST_ARCHIVE_ASYNC: "y"
       PGBACKREST_SPOOL_PATH: /var/spool/pgbackrest
       PGBACKREST_ARCHIVE_PUSH_QUEUE_MAX: ${BACKUP_ARCHIVE_QUEUE_MAX:-1GiB}
       PGBACKREST_PROCESS_MAX: "2"
     volumes:
-      # Le spool de l'archivage asynchrone. Un volume nommé et non un tmpfs :
-      # une file d'attente qui grossit pendant une panne S3 ne doit pas
-      # consommer la mémoire de l'hôte.
+      # The spool of the asynchronous archiving. A named volume and not a tmpfs:
+      # a queue that grows during an S3 outage must not eat into the
+      # host's memory.
       - surface-spool:/var/spool/pgbackrest
 
   appsec-db:
@@ -288,25 +288,25 @@ services:
       PGBACKREST_REPO2_S3_KEY_SECRET: ${BACKUP_S3_KEY_SECRET:?BACKUP_S3_KEY_SECRET est obligatoire}
       PGBACKREST_REPO2_S3_URI_STYLE: ${BACKUP_S3_URI_STYLE:-host}
       PGBACKREST_REPO2_CIPHER_TYPE: aes-256-cbc
-      # Passphrase propre au dépôt hors site, avec repli sur celle de repo1.
-      # Le hors-site est exposé à un tiers — l'hébergeur — là où repo1 ne
-      # l'est pas : pouvoir les séparer permet de confier l'une sans l'autre.
+      # Passphrase specific to the off-site repository, falling back to repo1's.
+      # The off-site copy is exposed to a third party — the storage provider —
+      # where repo1 is not: separating them lets one be handed over alone.
       PGBACKREST_REPO2_CIPHER_PASS: ${BACKUP_S3_CIPHER_PASS:-${BACKUP_CIPHER_PASS:?BACKUP_CIPHER_PASS est obligatoire}}
-      # NON NÉGOCIABLE dès qu'un second dépôt existe. L'archivage WAL est
-      # diffusé à TOUS les dépôts ; sans archive-async, une indisponibilité de
-      # S3 empêche les autres dépôts d'avancer de plus d'un segment. Alors
-      # l'archive_command échoue, les WAL s'accumulent dans pg_wal, le disque
-      # se remplit et la base s'arrête. Autrement dit : la sauvegarde hors
-      # site, censée protéger d'une panne d'hôte, en provoquerait une — au
-      # moment choisi par l'hébergeur du stockage.
+      # NON-NEGOTIABLE as soon as a second repository exists. WAL archiving is
+      # broadcast to ALL repositories; without archive-async, an S3 outage
+      # keeps the other repositories from advancing by more than one segment.
+      # Then archive_command fails, the WAL piles up in pg_wal, the disk
+      # fills up and the database stops. In other words: the off-site backup,
+      # meant to protect against a host failure, would cause one — at a
+      # moment chosen by the storage provider.
       PGBACKREST_ARCHIVE_ASYNC: "y"
       PGBACKREST_SPOOL_PATH: /var/spool/pgbackrest
       PGBACKREST_ARCHIVE_PUSH_QUEUE_MAX: ${BACKUP_ARCHIVE_QUEUE_MAX:-1GiB}
       PGBACKREST_PROCESS_MAX: "2"
     volumes:
-      # Le spool de l'archivage asynchrone. Un volume nommé et non un tmpfs :
-      # une file d'attente qui grossit pendant une panne S3 ne doit pas
-      # consommer la mémoire de l'hôte.
+      # The spool of the asynchronous archiving. A named volume and not a tmpfs:
+      # a queue that grows during an S3 outage must not eat into the
+      # host's memory.
       - appsec-spool:/var/spool/pgbackrest
 
   watch-db:
@@ -320,25 +320,25 @@ services:
       PGBACKREST_REPO2_S3_KEY_SECRET: ${BACKUP_S3_KEY_SECRET:?BACKUP_S3_KEY_SECRET est obligatoire}
       PGBACKREST_REPO2_S3_URI_STYLE: ${BACKUP_S3_URI_STYLE:-host}
       PGBACKREST_REPO2_CIPHER_TYPE: aes-256-cbc
-      # Passphrase propre au dépôt hors site, avec repli sur celle de repo1.
-      # Le hors-site est exposé à un tiers — l'hébergeur — là où repo1 ne
-      # l'est pas : pouvoir les séparer permet de confier l'une sans l'autre.
+      # Passphrase specific to the off-site repository, falling back to repo1's.
+      # The off-site copy is exposed to a third party — the storage provider —
+      # where repo1 is not: separating them lets one be handed over alone.
       PGBACKREST_REPO2_CIPHER_PASS: ${BACKUP_S3_CIPHER_PASS:-${BACKUP_CIPHER_PASS:?BACKUP_CIPHER_PASS est obligatoire}}
-      # NON NÉGOCIABLE dès qu'un second dépôt existe. L'archivage WAL est
-      # diffusé à TOUS les dépôts ; sans archive-async, une indisponibilité de
-      # S3 empêche les autres dépôts d'avancer de plus d'un segment. Alors
-      # l'archive_command échoue, les WAL s'accumulent dans pg_wal, le disque
-      # se remplit et la base s'arrête. Autrement dit : la sauvegarde hors
-      # site, censée protéger d'une panne d'hôte, en provoquerait une — au
-      # moment choisi par l'hébergeur du stockage.
+      # NON-NEGOTIABLE as soon as a second repository exists. WAL archiving is
+      # broadcast to ALL repositories; without archive-async, an S3 outage
+      # keeps the other repositories from advancing by more than one segment.
+      # Then archive_command fails, the WAL piles up in pg_wal, the disk
+      # fills up and the database stops. In other words: the off-site backup,
+      # meant to protect against a host failure, would cause one — at a
+      # moment chosen by the storage provider.
       PGBACKREST_ARCHIVE_ASYNC: "y"
       PGBACKREST_SPOOL_PATH: /var/spool/pgbackrest
       PGBACKREST_ARCHIVE_PUSH_QUEUE_MAX: ${BACKUP_ARCHIVE_QUEUE_MAX:-1GiB}
       PGBACKREST_PROCESS_MAX: "2"
     volumes:
-      # Le spool de l'archivage asynchrone. Un volume nommé et non un tmpfs :
-      # une file d'attente qui grossit pendant une panne S3 ne doit pas
-      # consommer la mémoire de l'hôte.
+      # The spool of the asynchronous archiving. A named volume and not a tmpfs:
+      # a queue that grows during an S3 outage must not eat into the
+      # host's memory.
       - watch-spool:/var/spool/pgbackrest
 
   backup-agent:
@@ -352,13 +352,13 @@ services:
       PGBACKREST_REPO2_S3_KEY_SECRET: ${BACKUP_S3_KEY_SECRET:?BACKUP_S3_KEY_SECRET est obligatoire}
       PGBACKREST_REPO2_S3_URI_STYLE: ${BACKUP_S3_URI_STYLE:-host}
       PGBACKREST_REPO2_CIPHER_TYPE: aes-256-cbc
-      # Passphrase propre au dépôt hors site, avec repli sur celle de repo1.
-      # Le hors-site est exposé à un tiers — l'hébergeur — là où repo1 ne
-      # l'est pas : pouvoir les séparer permet de confier l'une sans l'autre.
+      # Passphrase specific to the off-site repository, falling back to repo1's.
+      # The off-site copy is exposed to a third party — the storage provider —
+      # where repo1 is not: separating them lets one be handed over alone.
       PGBACKREST_REPO2_CIPHER_PASS: ${BACKUP_S3_CIPHER_PASS:-${BACKUP_CIPHER_PASS:?BACKUP_CIPHER_PASS est obligatoire}}
       PGBACKREST_REPO2_RETENTION_FULL: ${BACKUP_S3_RETENTION_FULL:-4}
-      # Déclenche la sauvegarde de base vers repo2 et le test de
-      # restauration hors site dans agent.sh.
+      # Triggers the base backup to repo2 and the off-site restore test
+      # in agent.sh.
       BACKUP_S3_ENABLED: "1"
 
 volumes:

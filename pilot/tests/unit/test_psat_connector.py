@@ -80,15 +80,15 @@ def _users():
 
 
 def test_access_payload_domain_filter_and_full_snapshot():
-    # Sémantique actuelle (awareness-sync) : TOUS les utilisateurs du domaine,
-    # avec le relevé complet de leurs formations (y compris incomplètes) —
-    # c'est Access qui possède la machine à états de conformité. L'ancienne
-    # version ne poussait que les conformes ; les tests étaient restés dessus.
+    # Current semantics (awareness-sync): ALL users of the domain, with
+    # the full record of their trainings (incomplete ones included) —
+    # Access owns the compliance state machine. The old version pushed only
+    # the compliant ones; the tests had stayed on that behavior.
     payload = _build_access_payload(_users(), _cfg(), today="2026-06-01")
     emails = {p["email"] for p in payload}
     assert "ok@acme.example" in emails
-    assert "partial@acme.example" in emails      # domaine ok, snapshot complet
-    assert "ext@other.com" not in emails         # hors domaine
+    assert "partial@acme.example" in emails      # domain ok, full snapshot
+    assert "ext@other.com" not in emails         # outside the domain
     entry = next(p for p in payload if p["email"] == "ok@acme.example")
     done = {t["campaign"]: t for t in entry["trainings"]}
     assert done[MANDATORY]["completed"] is True

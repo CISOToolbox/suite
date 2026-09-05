@@ -61,7 +61,7 @@ async def test_get_connectors_with_service_token(client):
 # harness sets AUTH_MODE=none (see tests/conftest.py), which intentionally
 # disables auth across the whole app. The 401 gate is verified manually
 # against a running stack (AUTH_MODE=pilot) — every connector route
-# returned 401 without a session in the étape 5 smoke check.
+# returned 401 without a session in the step 5 smoke check.
 
 
 async def test_get_secret_field_is_masked(client, db):

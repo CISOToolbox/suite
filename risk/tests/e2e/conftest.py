@@ -28,8 +28,8 @@ import pytest
 
 MODULE = Path(__file__).resolve().parents[2].name
 
-# Dans la suite, les modules sont servis par le proxy sous /<module>/, et non
-# sur un port par module comme en standalone.
+# In the suite, the modules are served by the proxy under /<module>/, and not
+# on one port per module as in standalone.
 PROXY = os.getenv("E2E_PROXY", "https://localhost:8443").rstrip("/")
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -46,25 +46,25 @@ def _env_file_value(key: str) -> str:
     return ""
 
 
-# Pilot est servi a la racine du proxy ; les autres sous /<module>/.
+# Pilot is served at the proxy root; the others under /<module>/.
 _DEFAULT = PROXY if MODULE == "pilot" else PROXY + "/" + MODULE
 BASE_URL = os.getenv("E2E_BASE_URL", _DEFAULT).rstrip("/")
 AUTH_TOKEN = os.getenv("E2E_AUTH_TOKEN") or _env_file_value("AUTH_TOKEN")
 TIMEOUT = float(os.getenv("E2E_TIMEOUT", "20"))
 
-# Ce que /auth/providers doit annoncer ici. Le meme fichier de test sert les
-# deux postures ; c'est cette constante qui les distingue.
-# Les modules derriere Pilot annoncent central=True. Pilot, lui, EST le
-# fournisseur d'identite : il annonce ses IdP, pas une posture. Ce qui doit
-# tenir chez lui, c'est que l'authentification ne soit jamais desactivee.
+# What /auth/providers must report here. The same test file serves both
+# postures; this constant is what distinguishes them.
+# The modules behind Pilot report central=True. Pilot itself IS the identity
+# provider: it reports its IdPs, not a posture. What must hold for it is that
+# authentication is never disabled.
 POSTURE_FLAG = "auth_enabled" if MODULE == "pilot" else "central"
 
-# Dans la suite, seul Pilot porte l'authentification federee.
+# In the suite, only Pilot carries federated authentication.
 HAS_TOKEN_LOGIN = MODULE != "pilot"
 
-# appsec et watch posent docs_url=None / openapi_url=None : ne pas publier son
-# schema est un durcissement volontaire, pas une panne. Le test le respecte au
-# lieu de le signaler indefiniment.
+# appsec and watch set docs_url=None / openapi_url=None: not publishing its
+# schema is a deliberate hardening, not a failure. The test honours it instead
+# of flagging it indefinitely.
 HAS_OPENAPI = MODULE not in ("appsec", "watch")
 
 # A local standalone deployment normally carries a self-signed certificate.

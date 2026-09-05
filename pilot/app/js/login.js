@@ -4,13 +4,13 @@
 // Fix the master in the shared repository and re-propagate. See CONTRIBUTING.md.
 // -----------------------------------------------------------------------------
 /**
- * Login page script — variante PILOT (page de login centrale de la suite).
- * Gère ?error= et ?redirect=, révèle les boutons OAuth configurés et
- * renvoie vers la cible après authentification.
+ * Login page script — PILOT variant (the suite's central login page).
+ * Handles ?error= and ?redirect=, reveals the configured OAuth buttons and
+ * sends the user to the target after authentication.
  *
- * Compilé vers login_pilot.js ; le script de build le copie sous le nom
- * app/js/login.js pour le module pilot (cf. ts-build.sh).
- * Voir login.ts pour la note de factorisation.
+ * Compiled to login_pilot.js; the build script copies it as
+ * app/js/login.js for the pilot module (see ts-build.sh).
+ * See login.ts for the factorisation note.
  */
 (function () {
     "use strict";

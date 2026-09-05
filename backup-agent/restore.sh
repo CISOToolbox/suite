@@ -6,13 +6,13 @@
 #
 # Usage (from the host):
 #   podman exec -it ciso-backup-agent restore.sh <module> [--time "2026-08-12 14:35:00+00"]
-#   podman exec -it ciso-backup-agent restore.sh <module> --repo 2   # depuis le hors site
+#   podman exec -it ciso-backup-agent restore.sh <module> --repo 2   # from the off-site repo
 #   podman exec -it ciso-backup-agent restore.sh <module> --set <label>
 #   podman exec -it ciso-backup-agent restore.sh <module> --stop     # stop+clean scratch
 #
-# --repo 2 restaure depuis le dépôt S3 (FEAT-29). C'est le chemin d'une
-# reprise après perte de l'hôte : les deux dépôts contiennent les mêmes
-# sauvegardes, mais seul le second survit à la disparition de la machine.
+# --repo 2 restores from the S3 repository (FEAT-29). This is the path for a
+# recovery after losing the host: both repositories hold the same backups, but
+# only the second one survives the machine disappearing.
 #
 # After a successful restore the scratch postgres listens on the unix
 # socket /tmp/restore-<module> (port 5433). Examples:
@@ -47,9 +47,9 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-# --time désigne un instant, --set une sauvegarde précise. Les combiner
-# revient à demander deux cibles contradictoires ; pgBackRest trancherait
-# silencieusement, ce qui est le pire des comportements pour une restauration.
+# --time designates a point in time, --set a specific backup. Combining them
+# amounts to asking for two contradictory targets; pgBackRest would silently
+# pick one, which is the worst possible behavior for a restore.
 if [ -n "$TIME" ] && [ -n "$SET" ]; then
     echo "!! --time et --set sont exclusifs : choisissez un instant OU une sauvegarde" >&2
     exit 2

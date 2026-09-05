@@ -438,23 +438,23 @@ def test_every_proxy_validator_delegates_to_the_guard() -> list[str]:
     return problems
 
 
-# ── Add-ons : ce qui est livre doit etre chargeable ────────────────────
+# ── Add-ons: what ships must be loadable ───────────────────────────────
 #
-# Access a expedie pendant un temps une image sans AUCUN de ses 22 connecteurs :
-# ils vivent sous addons/generic/ et le Dockerfile ne copiait que src/, app/ et
-# alembic/. Rien ne le signalait — le chargeur emet au mieux un avertissement et
-# l'interface affiche une grille vide. Le README promettait 22 connecteurs,
-# l'API en renvoyait zero, et tous les controles etaient au vert.
+# Access shipped for a while an image with NONE of its 22 connectors: they live
+# under addons/generic/ and the Dockerfile only copied src/, app/ and alembic/.
+# Nothing flagged it — the loader emits a warning at best and the UI shows an
+# empty grid. The README promised 22 connectors, the API returned zero, and
+# every check was green.
 #
-# La regle n'est pas "tout embarquer" : Surface laisse volontairement son palier
-# generic optionnel (scanners lourds, superposes par build-client-image.sh).
-# Elle est : tout palier non vide doit etre soit embarque, soit declare optionnel
-# ici, avec sa raison.
-# Paliers d'add-ons qu'une image publiee n'embarque PAS. Seul `custom` en fait
-# partie : il est par definition propre a un client et superpose par
-# Dockerfile.addons. `generic` a quitte cette liste en 2026-09 — les images
-# publiees (standalone, suite, et les images clientes qui en derivent) portent
-# desormais le jeu complet de scanners/connecteurs.
+# The rule is not "bundle everything": Surface deliberately keeps its generic
+# tier optional (heavy scanners, layered by build-client-image.sh). It is: every
+# non-empty tier must be either bundled, or declared optional here, with its
+# reason.
+# Add-on tiers a published image does NOT bundle. Only `custom` belongs here:
+# it is by definition client-specific and layered by Dockerfile.addons.
+# `generic` left this list in 2026-09 — the published images (standalone, suite,
+# and the client images derived from them) now carry the full set of
+# scanners/connectors.
 OPTIONAL_ADDON_TIERS = {
     ("surface", "custom"): "add-ons specifiques client",
     ("access", "custom"): "connecteurs specifiques client",
@@ -462,13 +462,13 @@ OPTIONAL_ADDON_TIERS = {
 
 
 def _final_stage(dockerfile: str) -> str:
-    """Le contenu de la derniere etape FROM d'un Dockerfile multi-stage."""
+    """The contents of the last FROM stage of a multi-stage Dockerfile."""
     parts = re.split(r'^FROM\s', dockerfile, flags=re.M)
     return parts[-1] if parts else dockerfile
 
 
 def _addon_tiers() -> list[tuple[str, str, int]]:
-    """(module, palier, nombre d'add-ons) pour chaque palier non vide."""
+    """(module, tier, add-on count) for every non-empty tier."""
     out = []
     for addons in sorted(REPO_ROOT.glob("*/addons")):
         module = addons.parent.name
@@ -488,10 +488,10 @@ def test_every_bundled_addon_tier_is_copied() -> list[str]:
         if not dockerfile.is_file():
             problems.append(f"{module}: no Dockerfile, cannot ship its {n} {tier} add-on(s)")
             continue
-        # Seule la DERNIERE etape compte : un COPY dans le builder (pour
-        # installer les deps) ne met rien dans l'image finale — il l'efface
-        # meme. Un premier jet de ce controle matchait ce COPY-la et laissait
-        # passer la panne qu'il etait cense attraper.
+        # Only the LAST stage counts: a COPY in the builder (to install the
+        # deps) puts nothing in the final image — it even wipes it. A first
+        # draft of this check matched that very COPY and let through the exact
+        # failure it was meant to catch.
         src = _final_stage(dockerfile.read_text(encoding="utf-8"))
         if not re.search(rf'^COPY\b[^#\n]*addons/{tier}\b', src, re.M):
             problems.append(
@@ -503,8 +503,8 @@ def test_every_bundled_addon_tier_is_copied() -> list[str]:
 
 
 def test_bundled_addons_get_their_dependencies() -> list[str]:
-    """Un add-on embarque dont les deps manquent est ignore avec un simple
-    avertissement : vingt connecteurs marchent, trois non, et rien ne le dit."""
+    """A bundled add-on whose deps are missing is skipped with a mere warning:
+    twenty connectors work, three do not, and nothing says so."""
     problems = []
     for module, tier, _n in _addon_tiers():
         if (module, tier) in OPTIONAL_ADDON_TIERS:
@@ -515,8 +515,8 @@ def test_bundled_addons_get_their_dependencies() -> list[str]:
         dockerfile = REPO_ROOT / module / "Dockerfile"
         if not dockerfile.is_file():
             continue
-        # Les commentaires ne comptent pas : un Dockerfile qui DÉCRIT
-        # l'installation sans la faire satisfaisait la recherche.
+        # Comments do not count: a Dockerfile that DESCRIBES the install
+        # without performing it used to satisfy the search.
         src = "\n".join(l for l in dockerfile.read_text(encoding="utf-8").splitlines()
                         if not l.lstrip().startswith("#"))
         installs = (re.search(r'addons?[^\n]*requirements\.txt|requirements\.txt[^\n]*addons', src)
@@ -533,15 +533,15 @@ def test_bundled_addons_get_their_dependencies() -> list[str]:
 
 
 def test_externally_built_artefacts_are_verified_at_build() -> list[str]:
-    """Un artefact compile HORS de l'image doit etre controle par le Dockerfile.
+    """An artefact compiled OUTSIDE the image must be checked by the Dockerfile.
 
-    Cas reel : addons/generic/smb_scan_rs porte un worker Rust cross-compile par
-    rust/build.sh, gitignore, impossible a produire dans un stage builder (rustc
-    segfaute sous qemu). Il a ete oublie, et les images publiees avant 2026-09
-    embarquaient l'add-on avec un bin/ vide : le scanner echouait a la premiere
-    utilisation, chez un client, sans que rien ne l'ait signale au build.
+    Real case: addons/generic/smb_scan_rs carries a Rust worker cross-compiled by
+    rust/build.sh, gitignored, impossible to produce in a builder stage (rustc
+    segfaults under qemu). It was forgotten, and the images published before
+    2026-09 bundled the add-on with an empty bin/: the scanner failed at first
+    use, at a client site, with nothing flagging it at build time.
 
-    Un COPY qui reussit ne prouve pas que le repertoire copie n'est pas vide.
+    A COPY that succeeds does not prove the copied directory is not empty.
     """
     problems = []
     for addons in sorted(REPO_ROOT.glob("*/addons")):
@@ -554,7 +554,7 @@ def test_externally_built_artefacts_are_verified_at_build() -> list[str]:
             addon = build_dir.parent
             if (module, addon.parent.name) in OPTIONAL_ADDON_TIERS:
                 continue
-            # Le Dockerfile doit nommer l'artefact ET savoir echouer.
+            # The Dockerfile must name the artefact AND know how to fail.
             names_it = re.search(rf'{re.escape(addon.name)}/bin/', src)
             fails = re.search(r'\bexit\s+1\b', src)
             if not (names_it and fails):
@@ -568,27 +568,27 @@ def test_externally_built_artefacts_are_verified_at_build() -> list[str]:
 
 
 def test_ai_requests_carry_no_precomposed_prompt() -> list[str]:
-    """FEAT-41 / CLAUDE.md §5.1 — le frontend envoie des champs structurés.
+    """FEAT-41 / CLAUDE.md §5.1 — the frontend sends structured fields.
 
-    Un modele de requete d'un endpoint IA qui declare un champ `user`,
-    `prompt` ou `user_prompt` de type `str` est la signature d'un prompt
-    deja compose par le navigateur, que le backend se contenterait de
-    relayer. Une garantie ne peut etre tenue que la ou le prompt est
-    construit : FEAT-40 exige que le modele voie tout le plan de mesures,
-    ce qui est invérifiable si le client decide de l'inclure ou non.
+    A request model of an AI endpoint that declares a `user`, `prompt` or
+    `user_prompt` field of type `str` is the signature of a prompt already
+    composed by the browser, that the backend would merely relay. A guarantee
+    can only be held where the prompt is built: FEAT-40 requires the model to
+    see the whole measure plan, which is unverifiable if the client decides
+    whether to include it.
 
-    C'est invisible en relecture de diff — d'ou ce controle.
+    This is invisible when reviewing a diff — hence this check.
     """
     suspects = {"user", "prompt", "user_prompt", "system_prompt", "messages"}
-    # Modules dont TOUS les prompts sont composés côté serveur. Chaque
-    # nouvelle migration FEAT-41 s'ajoute ICI : c'est ce qui impose la
-    # coupure du proxy générique et interdit tout modèle à prompt pré-composé.
+    # Modules whose prompts are ALL composed server-side. Every new FEAT-41
+    # migration is added HERE: that is what enforces cutting the generic proxy
+    # and forbids any pre-composed-prompt model.
     migrated = {"risk", "compliance", "vendor"}
-    # AICompleteRequest EST un prompt pré-composé — c'est le contrat du proxy
-    # générique /api/ai/complete. La classe existe dans TOUS les modules
-    # (ai_proxy_common l'importe au chargement), mais dans un module migré la
-    # route qui la lit est coupée (generic_complete=False, vérifié plus bas) :
-    # c'est la coupure qui porte la garantie, pas l'absence de la classe.
+    # AICompleteRequest IS a pre-composed prompt — that is the contract of the
+    # generic /api/ai/complete proxy. The class exists in EVERY module
+    # (ai_proxy_common imports it at load time), but in a migrated module the
+    # route that reads it is cut off (generic_complete=False, checked below):
+    # the guarantee is carried by the cut-off, not by the absence of the class.
     tolerated_class = "AICompleteRequest"
     problems = []
     for route in sorted(list(REPO_ROOT.glob("*/src/routes/ai.py"))
@@ -604,10 +604,10 @@ def test_ai_requests_carry_no_precomposed_prompt() -> list[str]:
         for node in ast.walk(tree):
             if not isinstance(node, ast.ClassDef):
                 continue
-            # Toute classe avec une base est candidate : exiger `BaseModel`
-            # dans les bases DIRECTES laissait passer l'héritage indirect
-            # (class X(AICompleteRequest)) — et schemas.py n'était pas scanné
-            # du tout, alors que la violation vivante y logeait.
+            # Any class with a base is a candidate: requiring `BaseModel`
+            # among the DIRECT bases let indirect inheritance through
+            # (class X(AICompleteRequest)) — and schemas.py was not scanned at
+            # all, even though the live violation lived there.
             if not node.bases:
                 continue
             if node.name == tolerated_class:
@@ -626,8 +626,8 @@ def test_ai_requests_carry_no_precomposed_prompt() -> list[str]:
                     f"pre-composed prompt. The frontend must send structured fields "
                     f"and routes/ai.py must build the prompt (CLAUDE.md 5.1)."
                 )
-    # Un module migré doit COUPER le proxy générique : sans cela, un client
-    # modifié contourne toutes les garanties métier par /api/ai/complete.
+    # A migrated module must CUT OFF the generic proxy: without that, a
+    # modified client bypasses every business guarantee via /api/ai/complete.
     for module in sorted(migrated):
         route = REPO_ROOT / module / "src" / "routes" / "ai.py"
         if route.exists() and "generic_complete=False" not in route.read_text(encoding="utf-8"):

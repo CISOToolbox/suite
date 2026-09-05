@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""E2E HTTP de la stack demo-docker FRONT TS (sans navigateur).
+"""HTTP E2E for the demo-docker TS FRONTEND stack (no browser).
 
-Pour chaque module servi par le proxy : l'index se charge, TOUS ses
-<script src>/<link href> locaux résolvent (200), l'API santé répond, et le
-front servi est bien le build TypeScript (marqueur icône 'code')."""
+For every module served by the proxy: the index loads, ALL of its local
+<script src>/<link href> resolve (200), the health API answers, and the
+frontend being served really is the TypeScript build ('code' icon marker)."""
 import ssl, sys, re, urllib.request
 from urllib.parse import urljoin
 
 BASE = sys.argv[1] if len(sys.argv) > 1 else "https://localhost:8444"
-MODULES = {  # module: préfixe URL
+MODULES = {  # module: URL prefix
     "pilot": "", "risk": "risk/", "vendor": "vendor/", "compliance": "compliance/",
     "asset": "asset/", "access": "access/", "surface": "surface/",
     "appsec": "appsec/", "watch": "watch/", "audit": "audit/",
@@ -32,7 +32,7 @@ for mod, pfx in MODULES.items():
     if st != 200:
         print(f"FAIL {tag} index -> {st}"); fails.append(f"{mod}:index"); continue
     html = body.decode("utf-8", "replace")
-    # assets locaux référencés
+    # referenced local assets
     assets = re.findall(r'<script[^>]+src="([^"]+)"', html) + \
              re.findall(r'<link[^>]+href="([^"]+\.css[^"]*)"', html)
     assets = [a for a in assets if not a.startswith(("http://", "https://", "//"))]
@@ -45,12 +45,12 @@ for mod, pfx in MODULES.items():
             ast = f"ERR {e}"
         if ast != 200:
             bad.append(f"{a} -> {ast}")
-    # API santé
+    # health API
     try:
         hst, _ = get(urljoin(base, "api/health"))
     except Exception as e:
         hst = f"ERR {e}"
-    # marqueur build TS dans cisotoolbox.js
+    # TS build marker in cisotoolbox.js
     ts_ok = None
     try:
         _, js = get(urljoin(base, "js/cisotoolbox.js"))

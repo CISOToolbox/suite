@@ -1,6 +1,7 @@
-/* Sur une teinte, l'encre est le grade -ink du MÊME ton. La couleur de base y
-   passe de justesse ou échoue selon le ton — medium tombe à 4,49:1 en clair — et
-   l'écart ne se voit qu'à la mesure. Règle uniforme plutôt que cas par cas. */
+/* On a tint, the ink is the -ink grade of the SAME tone. The base color either
+   barely passes or outright fails depending on the tone — medium drops to
+   4.49:1 in light mode — and the gap only shows up when measured. A uniform
+   rule rather than a case-by-case one. */
 
 /* Connector list cards — bordered + spaced so each connector is visually
    self-contained (title groups with its own buttons, not the card above). */
@@ -36,8 +37,8 @@
 .entry-row.critical-flag td { background: var(--ct-critical-tint); }
 .entry-row.critical-flag:hover td { background: var(--ct-critical-tint); }
 
-/* Modificateur de .ct-badge : le ton vient du socle, cette regle ne garde
-   que ce qu'il ne fournit pas — graisse, interlettrage et espacement. */
+/* Modifier of .ct-badge: the tone comes from the base layer, this rule keeps
+   only what the base does not provide — weight, letter-spacing and margin. */
 .warn-badge { font-size: 0.68em; letter-spacing: 0.3px; margin-right: 3px; vertical-align: middle; }
 /* Declared service account — informational, neutral blue-gray */
 
@@ -320,5 +321,5 @@ mark.admin-term {
 /* Vars consumed by inline styles in Access_app.ts; undefined in light
    mode, where the inline fallback keeps the current rendering. */
 
-/* Extrait du balisage : la classe existait, son style vivait a cote. */
+/* Extracted from the markup: the class existed, its styling lived next to it. */
 .plg-type-card { padding:8px 10px; border:2px solid var(--ct-line); border-radius:6px; cursor:pointer; font-size:var(--ct-text-label); transition:border-color 0.15s; }

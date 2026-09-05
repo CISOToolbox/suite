@@ -1,10 +1,10 @@
-"""« Abandonné » (cancelled) — le statut que le backend refusait.
+"""« Abandonné » (cancelled) — the status the backend used to refuse.
 
-Le kanban proposait la colonne, le Literal du backend ne la connaissait pas :
-tout drop répondait 422 + rollback. Et une mesure abandonnée comptait dans le
-% de complétion des projets (dénominateur) et dans les échéances à venir.
+The kanban offered the column, the backend's Literal did not know it:
+every drop answered 422 + rollback. And a cancelled measure counted in the
+projects' completion % (denominator) and in the upcoming deadlines.
 
-Vérifications par le code source (AST/texte) + calcul pur, sans base.
+Checks via the source code (AST/text) + pure computation, no database.
 """
 import ast
 import os
@@ -22,9 +22,9 @@ def _source(name: str) -> str:
 
 
 def test_the_backend_accepts_every_status_the_kanban_offers():
-    # La consigne écrite dans Pilot_app.ts : garder _MEASURE_STATUSES en phase
-    # avec le Literal de MeasureUpdate. Le commit 39bf28f l'avait violée dans
-    # la ligne même qui la portait.
+    # The rule written in Pilot_app.ts: keep _MEASURE_STATUSES in step
+    # with MeasureUpdate's Literal. Commit 39bf28f violated it on the very
+    # line that carried it.
     tree = ast.parse(_source("measures.py"))
     literals: list[set] = []
     for node in ast.walk(tree):
@@ -48,7 +48,7 @@ def test_project_completion_ignores_cancelled_measures():
     measures = [{"status": "completed"}, {"status": "planned"},
                 {"status": "cancelled"}, {"status": "annule"}]
     d = _project_to_dict(p, measures)
-    # 1 faite sur 2 actives — les 2 abandonnées ne plombent pas le %.
+    # 1 done out of 2 active — the 2 cancelled ones do not drag the %.
     assert d["measures_total"] == 2
     assert d["measures_completed"] == 1
 

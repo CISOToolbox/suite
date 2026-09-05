@@ -1,15 +1,15 @@
-// FEAT-40 — les garanties anti-doublon, verrouillées côté navigateur.
+// FEAT-40 — the anti-duplicate guarantees, locked down from the browser.
 //
-// HERMÉTIQUE : une barrière d'écriture intercepte TOUTE l'API — les GET
-// passent (l'app charge les vraies données), les écritures sont absorbées
-// (200 {ok:true}) et les endpoints IA sont simulés. Rien ne touche la base :
-// la première version de ce spec a écrit dans les données de dev réelles,
-// c'est la leçon. Le fournisseur IA n'est jamais appelé — on teste ce que le
-// frontend ENVOIE (l'intention include_existing_measures) et ce qu'il FAIT
-// d'une réponse enrich (préserver l'existant), pas le modèle.
+// HERMETIC: a write fence intercepts the WHOLE API — GETs pass through (the
+// app loads the real data), writes are absorbed (200 {ok:true}) and the AI
+// endpoints are stubbed. Nothing touches the database: the first version of
+// this spec wrote into real dev data, that is the lesson. The AI provider is
+// never called — what is tested is what the frontend SENDS (the
+// include_existing_measures intent) and what it DOES with an enrich response
+// (preserve the existing content), not the model.
 //
-// Trois comportements, chacun payé par un constat de la revue du 2026-09-02.
-// Prérequis : stack en marche + `bash mint-tokens.sh` (cf. console.spec.js).
+// Three behaviours, each one paid for by a finding of the 2026-09-02 review.
+// Prerequisites: stack running + `bash mint-tokens.sh` (cf. console.spec.js).
 const fs = require("fs");
 const path = require("path");
 const { test, expect } = require("@playwright/test");
@@ -27,8 +27,8 @@ if (!IS_LOCAL && process.env.E2E_ALLOW_REMOTE !== "1") {
 const ANCIEN_DETAILS = "MFA active sur les portails web.";
 const AJOUT = "Étendre la couverture aux comptes de service.";
 
-// Barrière d'écriture + simulation IA. `aiHandler` reçoit le corps de la
-// requête IA intercepée et rend le JSON à servir.
+// Write fence + AI stub. `aiHandler` receives the body of the intercepted AI
+// request and returns the JSON to serve.
 async function fence(page, aiPattern, aiHandler) {
     await page.route("**/api/**", async (route) => {
         const req = route.request();
@@ -36,13 +36,13 @@ async function fence(page, aiPattern, aiHandler) {
             return route.fulfill({ json: aiHandler(req.postDataJSON()) });
         }
         if (req.method() === "GET") return route.continue();
-        return route.fulfill({ json: { ok: true } });   // écriture absorbée
+        return route.fulfill({ json: { ok: true } });   // write absorbed
     });
 }
 
 function enableAi(page, pfx) {
-    // Direct (enabled + apikey) comme administré (enabled + can_use admin) :
-    // la clé factice ne part nulle part, tout est intercepté.
+    // Direct mode (enabled + apikey) as well as managed mode (enabled +
+    // can_use admin): the dummy key goes nowhere, everything is intercepted.
     return page.addInitScript(([p]) => {
         localStorage.setItem(p + "_ai_enabled", "true");
         localStorage.setItem(p + "_ai_apikey", "e2e-intercepted");
@@ -59,11 +59,11 @@ async function openModule(page, module, pfx) {
     await page.goto(`${PROXY}/${module}/`, { waitUntil: "networkidle" });
 }
 
-// Sème une mesure par les seams de l'app, en un seul evaluate (pas de
-// localisateur périmé : chaque _updateFieldFromEl re-rend le tableau).
-// `let D` de Risk n'est pas sur window ; addRow et _updateFieldFromEl sont
-// des déclarations de fonction, donc exposées. Rend l'id généré, lu dans le
-// DOM re-rendu — jamais supposé.
+// Seeds a measure through the app's own seams, in a single evaluate (no stale
+// locator: every _updateFieldFromEl re-renders the table). Risk's `let D` is
+// not on window; addRow and _updateFieldFromEl are function declarations, so
+// they are exposed. Returns the generated id, read from the re-rendered DOM —
+// never assumed.
 async function seedRiskMeasure(page, details) {
     await page.locator('[data-click="selectPanel"][data-args*="measures"]').first().click();
     await page.waitForTimeout(300);
@@ -107,13 +107,13 @@ test.describe("risk — FEAT-40", () => {
         await page.locator('#toggles-measures [data-click="suggestFor"]').click();
         await expect(page.locator("#ai-include-measures")).toBeChecked();
 
-        // 1er envoi : case cochée (défaut) → l'intention part à true.
+        // 1st send: box checked (the default) → the intent goes out as true.
         await page.locator('[data-click="_aiRunSuggest"]').first().click();
         await expect.poll(() => bodies.length).toBe(1);
         expect(bodies[0].include_existing_measures).toBe(true);
 
-        // 2e envoi : case décochée — vérifié sur la REQUÊTE émise, pas sur
-        // l'état de la case (critère d'acceptation 8 de la spec).
+        // 2nd send: box unchecked — verified on the REQUEST that went out, not
+        // on the state of the box (acceptance criterion 8 of the spec).
         await page.evaluate(() => window._aiClosePanel());
         await page.locator('#toggles-measures [data-click="suggestFor"]').click();
         await page.locator("#ai-include-measures").uncheck();
@@ -132,18 +132,18 @@ test.describe("risk — FEAT-40", () => {
         await page.locator('#toggles-measures [data-click="suggestFor"]').click();
         await page.locator('[data-click="_aiRunSuggest"]').first().click();
 
-        // La carte enrich porte le badge « mise à jour » et l'aperçu.
+        // The enrich card carries the « mise à jour » badge and the preview.
         const card = page.locator(".ai-card", { hasText: seededId }).first();
         await expect(card).toBeVisible();
         await card.locator(".ai-btn-accept").click();
         await page.waitForTimeout(400);
 
-        // L'état vérifié dans le TABLEAU re-rendu, pas dans une variable.
+        // The state is verified in the re-rendered TABLE, not in a variable.
         await page.evaluate(() => window._aiClosePanel());
         await page.locator('[data-click="selectPanel"][data-args*="measures"]').first().click();
         const details = await page.locator('textarea[data-s="measures"][data-f="details"]').last().inputValue();
-        expect(details).toContain(ANCIEN_DETAILS);   // l'existant survit
-        expect(details).toContain(AJOUT);            // l'ajout est là
+        expect(details).toContain(ANCIEN_DETAILS);   // the existing text survives
+        expect(details).toContain(AJOUT);            // the addition is there
     });
 });
 
@@ -158,8 +158,8 @@ test.describe("vendor — FEAT-40", () => {
                 details: "Prévoir la sortie.", type: "Contractuelle" }] };
         });
 
-        // Vendor + risque semés dans l'état (var D est sur window côté
-        // Vendor). La barrière absorbe les POST : rien n'atteint la base.
+        // Vendor + risk seeded into the state (var D is on window on the
+        // Vendor side). The fence absorbs the POSTs: nothing reaches the DB.
         await page.evaluate(() => {
             const v = { id: "PP-901", name: "MedSecure Cloud", status: "active",
                         sector: "Santé", measures: [], certifications: [] };
@@ -171,9 +171,9 @@ test.describe("vendor — FEAT-40", () => {
             window._persistCreate("risk", r);
         });
 
-        // openAiRiskAssistant rend la case + le bouton « générer des mesures ».
-        // Fermer le panneau ne détruit pas la case (classe .open retirée
-        // seulement) : c'est _aiShowLoading qui la remplaçait — le bug d'origine.
+        // openAiRiskAssistant renders the box + the « générer des mesures » button.
+        // Closing the panel does not destroy the box (only the .open class is
+        // removed): _aiShowLoading was the one replacing it — the original bug.
         await page.evaluate(() => {
             const idx = window.D.vendors.findIndex((v) => v.id === "PP-901");
             window.openAiRiskAssistant(idx);

@@ -41,8 +41,8 @@ logger = logging.getLogger("pilot.connectors.aws")
 # credentials are unavailable. Kept in one place so test/run agree.
 _DEMO = {
     "aws_securityhub_critical": 0.0,  # <= target 0 → vert
-    "aws_guardduty_high": 2.0,        # > target 0 (< amber 3) → ambre (réaliste)
-    "aws_iam_keys_old_pct": 9.0,      # > target 0 (< amber 15) → ambre (réaliste)
+    "aws_guardduty_high": 2.0,        # > target 0 (< amber 3) → amber (realistic)
+    "aws_iam_keys_old_pct": 9.0,      # > target 0 (< amber 15) → amber (realistic)
     "aws_s3_public_buckets": 0.0,     # <= target 0 → vert
 }
 

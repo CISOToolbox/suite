@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
-# Frappe un JWT de session par module et les écrit dans tokens.json (gitignoré).
+# Mints one session JWT per module and writes them to tokens.json (gitignored).
 #
-# Chaque module signe avec sa propre clé, d'où un jeton par module plutôt qu'un
-# jeton partagé. Le compte utilisé est découvert dans l'annuaire de Pilot : un
-# JWT valide ne suffit pas, `_is_active_upstream` demande à Pilot si le compte
-# est actif, et refuse tout email qu'il ne connaît pas — c'est ce qui rend
-# inutilisable un compte de test présent seulement dans la base d'un module.
+# Each module signs with its own key, hence one token per module rather than a
+# shared one. The account used is discovered in Pilot's directory: a valid JWT
+# is not enough, `_is_active_upstream` asks Pilot whether the account is active,
+# and refuses any email it does not know — which is what makes a test account
+# present only in a single module's database unusable.
 set -uo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")" || exit 1
 PREFIX="${CISO_CONTAINER_PREFIX:-ciso2}"
 OUT=tokens.json
 
-# Un administrateur réellement actif côté Pilot. Découvert, jamais codé en dur.
+# An administrator that is genuinely active on the Pilot side. Discovered, never hard-coded.
 EMAIL="${E2E_EMAIL:-$(docker exec "${PREFIX}-pilot-db" psql -U pilot pilot -t -A \
         -c "select email from users where role='admin' order by created_at limit 1;" \
         2>/dev/null | tr -d ' \r')}"
@@ -27,8 +27,8 @@ for m in access appsec asset audit compliance pilot risk surface vendor watch; d
     uid=$(docker exec "${PREFIX}-${m}-db" psql -U "$m" "$m" -t -A \
           -c "select id from users where email='${EMAIL}';" 2>/dev/null | tr -d ' \r')
     [ -n "$uid" ] || { echo "  skip ${m}: ${EMAIL} unknown in its database" >&2; continue; }
-    # Pilot federe les autres : il a son propre src/auth.py, dont create_jwt
-    # prend en plus la liste des modules autorises.
+    # Pilot federates the others: it has its own src/auth.py, whose create_jwt
+    # additionally takes the list of allowed modules.
     if [ "$m" = "pilot" ]; then
         code="from src.auth import create_jwt
 print(create_jwt('${uid}', '${EMAIL}', 'admin', [], None, ''))"
@@ -46,13 +46,12 @@ ${code}" 2>/dev/null | tail -1)
 done
 echo "" >> "$OUT"; echo "}" >> "$OUT"
 
-# Le fichier contient des sessions administrateur valides pendant
-# JWT_EXPIRY_HOURS (24 h par defaut). Il est gitignore, mais il reste lisible
-# sur le disque : le restreindre est le minimum, l'effacer apres la campagne
-# est mieux (`rm tokens.json`).
+# The file holds administrator sessions valid for JWT_EXPIRY_HOURS (24 h by
+# default). It is gitignored, but it stays readable on disk: restricting it is
+# the bare minimum, deleting it after the run is better (`rm tokens.json`).
 chmod 600 "$OUT"
 
 n=$(grep -c '":' "$OUT")
 echo "minted ${n} token(s) for ${EMAIL} → ${OUT}"
-# Ne rien avoir frappé n'est pas un succès : le parcours skiperait tout en vert.
+# Having minted nothing is not a success: the journey would skip everything and stay green.
 [ "$n" -gt 0 ] || exit 1

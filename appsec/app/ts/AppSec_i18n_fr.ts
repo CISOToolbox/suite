@@ -111,7 +111,7 @@ _registerTranslations("fr", {
     "apps.no_apps": "Aucune application configurée",
 
     "findings.title": "Findings",
-    // Libellés de findings reconstruits (type/scanner + evidence) — cf. ct_findings.js
+    // Rebuilt finding labels (type/scanner + evidence) — see ct_findings.js
     "finding.trivy_fs.title":    "{cve} : {package}@{installed_version}",
     "finding.trivy_fs.desc":     "Vulnérabilité {cve} affectant {package} {installed_version}.\n\n{original}",
     "finding.trivy_image.title": "{cve} : {package}@{installed_version} dans {image}",

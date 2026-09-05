@@ -2,7 +2,7 @@
 
 Everything generic (provider dispatch, /api/ai/complete, /runtime,
 /config, /keys, managed mode) comes from src/ai_proxy_common.py. Audit
-métier prompts (finding suggestions, report wording) will be added here
+domain-specific prompts (finding suggestions, report wording) will be added here
 when the feature lands.
 """
 from __future__ import annotations

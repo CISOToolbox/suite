@@ -166,8 +166,8 @@ window._cancelAutosave = function() {
 
 var _origLoadBuffer = window._loadBuffer;
 if (_origLoadBuffer) {
-    // Réassignation d'un global déclaré `declare function` → on passe par
-    // l'interface Window ; le wrapper est volontairement void (iso source).
+    // Reassigning a global declared with `declare function` → go through
+    // the Window interface; the wrapper is deliberately void (identical to source).
     (window as Window)._loadBuffer = function(buffer: ArrayBuffer, filename: string) {
         _origLoadBuffer!(buffer, filename);
         setTimeout(function() {

@@ -147,10 +147,10 @@ function _swapData(pdata: any): void {
     if (_auditorHandle) _auditorHandle.setValue((D.meta && D.meta.auditor) || "");
 }
 
-// ── Champ Auditeur → ct_userpicker branché sur l'annuaire ──────
-// Remplace l'input libre #meta-auditor (la boucle de remplissage de
-// l'app garde son null-guard). Repli automatique du composant : input
-// simple si aucun annuaire inscriptible derrière le proxy.
+// ── Auditor field → ct_userpicker wired to the directory ───────
+// Replaces the free-text input #meta-auditor (the app's fill loop
+// keeps its null-guard). Automatic component fallback: plain input
+// if no writable directory behind the proxy.
 
 var _auditorHandle: { getValue(): string; setValue(v: string): void } | null = null;
 
@@ -358,7 +358,7 @@ window._auditPickerImport = function() {
 
 
 // ═══════════════════════════════════════════════════════════════
-// ACTIONS CORRECTIVES (mesures) — par NC + panneau de suivi
+// CORRECTIVE ACTIONS (measures) — per NC + tracking panel
 // ═══════════════════════════════════════════════════════════════
 
 var _measures: any[] = [];
@@ -384,8 +384,8 @@ function _measureStatusLabel(s: string): string {
     return s;
 }
 
-// Bloc inline sous les champs d'écart d'un contrôle (appelé par le fork
-// suite d'ISO_Audit_app.renderControl via un hook typeof-guardé).
+// Inline block under a control's finding fields (called by the suite
+// fork of ISO_Audit_app.renderControl via a typeof-guarded hook).
 window._auditControlMeasuresHTML = function(controlId: string): string {
     var linked = _measures.filter(function(m) { return m.control_id === controlId; });
     var h = '<div class="ctrl-field audit-measures-inline">';
@@ -503,7 +503,7 @@ window._renderAuditMeasures = function() {
 };
 
 // ═══════════════════════════════════════════════════════════════
-// AUTH + TOOLBAR (user pill — "Mes audits" vit dans le menu Fichier)
+// AUTH + TOOLBAR (user pill — "Mes audits" lives in the File menu)
 // ═══════════════════════════════════════════════════════════════
 
 function _initAuth(): void {

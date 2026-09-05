@@ -1,11 +1,11 @@
 /**
- * Access Rights Review (demo-docker) — modèle de données D + globals app.
- * Types déduits de Access_app.ts / access_api.ts (création dans addUser /
- * addApp / startReview / addServiceAccount / addMeasure), de demo-fr.json
- * et des routes du backend Access. Fichier de types pur (aucun emit).
+ * Access Rights Review (demo-docker) — D data model + app globals.
+ * Types derived from Access_app.ts / access_api.ts (creation in addUser /
+ * addApp / startReview / addServiceAccount / addMeasure), from demo-fr.json
+ * and from the Access backend routes. Pure type file (no emit).
  */
 
-/* ── Modèle D ───────────────────────────────────────────────────── */
+/* ── D model ───────────────────────────────────────────────────── */
 
 type AccessDecision = "pending" | "conforme" | "non_conforme";
 
@@ -45,11 +45,11 @@ type AccessSiUser = {
     nda_signed?: boolean;
     nda_date?: string;
     nda_justification?: string;
-    /** ISO datetime — alimenté par les connecteurs / Pilot. */
+    /** ISO datetime — fed by the connectors / Pilot. */
     last_login_at?: string;
-    /** État du compte IdP (actif/désactivé) ; null/absent = inconnu. */
+    /** IdP account state (enabled/disabled); null/absent = unknown. */
     account_enabled?: boolean | null;
-    /** "pilot" → identité gérée par l'annuaire Pilot (champs verrouillés). */
+    /** "pilot" → identity managed by the Pilot directory (fields locked). */
     sync_source?: string;
 };
 
@@ -169,7 +169,7 @@ type AccessData = {
     metadata: AccessMetadata;
 };
 
-/* ── Plugins (connecteurs) — hors D, chargés via l'API ──────────── */
+/* ── Plugins (connectors) — outside D, loaded through the API ───── */
 
 type AccessPluginConfigField = {
     key: string;
@@ -178,7 +178,7 @@ type AccessPluginConfigField = {
     required?: boolean;
     placeholder?: string;
     rows?: number;
-    /** Objets {value,label} ou primitives nues — formats mixtes côté backend. */
+    /** {value,label} objects or bare primitives — mixed formats backend-side. */
     options?: any[];
 };
 
@@ -214,7 +214,7 @@ type AccessSyncJob = {
     error_message?: string;
 };
 
-/* ── Réponses API ───────────────────────────────────────────────── */
+/* ── API responses ─────────────────────────────────────────────── */
 
 type AccessProject = {
     id: string;
@@ -329,26 +329,26 @@ interface AccessApi {
     updateUser(id: string, data: Record<string, unknown>): Promise<any>;
 }
 
-/* ── Globals shared déclarés Window-only dans les .d.ts générés ───
- * ct_table / ct_bulkbar / ct_modal / ct_measure_modal n'exposent leurs
- * APIs que sur l'interface Window (propriétés optionnelles) ;
- * Access_app.js les appelle en globals nus → déclarations ambiantes
- * locales (aucun impact sur le js émis). Idem pour les helpers de
- * directory_picker.js et la couche access_api.js (toujours chargés
- * avant Access_app.js dans index.html). */
+/* ── Shared globals declared Window-only in the generated .d.ts ───
+ * ct_table / ct_bulkbar / ct_modal / ct_measure_modal only expose their
+ * APIs on the Window interface (optional properties); Access_app.js calls
+ * them as bare globals → local ambient declarations (no impact on the
+ * emitted js). Same for the directory_picker.js helpers and the
+ * access_api.js layer (always loaded before Access_app.js in
+ * index.html). */
 declare var ct_table: CtTableApi;
 declare var ct_bulkbar: CtBulkbarApi;
 declare var ct_modal: CtModalApi;
 declare var ct_measure_modal: CtMeasureModalApi;
 declare function _dirGetSource(): string;
 declare function _dirMultiPicker(currentIds: string[] | null | undefined, addHandler: string, removeHandler: string): string;
-/** Truth-testé nu dans renderAppDetail → déclaré possiblement undefined. */
+/** Truth-tested bare in renderAppDetail → declared possibly undefined. */
 declare var _dirResolve: ((email: string | null | undefined) => string) | undefined;
 declare var AccessAPI: AccessApi;
 declare function getActiveProjectId(): string | null;
 declare var _setDataReady: (() => void) | undefined;
 
-/* ── Window : propriétés posées par access_api.js / Access_app.js ── */
+/* ── Window: properties set by access_api.js / Access_app.js ────── */
 
 interface Window {
     /* access_api.js */
@@ -362,10 +362,10 @@ interface Window {
     _moduleRole?: string;
     _logout?: () => void;
     openUserAdmin?: () => void;
-    /** Hook de sauvegarde debouncée (couches backend alternatives). */
+    /** Debounced save hook (alternative backend layers). */
     _debouncedSave?: () => void;
 
-    /* directory_picker.js (decl générée vide — globals window-only) */
+    /* directory_picker.js (generated decl is empty — window-only globals) */
     _dirGetSource?: () => string;
     _dirMultiPicker?: (currentIds: string[] | null | undefined, addHandler: string, removeHandler: string) => string;
     _dirResolve?: (email: string | null | undefined) => string;

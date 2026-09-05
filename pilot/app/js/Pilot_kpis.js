@@ -164,9 +164,9 @@
         var n = parseFloat(v);
         return isNaN(n) ? null : n;
     }
-    // Le referentiel est une identite, pas un niveau : le ton ne code qu'une
-    // difference de famille. .kpi-fw-badge reste comme modificateur (chip
-    // rectangulaire compacte), le fond et l'encre viennent du socle.
+    // A framework is an identity, not a level: the tone only encodes a
+    // difference of family. .kpi-fw-badge stays as a modifier (compact
+    // rectangular chip), the background and the ink come from the base layer.
     var _FW_TONES = {
         "nist-csf-2": "info", "iso-27001-2022": "low", "cis-v8": "medium",
         "dora": "accent", "nis2": "critical", "iso-27004-2016": "info",
@@ -362,9 +362,9 @@
             + " " + p(d.getHours()) + ":" + p(d.getMinutes());
     }
     // Compact card: title · value (with status) · thresholds. Click for details.
-    // Migrée sur la primitive socle .ct-kpi-adv. Correspondance santé→ton :
-    // green→low, amber→high, red→critical, grey→neutral (identique au rendu
-    // historique, où amber consommait --ct-high et grey l'encre atténuée).
+    // Migrated to the core .ct-kpi-adv primitive. Health→tone mapping:
+    // green→low, amber→high, red→critical, grey→neutral (identical to the
+    // legacy rendering, where amber used --ct-high and grey the muted ink).
     function _kpiCard(k) {
         var health = _kpiHealth(k);
         var valueStr = _fmtValue(k);
@@ -440,8 +440,8 @@
             ct_modal.open({
                 title: _kpiName(k) + " · " + k.code,
                 body: body,
-                // "large" n'est pas une taille ct_modal ("lg" attendu) → retombe en taille par défaut.
-                // Bug d'origine conservé tel quel (iso-fonctionnel), consigné dans le rapport P3b.
+                // "large" is not a ct_modal size ("lg" expected) → falls back to the default size.
+                // Original bug kept as-is (iso-functional), logged in the P3b report.
                 size: "large",
                 buttons: _isAdmin()
                     ? [
@@ -909,7 +909,7 @@
             ct_modal.open({
                 title: t("pilot.kpi.history") + " · " + (_kpiName(k) || code),
                 body: body,
-                // Idem : "large" inconnue de ct_modal — bug d'origine conservé.
+                // Same: "large" unknown to ct_modal — original bug kept.
                 size: "large",
                 buttons: [{ id: "close", label: t("pilot.action.close"), primary: true }]
             });
@@ -967,7 +967,7 @@
         ct_modal.open({
             title: t("pilot.kpi.picker_title"),
             body: body,
-            // Idem : "large" inconnue de ct_modal — bug d'origine conservé.
+            // Same: "large" unknown to ct_modal — original bug kept.
             size: "large",
             buttons: [{ id: "close", label: t("pilot.action.close"), primary: true }]
         });

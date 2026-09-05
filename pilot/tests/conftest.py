@@ -40,9 +40,9 @@ test_engine = create_async_engine(
 )
 
 
-# SQLite ignore les FK (donc les ON DELETE CASCADE du DDL) tant que le pragma
-# n'est pas armé par connexion — les tests de cascade passaient à côté du
-# comportement qu'ils vérifient, et échouaient sur un DDL pourtant correct.
+# SQLite ignores FKs (hence the DDL's ON DELETE CASCADE) until the pragma
+# is armed per connection — the cascade tests were missing the very behavior
+# they verify, and failed on a DDL that was actually correct.
 @sa_event.listens_for(test_engine.sync_engine, "connect")
 def _enable_sqlite_fks(dbapi_conn, _record):
     cursor = dbapi_conn.cursor()

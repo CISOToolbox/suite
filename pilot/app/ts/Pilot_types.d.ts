@@ -1,17 +1,17 @@
 /**
- * Pilot_types.d.ts — modèle de données du front Pilot (demo-docker).
+ * Pilot_types.d.ts — data model of the Pilot front end (demo-docker).
  *
- * L'enveloppe stats v2 (PilotStatsEnvelope) suit le contrat autoritaire
- * shared/docs/pilot-dashboard-contract.md : chaque module backend expose
- * GET /api/internal/stats avec { entity_count, entity_label, measures{},
- * posture{score, score_label, trend_30d}, breakdown{type, data},
- * top_items[], alerts[] }. Les champs sont optionnels côté front car
- * Pilot applique les fallbacks documentés dans le contrat.
+ * The stats v2 envelope (PilotStatsEnvelope) follows the authoritative
+ * contract shared/docs/pilot-dashboard-contract.md: every backend module
+ * exposes GET /api/internal/stats with { entity_count, entity_label,
+ * measures{}, posture{score, score_label, trend_30d}, breakdown{type, data},
+ * top_items[], alerts[] }. Fields are optional on the front end because
+ * Pilot applies the fallbacks documented in the contract.
  *
- * Fichier de types pur — aucun emit.
+ * Pure type file — no emit.
  */
 
-/* ── Stats v2 (contrat dashboard) ──────────────────────────────── */
+/* ── Stats v2 (dashboard contract) ─────────────────────────────── */
 
 interface PilotMeasuresSummary {
     total?: number;
@@ -41,13 +41,13 @@ interface PilotAlert {
     url?: string;
 }
 
-/** Enveloppe stats v2 renvoyée par chaque module (contrat dashboard). */
+/** Stats v2 envelope returned by each module (dashboard contract). */
 interface PilotStatsEnvelope {
     entity_count?: number;
     entity_label?: string;
     measures?: PilotMeasuresSummary;
     posture?: PilotPosture | null;
-    /** breakdown.type ∈ donut | bar | gauge | heatmap_5x5 | timeline — rendu via _svgBreakdown. */
+    /** breakdown.type ∈ donut | bar | gauge | heatmap_5x5 | timeline — rendered via _svgBreakdown. */
     breakdown?: CtBreakdown | null;
     top_items?: PilotTopItem[];
     alerts?: PilotAlert[];
@@ -62,7 +62,7 @@ interface PilotModuleEntry {
     stats?: PilotStatsEnvelope | null;
 }
 
-/* ── Dashboard consolidé (GET /api/dashboard) ──────────────────── */
+/* ── Consolidated dashboard (GET /api/dashboard) ───────────────── */
 
 interface PilotDashKpis {
     posture_global?: number | null;
@@ -94,7 +94,7 @@ interface PilotDashboard {
     activity?: PilotActivityEvent[];
 }
 
-/* ── Mesures / projets ─────────────────────────────────────────── */
+/* ── Measures / projects ───────────────────────────────────────── */
 
 interface PilotMeasure {
     id: string;
@@ -108,7 +108,7 @@ interface PilotMeasure {
     due_date?: string | null;
     entity_name?: string;
     vendor_name?: string;
-    /** Stash front-only : projet courant au moment de l'édition (diff). */
+    /** Front-only stash: current project at edit time (diff). */
     __project_id?: string;
 }
 
@@ -135,7 +135,7 @@ interface PilotMeasureGroup {
 }
 
 interface PilotProject {
-    id?: string;             // absent pour un projet en cours de création
+    id?: string;             // absent for a project still being created
     name: string;
     description?: string;
     status?: string;         // planned | in_progress | completed | on_hold
@@ -172,7 +172,7 @@ interface PilotUser {
     role?: string;           // admin | user | viewer | pending
     picture?: string;
     permissions?: Record<string, string>;
-    ai_enabled?: string;     // "true" | "false" (stocké en string côté backend)
+    ai_enabled?: string;     // "true" | "false" (stored as a string on the backend side)
     last_login?: string;
 }
 
@@ -252,7 +252,7 @@ interface PilotSettings {
     demo_mode?: string;
     ai_provider?: string;
     ai_model?: string;
-    ai_key_anthropic?: string;     // "configured" ou absent (jamais la clé)
+    ai_key_anthropic?: string;     // "configured" or absent (never the key itself)
     ai_key_openai?: string;
     ai_key_gemini?: string;
     ai_custom_label?: string;
@@ -271,7 +271,7 @@ interface PilotSettings {
     [k: string]: string | undefined;
 }
 
-/* ── Connecteurs (Pilot_connectors.js, agrégateur /api/admin/connectors) ── */
+/* ── Connectors (Pilot_connectors.js, /api/admin/connectors aggregator) ── */
 
 interface PilotConnInstance {
     id?: string;
@@ -298,12 +298,12 @@ interface PilotConnAggregate {
 interface PilotFetchInit {
     method?: string;
     headers?: Record<string, string>;
-    /** Objet → sérialisé JSON par _fetch ; string/FormData passés tels quels. */
+    /** Object → JSON-serialized by _fetch; string/FormData passed through. */
     body?: any;
     credentials?: RequestCredentials;
 }
 
-/* ── Panneau IA Pilot (pilot_ai_panel.js — variante locale, PAS ai_common) ── */
+/* ── Pilot AI panel (pilot_ai_panel.js — local variant, NOT ai_common) ────── */
 
 interface PilotAiPanelParts {
     panel: HTMLElement;
@@ -312,7 +312,7 @@ interface PilotAiPanelParts {
     footer: HTMLElement;
 }
 
-/* ── Globals inter-fichiers (assignés sur window, appelés à nu) ── */
+/* ── Cross-file globals (assigned on window, called bare) ──────── */
 
 declare var ct_modal: CtModalApi;
 declare var ct_table: CtTableApi;
@@ -342,7 +342,7 @@ interface Window {
     _filterEvidences?: () => void;
     _aiSuggestGroups?: () => void;
     _aiCreateSuggestedGroups?: () => void;
-    /** Flag variante cisotoolbox_backend : Pilot ne déplie pas ses propres backups. */
+    /** cisotoolbox_backend variant flag: Pilot does not unwrap its own backups. */
     _CT_IMPORT_NO_UNWRAP?: boolean;
     _currentUser?: PilotCurrentUser;
     _locale?: string;

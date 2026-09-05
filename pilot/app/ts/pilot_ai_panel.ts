@@ -4,11 +4,11 @@
  * Same look & feel as Risk's ai_common.js panel, scoped to Pilot.
  */
 
-// Variante cisotoolbox_backend (master factorisé P1) : Pilot ne doit PAS
-// déplier le format de backup Pilot {"module":...,"data":[...]} à l'import
-// de ses propres fichiers. Le flag est lu à l'usage par le master
-// cisotoolbox_backend.js — posé ici car pilot_ai_panel.js est le premier
-// script propre à Pilot chargé par index.html (pas d'inline script, CSP).
+// cisotoolbox_backend variant (P1 factored master): Pilot must NOT unwrap
+// the Pilot backup format {"module":...,"data":[...]} when importing its own
+// files. The flag is read at use time by the cisotoolbox_backend.js master —
+// set here because pilot_ai_panel.js is the first Pilot-specific script
+// loaded by index.html (no inline script, CSP).
 window._CT_IMPORT_NO_UNWRAP = true;
 
 (function() {
@@ -107,8 +107,9 @@ style.textContent = [
     ".ai-spinner { width:36px; height:36px; border:3px solid var(--ct-surface-2); border-top-color:var(--ct-accent); border-radius:50%; animation:ai-spin 0.8s linear infinite; margin:0 auto; }",
     "@keyframes ai-spin { to { transform:rotate(360deg); } }",
     ".ai-error { padding:16px; color:var(--ct-critical); background:var(--ct-critical-tint); border:1px solid var(--ct-critical-tint); border-radius:6px; font-size:0.85em; }",
-    // Boutons IA : plus de surcharge. Ils portent .ct-btn + data-variant du socle
-    // (primary / ghost / nu) et s'habillent donc du style par défaut, thème-safe.
+    // AI buttons: no more overrides. They carry the core .ct-btn +
+    // data-variant (primary / ghost / bare) and therefore inherit the default
+    // theme-safe style.
     ".ai-empty { text-align:center; padding:30px; color:var(--ct-ink-2); font-size:0.88em; }"
 ].join("\n");
 document.head.appendChild(style);

@@ -377,7 +377,7 @@ function _openScopeEditor(scope) {
     h += '<label class="ct-block ct-text-meta ct-ink-1 ct-mb-1">' + esc(t("scopes.modal.description_label")) + '</label>';
     h += '<textarea id="scope-description" rows="3" maxlength="10000"' + (canEdit ? '' : ' readonly') + ' class="ct-journal-body ct-py-2 ct-px-2 ct-bordered ct-r-md ct-mb-3 ct-font-inherit ct-text-data ct-resize-y">' + esc(scope ? scope.description : "") + '</textarea>';
     // ─────────────────────────────────────────────────────────────
-    // Section A — VULNÉRABILITÉS (vuln digest cadence + thresholds + targets)
+    // Section A — VULNERABILITIES (vuln digest cadence + thresholds + targets)
     // ─────────────────────────────────────────────────────────────
     var dEnabled = scope && scope.digest_enabled !== undefined ? !!scope.digest_enabled : true;
     var dHour = scope && scope.digest_hour !== undefined ? scope.digest_hour : 7;
@@ -431,7 +431,7 @@ function _openScopeEditor(scope) {
     h += '<input type="number" id="scope-epss-min" min="0" max="1" step="0.01" value="' + esc(String(dEpss)) + '" placeholder="' + esc(t("scopes.modal.threshold_off")) + '"' + (canEdit ? '' : ' readonly') + ' class="ct-w-90 ct-py-1 ct-px-2 ct-bordered ct-r-sm ct-text-meta">';
     h += '<span class="ct-text-label ct-muted">' + esc(t("scopes.modal.epss_help")) + '</span>';
     h += '</div>';
-    // — Targets (technologies surveillées) — needs an existing scope.
+    // — Targets (monitored technologies) — needs an existing scope.
     h += '<div style="font-size:var(--ct-text-data);font-weight:600;color:var(--ct-ink-1);margin:var(--ct-s2) 0 var(--ct-s1) 0">' + esc(t("targets.title")) + '</div>';
     if (isNew) {
         h += '<div class="ct-text-meta ct-journal-sep ct-italic ct-py-1 ct-px-1">' + esc(t("targets.save_first")) + '</div>';
@@ -601,8 +601,8 @@ function _renderTargetsList(box, scope, targets) {
     }
     var h = '<div class="ct-flex ct-body ct-gap-1">';
     targets.forEach(function (tg) {
-        // Les trois fonds etaient des hex en dur : ils restaient clairs en theme
-        // sombre. Le ton du socle suit le theme, la classe garde la typographie.
+        // The three backgrounds were hardcoded hex: they stayed light in dark
+        // theme. The base tone follows the theme, the class keeps the typography.
         var _kindTone = tg.kind === "cpe" ? "medium" : tg.kind === "purl" ? "info" : "low";
         var kindBadge = '<span class="ct-badge target-kind-badge" data-tone="' + _kindTone + '">' + esc(tg.kind) + '</span>';
         var ver = tg.version_constraint ? ' <span class="ct-muted ct-text-label">' + esc(tg.version_constraint) + '</span>' : '';
