@@ -339,15 +339,7 @@ function renderDashboard() {
     var plgActive = _pluginList.filter(function (p) { return p.enabled; }).length;
     h += _card(plgActive + '/' + _pluginList.length, t("nav.plugins"));
     h += '</div>';
-    // Compliance overview
-    if (D.si_users.length) {
-        h += '<div class="ct-mt-4 ct-mb-4"><h3 class="ct-text-data ct-mb-2">' + t("dashboard.compliance") + '</h3>';
-        h += '<div class="ct-flex ct-gap-4 ct-row-wrap ct-text-meta">';
-        h += '<div>' + t("user.politique_validee") + ': <strong>' + compPol + '%</strong></div>';
-        h += '<div>' + t("user.mfa_active") + ': <strong>' + compMfa + '%</strong></div>';
-        h += '</div></div>';
-    }
-    // Overdue reviews
+    // Overdue reviews — computed before the charts row, which reuses the count.
     var overdue = [];
     D.applications.forEach(function (app) {
         var lastClosed = null;
@@ -360,6 +352,73 @@ function renderDashboard() {
         if (_isReviewOverdue(app, lastClosed))
             overdue.push(app);
     });
+    // Charts row (FEAT-44) — all derived from D, same predicates as the KPIs.
+    h += '<div class="dash-charts ct-mb-4">';
+    if (D.si_users.length) {
+        h += '<div class="dash-chart-card"><h3 class="ct-text-data">' + t("dashboard.compliance") + '</h3>';
+        h += '<div class="ct-flex ct-gap-4">';
+        h += '<div class="dash-gauge">' + window._svgGauge(compPol, 100, { size: 100 }) + '<div class="ct-text-meta ct-muted">' + esc(t("user.politique_validee")) + '</div></div>';
+        h += '<div class="dash-gauge">' + window._svgGauge(compMfa, 100, { size: 100 }) + '<div class="ct-text-meta ct-muted">' + esc(t("user.mfa_active")) + '</div></div>';
+        h += '</div></div>';
+        // IdP account state (FEAT-16 field); null = the IdP never reported.
+        var accOn = 0, accOff = 0, accUnk = 0;
+        D.si_users.forEach(function (u) {
+            if (u.account_enabled === true)
+                accOn++;
+            else if (u.account_enabled === false)
+                accOff++;
+            else
+                accUnk++;
+        });
+        h += '<div class="dash-chart-card"><h3 class="ct-text-data">' + t("dashboard.accounts_state") + '</h3>';
+        h += window._svgDonut({ center_label: D.si_users.length, segments: [
+                { label: t("dashboard.acct_active"), value: accOn, color: "green" },
+                { label: t("dashboard.acct_disabled"), value: accOff, color: "gray" },
+                { label: t("dashboard.acct_unknown"), value: accUnk, color: "dark" }
+            ] }, { size: 124, thickness: 18 });
+        h += '</div>';
+    }
+    if (D.applications.length) {
+        // Known types first, then any legacy value so the centre total always
+        // equals the perimeter count.
+        var byType = {};
+        D.applications.forEach(function (ap) { var k = ap.type || "application"; byType[k] = (byType[k] || 0) + 1; });
+        var perimTones = { application: "blue", infrastructure: "violet", physique: "teal" };
+        var perimSegs = [];
+        ["application", "infrastructure", "physique"].concat(Object.keys(byType).sort()).forEach(function (ty) {
+            if (!byType[ty] || perimSegs.some(function (sg) { return sg.label === (t("app.type." + ty) || ty); }))
+                return;
+            perimSegs.push({ label: t("app.type." + ty) || ty, value: byType[ty], color: perimTones[ty] || "gray" });
+        });
+        h += '<div class="dash-chart-card"><h3 class="ct-text-data">' + t("dashboard.apps_by_type") + '</h3>';
+        h += window._svgDonut({ center_label: D.applications.length, segments: perimSegs }, { size: 124, thickness: 18 });
+        h += '</div>';
+        h += '<div class="dash-chart-card"><h3 class="ct-text-data">' + t("dashboard.reviews_state") + '</h3>';
+        h += window._svgBar({ buckets: [
+                { label: t("dashboard.overdue"), value: overdue.length, color: "red" },
+                { label: t("dashboard.active_reviews"), value: active, color: "orange" },
+                { label: t("dashboard.closed_reviews"), value: closed, color: "green" }
+            ] }, { width: 280, labelWidth: 130 });
+        h += '</div>';
+    }
+    var saAll = D.service_accounts || [];
+    if (saAll.length) {
+        // A single account can be both rotation-overdue and expiring: the two
+        // rows count independently (same figures as the KPIs); "ok" is the
+        // complement of their union.
+        var saOk = saAll.filter(function (sa) {
+            var left = _expiryDaysLeft(sa);
+            return !_isRotationOverdue(sa) && !(left !== null && left <= 30);
+        }).length;
+        h += '<div class="dash-chart-card"><h3 class="ct-text-data">' + t("dashboard.service_accounts") + '</h3>';
+        h += window._svgBar({ scale: saAll.length, buckets: [
+                { label: t("dashboard.sa_ok"), value: saOk, color: "green" },
+                { label: t("dashboard.rotation_overdue"), value: _countRotationOverdue(), color: "red" },
+                { label: t("dashboard.sa_expiring_short"), value: _countExpiringSoon(), color: "orange" }
+            ] }, { width: 280, labelWidth: 130 });
+        h += '</div>';
+    }
+    h += '</div>';
     if (overdue.length) {
         h += '<div class="ct-mt-4 ct-mb-4"><h3 class="ct-text-data ct-mb-2 ct-text-critical">' + t("dashboard.overdue") + '</h3>';
         overdue.forEach(function (app) {
