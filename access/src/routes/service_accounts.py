@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -14,6 +14,18 @@ from src.models import ServiceAccount, User
 from src.routes.auth_helpers import get_project_or_404
 
 router = APIRouter(prefix="/api/projects/{project_id}", tags=["service_accounts"])
+
+
+def _norm_date_expiration(v) -> str:
+    """FEAT-42 — server-side validation: '' or a valid ISO date, else 422."""
+    s = str(v or "").strip()
+    if not s:
+        return ""
+    try:
+        date.fromisoformat(s)
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=422, detail="date_expiration must be an ISO date (YYYY-MM-DD) or empty")
+    return s
 
 
 @router.get("/service-accounts")
@@ -34,6 +46,7 @@ async def create_service_account(project_id: uuid.UUID, body: dict, user: Option
         purpose=body.get("purpose", ""), secret_storage=body.get("secret_storage", "unknown"),
         rotation_policy=body.get("rotation_policy", "unknown"),
         last_rotation=body.get("last_rotation", ""),
+        date_expiration=_norm_date_expiration(body.get("date_expiration", "")),
         owners=body.get("owners") or [],
         risk_level=body.get("risk_level", "medium"),
         notes=body.get("notes", ""),
@@ -54,6 +67,8 @@ async def patch_service_account(project_id: uuid.UUID, sa_id: str, body: dict, u
     for f in ("name", "identifier", "platform", "application_id", "purpose", "secret_storage", "rotation_policy", "last_rotation", "risk_level", "notes"):
         if f in body:
             setattr(sa, f, str(body[f]) if body[f] is not None else "")
+    if "date_expiration" in body:
+        sa.date_expiration = _norm_date_expiration(body["date_expiration"])
     if "owners" in body:
         sa.owners = body["owners"] if isinstance(body["owners"], list) else []
     if "sort_order" in body:
@@ -83,6 +98,7 @@ def _to_dict(sa: ServiceAccount) -> dict:
         "purpose": sa.purpose or "", "secret_storage": sa.secret_storage or "unknown",
         "rotation_policy": sa.rotation_policy or "unknown",
         "last_rotation": sa.last_rotation or "",
+        "date_expiration": sa.date_expiration or "",
         "owners": sa.owners or [],
         "risk_level": sa.risk_level or "medium",
         "notes": sa.notes or "",

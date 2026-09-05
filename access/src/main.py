@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 
@@ -119,6 +120,13 @@ async def on_startup():
         await conn.run_sync(Base.metadata.create_all)
     logger.info("Database tables created")
     await _ensure_default_project()
+
+    # FEAT-42 — SA expiry alerts: hydrate SMTP config, start the daily loop.
+    from src.routes.internal import _hydrate_smtp_from_db
+    from src.expiry_notifier import run_scheduler
+    await _hydrate_smtp_from_db()
+    app.state.expiry_task = asyncio.create_task(run_scheduler())
+    logger.info("SA-expiry scheduler started")
 
 
 async def _ensure_default_project():

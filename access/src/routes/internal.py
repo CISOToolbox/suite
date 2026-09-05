@@ -12,14 +12,41 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.database import get_db
-from src.models import Application, Measure, Project, RequestedEntitlement, Review, ServiceAccount, SiUser
+from src.database import async_session, get_db
+from src.models import AppSettings, Application, Measure, Project, RequestedEntitlement, Review, ServiceAccount, SiUser
 from src.proof_rules import enforce_proof_evidence
+from src.settings_crypto import decrypt_setting, encrypt_setting_or_plain
 
 router = APIRouter(prefix="/api", tags=["internal"])
 logger = logging.getLogger("access-internal")
 
 SERVICE_TOKEN = os.getenv("SERVICE_TOKEN", "")
+
+# SMTP config pushed by Pilot at PUT /internal/smtp, read by src/mailer.py
+# through src.routes.internal._smtp_config. Mirrored to app_settings
+# (rows smtp.<field>) so it survives a rebuild; hydrated at startup.
+_smtp_config: dict = {}
+_SMTP_FIELDS = ("host", "port", "user", "password", "from_addr", "tls")
+
+
+async def _hydrate_smtp_from_db() -> None:
+    """Prime _smtp_config from app_settings rows smtp.* (called at startup)."""
+    try:
+        async with async_session() as db:
+            rows = (await db.execute(
+                select(AppSettings).where(AppSettings.key.like("smtp.%"))
+            )).scalars().all()
+        loaded = {}
+        for row in rows:
+            field = row.key.split(".", 1)[1]
+            if field in _SMTP_FIELDS and row.value not in (None, ""):
+                loaded[field] = decrypt_setting(row.value) if field == "password" else row.value
+        if loaded:
+            _smtp_config.clear()
+            _smtp_config.update(loaded)
+            logger.info("smtp config hydrated from app_settings (host=%s)", loaded.get("host", ""))
+    except Exception as exc:  # defensive: never block startup
+        logger.warning("smtp hydrate skipped: %s", exc)
 
 
 
@@ -55,6 +82,53 @@ def _check_service_token(request: Request) -> None:
     import secrets as _secrets
     if not token or not _secrets.compare_digest(token, SERVICE_TOKEN):
         raise HTTPException(status_code=403, detail="Invalid service token")
+
+
+# Rotation policy → days (FEAT-42: 540d/730d added). Aligned with the
+# frontend _ROT_DAYS; never/unknown deliberately absent (never overdue).
+ROT_DAYS = {"30d": 30, "60d": 60, "90d": 90, "180d": 180, "365d": 365,
+            "540d": 540, "730d": 730}
+
+
+def sa_rotation_overdue(secret_storage, rotation_policy, last_rotation, today=None) -> bool:
+    """Is a service account's secret rotation overdue?
+
+    FEAT-42: an account with no secret (``secret_storage == "none"``) has
+    nothing to rotate — never overdue. A dated policy with no recorded
+    rotation is overdue (nothing proves the secret was ever rotated).
+    Mirrors the frontend _isRotationOverdue.
+    """
+    from datetime import date as _date, timedelta
+    if (secret_storage or "") == "none":
+        return False
+    days = ROT_DAYS.get(rotation_policy or "")
+    if not days:
+        return False
+    if not last_rotation:
+        return True
+    try:
+        last = _date.fromisoformat(last_rotation)
+    except (ValueError, TypeError):
+        return False
+    return (today or _date.today()) > last + timedelta(days=days)
+
+
+def sa_expiry_bucket(date_expiration, today=None):
+    """Classify an SA's expiry: "expired", "expiring_soon" (≤30 d), or None."""
+    from datetime import date as _date, timedelta
+    exp_raw = (date_expiration or "").strip()
+    if not exp_raw:
+        return None
+    try:
+        exp = _date.fromisoformat(exp_raw)
+    except (ValueError, TypeError):
+        return None
+    today = today or _date.today()
+    if exp < today:
+        return "expired"
+    if exp <= today + timedelta(days=30):
+        return "expiring_soon"
+    return None
 
 
 def _normalize_status(s: str) -> str:
@@ -140,21 +214,19 @@ async def internal_stats(request: Request, db: AsyncSession = Depends(get_db)):
 
     # Service accounts stats
     total_service_accounts = await db.scalar(select(func.count()).select_from(ServiceAccount)) or 0
-    sa_rotation_overdue = 0
+    rotation_overdue_count = 0
+    sa_expiring_soon = 0   # FEAT-42: date_expiration within the next 30 days
+    sa_expired = 0         # FEAT-42: date_expiration already past
     if total_service_accounts:
-        _rot_days = {"30d": 30, "60d": 60, "90d": 90, "180d": 180, "365d": 365}
         sa_result = await db.execute(select(ServiceAccount))
         for sa in sa_result.scalars().all():
-            rot = _rot_days.get(sa.rotation_policy)
-            if rot and sa.last_rotation:
-                try:
-                    last = _date.fromisoformat(sa.last_rotation)
-                    if _date.today() > last + timedelta(days=rot):
-                        sa_rotation_overdue += 1
-                except (ValueError, TypeError):
-                    pass
-            elif rot and not sa.last_rotation:
-                sa_rotation_overdue += 1
+            if sa_rotation_overdue(sa.secret_storage, sa.rotation_policy, sa.last_rotation):
+                rotation_overdue_count += 1
+            bucket = sa_expiry_bucket(getattr(sa, "date_expiration", ""))
+            if bucket == "expired":
+                sa_expired += 1
+            elif bucket == "expiring_soon":
+                sa_expiring_soon += 1
 
     # FEAT-15 Lot 5: identity-referential counters.
     users_by_type = {"salarie": 0, "prestataire": 0, "stagiaire": 0, "alternant": 0}
@@ -199,10 +271,22 @@ async def internal_stats(request: Request, db: AsyncSession = Depends(get_db)):
             "text": f"{overdue} mesure(s) en retard",
             "url": "/access/",
         })
-    if sa_rotation_overdue > 0:
+    if rotation_overdue_count > 0:
         alerts.append({
             "level": "warning",
-            "text": f"{sa_rotation_overdue} compte(s) de service avec rotation en retard",
+            "text": f"{rotation_overdue_count} compte(s) de service avec rotation en retard",
+            "url": "/access/",
+        })
+    if sa_expiring_soon > 0:
+        alerts.append({
+            "level": "warning",
+            "text": f"{sa_expiring_soon} compte(s) de service expirant sous 30 jours",
+            "url": "/access/",
+        })
+    if sa_expired > 0:
+        alerts.append({
+            "level": "critical",
+            "text": f"{sa_expired} compte(s) de service expiré(s)",
             "url": "/access/",
         })
 
@@ -237,7 +321,7 @@ async def internal_stats(request: Request, db: AsyncSession = Depends(get_db)):
         "total_measures": total_measures,
         "measures_progress": progress_pct,
         "service_accounts_total": total_service_accounts,
-        "service_accounts_rotation_overdue": sa_rotation_overdue,
+        "service_accounts_rotation_overdue": rotation_overdue_count,
         # FEAT-15 Lot 5 — identity referential counters
         "users_by_type": users_by_type,
         "contracts_expiring": contracts_expiring,
@@ -955,3 +1039,51 @@ async def internal_journal(request: Request, entity_id: str = "", limit: int = 3
         "entity_id": getattr(r, "entity_id", "") or "",
         "details": (r.details or "")[:300],
     } for r in rows]
+
+
+# ── SA expiry alerts (FEAT-42) — SMTP config + manual trigger ──
+
+
+@router.put("/internal/smtp")
+async def set_smtp(request: Request, db: AsyncSession = Depends(get_db)):
+    """Receive SMTP config pushed by Pilot. Consumed by src/mailer.py.
+
+    Persists to app_settings (rows smtp.<field>) so the config survives a
+    rebuild and is available on the next startup without a Pilot re-push.
+    """
+    _check_service_token(request)
+    body = await request.json()
+    _smtp_config.clear()
+    incoming: dict = {}
+    for k in _SMTP_FIELDS:
+        if k in body and body[k] not in (None, ""):
+            _smtp_config[k] = str(body[k])
+            incoming[k] = str(body[k])
+    existing = (await db.execute(
+        select(AppSettings).where(AppSettings.key.like("smtp.%"))
+    )).scalars().all()
+    existing_by_key = {row.key: row for row in existing}
+    for field in _SMTP_FIELDS:
+        key = f"smtp.{field}"
+        row = existing_by_key.get(key)
+        if field in incoming:
+            stored = encrypt_setting_or_plain(incoming[field]) if field == "password" else incoming[field]
+            if row is None:
+                db.add(AppSettings(key=key, value=stored))
+            else:
+                row.value = stored
+        elif row is not None:
+            await db.delete(row)
+    await db.commit()
+    logger.info("smtp config received from pilot (host=%s)", _smtp_config.get("host", ""))
+    return {"ok": True}
+
+
+@router.post("/internal/expiry-notify-run")
+async def expiry_notify_run(request: Request, db: AsyncSession = Depends(get_db)):
+    """Run the SA-expiry check now (tests / on-demand), bypassing the cadence."""
+    _check_service_token(request)
+    from src.expiry_notifier import run_now
+    result = await run_now(db)
+    await db.commit()
+    return result

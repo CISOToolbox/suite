@@ -295,6 +295,8 @@ function renderDashboard() {
     var saOverdue = _countRotationOverdue();
     h += _card(saTotal, t("dashboard.service_accounts"));
     h += _card(saOverdue, t("dashboard.rotation_overdue"), _kpiTone(saOverdue, { bad: 1 }));
+    var saExpiring = _countExpiringSoon();
+    h += _card(saExpiring, t("dashboard.sa_expiring"), _kpiTone(saExpiring, { bad: 1 }));
     var plgActive = _pluginList.filter(function (p) { return p.enabled; }).length;
     h += _card(plgActive + '/' + _pluginList.length, t("nav.plugins"));
     h += '</div>';
@@ -1109,7 +1111,7 @@ window._bulkDeleteApps = function (scope) {
 function openApp(i) { _selectedApp = parseInt(i); renderPanel(); }
 window.openApp = openApp;
 function addApp() {
-    D.applications.push({ id: _genId("APP-", D.applications), nom: "", url: "", reviewers: [], frequence_revue: "semestrielle", type: "application", roles: [] });
+    D.applications.push({ id: _genId("APP-", D.applications), nom: "", url: "", reviewers: [], frequence_revue: "semestrielle", owner_email: "", type: "application", roles: [] });
     _selectedApp = D.applications.length - 1;
     renderPanel();
     _save();
@@ -1188,6 +1190,11 @@ function renderAppDetail() {
     h += '</select></div>';
     h += '<div class="app-field"><label class="app-field-lbl">URL</label>';
     h += '<input type="url" class="app-field-input" value="' + esc(a.url || "") + '" data-change="saveAppField" data-args=\'["url"]\' data-pass-value placeholder="https://..."></div>';
+    // Owner — shared user picker (ct_userpicker), mounted post-render on the
+    // slot below (same pattern as the user manager). Stores an email.
+    h += '<div class="app-field"><label class="app-field-lbl">' + t("app.owner_email") + '</label>';
+    h += '<div id="app-owner-slot"></div></div>';
+    setTimeout(_mountOwnerPicker, 0);
     h += '<div class="app-field"><label class="app-field-lbl">' + t("app.frequence") + '</label>';
     h += '<select class="app-field-input" data-change="saveAppField" data-args=\'["frequence_revue"]\' data-pass-value>';
     ["trimestrielle", "semestrielle", "annuelle"].forEach(function (f) {
@@ -1321,6 +1328,63 @@ window.deleteReviewFromApp = function (reviewId) {
 function saveAppField(field, val) { if (_selectedApp === null)
     return; D.applications[_selectedApp][field] = val; _save(); }
 window.saveAppField = saveAppField;
+var _ownerHandle = null;
+var _OWNER_EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+// Mount the shared user picker on the perimeter-owner slot (post-render) —
+// same pattern as the user manager picker. Stores the owner's EMAIL.
+function _mountOwnerPicker() {
+    var up = window.ct_userpicker;
+    if (!up || _selectedApp === null)
+        return;
+    var a = D.applications[_selectedApp];
+    if (!a)
+        return;
+    var cur = a.owner_email || "";
+    var curSu = D.si_users.find(function (x) { return !!x.email && x.email.toLowerCase() === cur.toLowerCase(); });
+    var initLabel = curSu ? ((curSu.prenom + " " + curSu.nom).trim() || curSu.email || "") : cur;
+    up.mount({
+        slotId: "app-owner-slot",
+        pickerId: "access-app-owner",
+        value: initLabel,
+        placeholder: t("app.owner_search") || "Rechercher un utilisateur…",
+        directoryUrl: "api/directory",
+    }).then(function (handle) {
+        _ownerHandle = handle;
+        ["access-app-owner-search", "access-app-owner-plain"].forEach(function (eid) {
+            var el = document.getElementById(eid);
+            if (el) {
+                el.addEventListener("blur", _commitOwner);
+                el.addEventListener("change", _commitOwner);
+            }
+        });
+        var wrap = document.getElementById("access-app-owner-wrap");
+        if (wrap)
+            wrap.addEventListener("click", function () { setTimeout(_commitOwner, 0); });
+    });
+}
+// Resolve the picked label back to an email against the referential and
+// persist it on owner_email. The backend rejects non-emails (422), so a
+// label that resolves to nothing is refused here with a status message.
+function _commitOwner() {
+    if (_selectedApp === null || !_ownerHandle)
+        return;
+    var a = D.applications[_selectedApp];
+    if (!a)
+        return;
+    var label = (_ownerHandle.getValue() || "").trim();
+    var su = D.si_users.find(function (x) {
+        return ((x.prenom + " " + x.nom).trim() === label)
+            || (!!x.email && x.email.toLowerCase() === label.toLowerCase());
+    });
+    var val = su ? (su.email || "") : label;
+    if (val && !_OWNER_EMAIL_RE.test(val)) {
+        showStatus(t("app.owner_invalid") || "Propriétaire : email introuvable", true);
+        return;
+    }
+    if ((a.owner_email || "") === val)
+        return;
+    saveAppField("owner_email", val);
+}
 function saveAppRoles(val) {
     if (_selectedApp === null)
         return;
@@ -2033,8 +2097,11 @@ window.closeReview = closeReview;
 // ═══════════════════════════════════════════════════════════════
 // SERVICE ACCOUNTS
 // ═══════════════════════════════════════════════════════════════
-var _ROT_DAYS = { "30d": 30, "60d": 60, "90d": 90, "180d": 180, "365d": 365 };
+var _ROT_DAYS = { "30d": 30, "60d": 60, "90d": 90, "180d": 180, "365d": 365, "540d": 540, "730d": 730 };
 function _isRotationOverdue(sa) {
+    // FEAT-42: an account with no secret has nothing to rotate.
+    if (sa.secret_storage === "none")
+        return false;
     var days = _ROT_DAYS[sa.rotation_policy];
     if (!days)
         return false;
@@ -2048,6 +2115,39 @@ function _isRotationOverdue(sa) {
     }
 }
 function _countRotationOverdue() { return (D.service_accounts || []).filter(_isRotationOverdue).length; }
+// FEAT-42 — days until date_expiration (negative = expired), null when unset.
+// Date-only arithmetic (UTC midnight vs UTC midnight) so the FE agrees with
+// the backend's date.fromisoformat comparison on the expiry day itself.
+function _expiryDaysLeft(sa) {
+    if (!sa.date_expiration)
+        return null;
+    try {
+        var ms = new Date(sa.date_expiration + "T00:00:00Z").getTime();
+        if (isNaN(ms))
+            return null;
+        var todayMs = new Date(new Date().toISOString().slice(0, 10) + "T00:00:00Z").getTime();
+        return Math.round((ms - todayMs) / 86400000);
+    }
+    catch (e) {
+        return null;
+    }
+}
+function _expiryBadge(sa) {
+    var left = _expiryDaysLeft(sa);
+    if (left === null)
+        return "";
+    if (left < 0)
+        return ' <span class="ct-badge" data-tone="critical" data-size="sm">' + t("svc.expired") + '</span>';
+    if (left <= 30)
+        return ' <span class="ct-badge" data-tone="high" data-size="sm">' + t("svc.expires_soon", { days: String(left) }) + '</span>';
+    return "";
+}
+function _countExpiringSoon() {
+    return (D.service_accounts || []).filter(function (sa) {
+        var left = _expiryDaysLeft(sa);
+        return left !== null && left <= 30;
+    }).length;
+}
 function _riskColor(r) { return { critical: "var(--ct-critical)", high: "var(--ct-high)", medium: "var(--ct-medium)", low: "var(--ct-low)" }[r] || "var(--ct-neutral)"; }
 function _storageLabel(s) { return t("svc.storage." + s) || s; }
 function _rotationLabel(r) { return t("svc.rotation." + r) || r; }
@@ -2061,7 +2161,7 @@ function renderSAList() {
         h += '<div class="ct-empty-state">' + t("svc.empty") + '</div>';
         return h;
     }
-    h += '<table><thead><tr><th>' + t("svc.name") + '</th><th>' + t("svc.identifier") + '</th><th>' + t("svc.platform") + '</th><th>' + t("svc.application") + '</th><th>' + t("svc.secret_storage") + '</th><th>' + t("svc.rotation_policy") + '</th><th>' + t("svc.risk_level") + '</th><th></th></tr></thead><tbody>';
+    h += '<table><thead><tr><th>' + t("svc.name") + '</th><th>' + t("svc.identifier") + '</th><th>' + t("svc.platform") + '</th><th>' + t("svc.application") + '</th><th>' + t("svc.secret_storage") + '</th><th>' + t("svc.rotation_policy") + '</th><th>' + t("svc.date_expiration") + '</th><th>' + t("svc.risk_level") + '</th><th></th></tr></thead><tbody>';
     D.service_accounts.forEach(function (sa, i) {
         var app = _findApp(sa.application_id);
         var overdue = _isRotationOverdue(sa);
@@ -2076,6 +2176,7 @@ function renderSAList() {
         if (overdue)
             h += ' <span class="ct-badge" data-tone="critical" data-size="sm">' + t("svc.rotation_overdue") + '</span>';
         h += '</td>';
+        h += '<td class="ct-text-meta">' + esc(sa.date_expiration || "-") + _expiryBadge(sa) + '</td>';
         h += '<td><span class="ct-badge" data-fill data-tone="' + _accessTone(sa.risk_level) + '">' + esc(_riskLabel(sa.risk_level)) + '</span></td>';
         h += '<td class="ct-ta-r"><button class="ct-btn mt-8 ct-py-1 ct-px-2 ct-text-label" data-write data-variant="danger" data-click="deleteServiceAccount" data-args=\'' + _da(i) + '\' data-stop>' + t("btn_delete") + '</button></td>';
         h += '</tr>';
@@ -2088,7 +2189,7 @@ window.openSA = openSA;
 function backToSA() { _selectedSA = null; renderPanel(); }
 window.backToSA = backToSA;
 function addServiceAccount() {
-    var sa = { id: _genId("SVC-", D.service_accounts || []), name: "", identifier: "", platform: "", application_id: "", purpose: "", secret_storage: "unknown", rotation_policy: "unknown", last_rotation: "", owners: [], risk_level: "medium", notes: "" };
+    var sa = { id: _genId("SVC-", D.service_accounts || []), name: "", identifier: "", platform: "", application_id: "", purpose: "", secret_storage: "unknown", rotation_policy: "unknown", last_rotation: "", date_expiration: "", owners: [], risk_level: "medium", notes: "" };
     if (!D.service_accounts)
         D.service_accounts = [];
     var pid = window.getActiveProjectId ? getActiveProjectId() : null;
@@ -2139,6 +2240,7 @@ function renderSADetail() {
     h += '<h2 class="ct-m-0">' + esc(sa.name || t("svc.add")) + '</h2>';
     if (_isRotationOverdue(sa))
         h += '<span class="ct-badge" data-tone="critical">' + t("svc.rotation_overdue") + '</span>';
+    h += _expiryBadge(sa);
     h += '<span class="ct-flex-1"></span>';
     h += '<button class="ct-btn mt-8" data-write data-variant="danger" data-click="deleteServiceAccount" data-args=\'' + _da(_selectedSA) + '\'>' + t("btn_delete") + '</button></div>';
     h += '<div class="ct-tprm-form"><div class="ct-form-grid">';
@@ -2150,10 +2252,12 @@ function renderSADetail() {
     h += '</div>';
     h += '<div class="ct-form-row"><label>' + t("svc.purpose") + '</label><textarea rows="2" class="ct-journal-body ct-bordered ct-r-sm ct-p-1 ct-text-meta ct-resize-y" data-change="saveSAField" data-args=\'["purpose"]\' data-pass-value>' + esc(sa.purpose || "") + '</textarea></div>';
     h += '<div class="ct-form-grid">';
-    h += _saSel("secret_storage", t("svc.secret_storage"), ["vault", "env_var", "key_management", "hardcoded", "unknown"].map(function (s) { return { v: s, l: _storageLabel(s) }; }), sa.secret_storage);
-    h += _saSel("rotation_policy", t("svc.rotation_policy"), ["30d", "60d", "90d", "180d", "365d", "never", "unknown"].map(function (r) { return { v: r, l: _rotationLabel(r) }; }), sa.rotation_policy);
+    h += _saSel("secret_storage", t("svc.secret_storage"), ["vault", "env_var", "key_management", "hardcoded", "other", "none", "unknown"].map(function (s) { return { v: s, l: _storageLabel(s) }; }), sa.secret_storage);
+    h += _saSel("rotation_policy", t("svc.rotation_policy"), ["30d", "60d", "90d", "180d", "365d", "540d", "730d", "never", "unknown"].map(function (r) { return { v: r, l: _rotationLabel(r) }; }), sa.rotation_policy);
     h += '</div><div class="ct-form-grid">';
     h += _saField("last_rotation", t("svc.last_rotation"), "date", sa.last_rotation);
+    h += _saField("date_expiration", t("svc.date_expiration"), "date", sa.date_expiration);
+    h += '</div><div class="ct-form-grid">';
     h += _saSel("risk_level", t("svc.risk_level"), ["critical", "high", "medium", "low"].map(function (r) { return { v: r, l: _riskLabel(r) }; }), sa.risk_level);
     h += '</div>';
     h += '<div class="ct-form-row"><label>' + t("svc.notes") + '</label><textarea rows="2" class="ct-journal-body ct-bordered ct-r-sm ct-p-1 ct-text-meta ct-resize-y" data-change="saveSAField" data-args=\'["notes"]\' data-pass-value>' + esc(sa.notes || "") + '</textarea></div>';
