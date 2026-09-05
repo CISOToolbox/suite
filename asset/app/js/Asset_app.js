@@ -164,6 +164,15 @@ function _typeColor(type) {
         return custom.color;
     return "var(--ct-ink-2)";
 }
+// CT series-color names for the dashboard donut. _svgDonut resolves color
+// NAMES through _svgSeriesColor, never raw hex — these mirror the hues of
+// _typeColor; custom types cycle through the fallback palette.
+var _TYPE_SERIES = {
+    terminal_mobile: "violet", poste_physique: "blue", poste_virtuel: "cyan",
+    serveur_physique: "redDark", serveur_virtuel: "orange",
+    systeme_exploitation: "green", application: "amber", donnees: "pink"
+};
+var _TYPE_SERIES_FALLBACK = ["indigo", "teal", "purple", "dark", "gray"];
 function _critLabel(val) { return t("asset.crit." + val) || String(val); }
 function _critColor(val) {
     var c = ["", "#22c55e", "#eab308", "#f97316", "var(--ct-critical)", "#dc2626"];
@@ -209,10 +218,18 @@ function renderDashboard() {
     h += _card(renouv, t("dashboard.renouv"), _kpiTone(renouv, { warn: 1 }));
     h += _card(expirees, t("dashboard.expirees"), _kpiTone(expirees, { bad: 1 }));
     h += '</div>';
-    // Upcoming deadlines (top 6)
+    // Upcoming deadlines (top 6) + timeline of the 8 nearest ones
     if (ech.length) {
         h += '<div class="dash-section">';
         h += '<h3 class="ct-text-data ct-mb-2">' + t("dashboard.echeances") + '</h3>';
+        var evs = ech.slice(0, 8).map(function (e) {
+            return {
+                date: e.date,
+                label: (e.asset.nom || String(e.asset.id)) + " — " + t("echeance.kind_" + e.kind),
+                status: e.bucket === "expired" ? "overdue" : e.bucket === "due" ? "in_progress" : "planned"
+            };
+        });
+        h += '<div class="ct-mb-2">' + window._svgTimeline({ events: evs }, { width: 480 }) + '</div>';
         ech.slice(0, 6).forEach(function (e) {
             var c = _echeanceColor(e.bucket);
             h += '<div class="ct-flex ct-items-center ct-gap-2 ct-py-1 ct-px-0 ct-text-meta ct-clickable" data-click="openEcheanceAsset" data-args=\'' + _da(e.asset.id) + '\'>';
@@ -224,23 +241,26 @@ function renderDashboard() {
         });
         h += '</div>';
     }
-    // Type breakdown
+    // Type breakdown (donut). Iterate over the types actually present so the
+    // centre total always equals D.assets.length, even for a legacy/unknown
+    // type value; known types keep the declared order.
     if (a.length > 0) {
+        var counts = {};
+        a.forEach(function (x) { var k = x.type || "?"; counts[k] = (counts[k] || 0) + 1; });
+        var ordered = [];
+        ASSET_TYPES.forEach(function (type) { if (counts[type])
+            ordered.push(type); });
+        Object.keys(counts).sort().forEach(function (type) { if (ordered.indexOf(type) < 0)
+            ordered.push(type); });
+        var fb = 0;
+        var segs = ordered.map(function (type) {
+            var color = _TYPE_SERIES[type] || _TYPE_SERIES_FALLBACK[(fb++) % _TYPE_SERIES_FALLBACK.length];
+            return { label: _typeLabel(type), value: counts[type], color: color };
+        });
         h += '<div class="dash-section">';
         h += '<h3 class="ct-text-data ct-mb-2">' + t("dashboard.par_type") + '</h3>';
-        h += '<div class="type-breakdown">';
-        ASSET_TYPES.forEach(function (type) {
-            var count = a.filter(function (x) { return x.type === type; }).length;
-            if (count === 0)
-                return;
-            var pct = Math.round(count / a.length * 100);
-            h += '<div class="type-bar-row">';
-            h += '<span class="type-bar-label">' + esc(_typeLabel(type)) + '</span>';
-            h += '<div class="type-bar-track"><div class="type-bar-fill" style="width:' + pct + '%;background:' + _typeColor(type) + '"></div></div>';
-            h += '<span class="type-bar-count">' + count + '</span>';
-            h += '</div>';
-        });
-        h += '</div></div>';
+        h += window._svgDonut({ center_label: a.length, segments: segs }, { size: 150, thickness: 22 });
+        h += '</div>';
     }
     // Group coverage
     if (g.length > 0) {
