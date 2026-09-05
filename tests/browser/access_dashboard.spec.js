@@ -43,7 +43,6 @@ test.describe("access dashboard charts (FEAT-44)", () => {
 
     test("gauges and account donut mirror the user base", async ({ page }) => {
         const users = await page.evaluate(() => (window.D && D.si_users ? D.si_users.length : 0));
-        const card = page.locator(".dash-chart-card");
         if (users === 0) {
             await expect(page.locator(".dash-gauge")).toHaveCount(0);
             test.info().annotations.push({ type: "warning", description: "no users — only the empty-state branch was exercised" });
@@ -54,7 +53,7 @@ test.describe("access dashboard charts (FEAT-44)", () => {
         const gbox = await page.locator(".dash-gauge .ct-svg-gauge").first().boundingBox();
         expect(gbox && gbox.width > 0 && gbox.height > 0, "gauge not painted").toBeTruthy();
         // Account-state donut: centre = user count, legend sums to it.
-        const donut = card.filter({ has: page.locator(".ct-donut-wrap") }).nth(0).locator(".ct-donut-wrap");
+        const donut = page.locator('[data-chart="accounts"] .ct-donut-wrap');
         await expect(donut.locator("svg text")).toHaveText(String(users));
         expect(await legendSum(donut)).toBe(users);
     });
@@ -67,26 +66,40 @@ test.describe("access dashboard charts (FEAT-44)", () => {
             saTotal: (D.service_accounts || []).length,
             rotOverdue: window._countRotationOverdue(),
             expiring: window._countExpiringSoon(),
+            // Same predicate as renderDashboard: overdue per application,
+            // against the latest closed review.
+            overdue: D.applications.filter((app) => {
+                let lastClosed = null;
+                D.reviews.forEach((r) => {
+                    if (r.application_id === app.id && r.status === "cloturee" && r.closed_at) {
+                        if (!lastClosed || r.closed_at > lastClosed) lastClosed = r.closed_at;
+                    }
+                });
+                return window._isReviewOverdue(app, lastClosed);
+            }).length,
         }));
         if (s.apps === 0) {
             test.info().annotations.push({ type: "warning", description: "no perimeters — only the empty-state branch was exercised" });
             return;
         }
         // Perimeter donut: centre total = perimeter count, legend sums to it.
-        const donuts = page.locator(".dash-chart-card .ct-donut-wrap");
-        const perim = donuts.nth((await page.evaluate(() => D.si_users.length)) > 0 ? 1 : 0);
+        const perim = page.locator('[data-chart="perimeters"] .ct-donut-wrap');
         await expect(perim.locator("svg text")).toHaveText(String(s.apps));
         expect(await legendSum(perim)).toBe(s.apps);
-        // Review bars carry the same three figures as the KPIs.
-        const bars = page.locator(".dash-chart-card .ct-svg-bar");
-        const reviewVals = await bars.nth(0).locator("text[text-anchor=end]").allTextContents();
-        expect(reviewVals.map(Number)).toContain(s.active);
-        expect(reviewVals.map(Number)).toContain(s.closed);
-        // Service-account bars, when accounts exist.
+        // Review bars: the three rows carry the KPI figures IN ORDER
+        // (overdue, in progress, closed) — the overdue row is the only
+        // non-trivial predicate, so it is asserted too.
+        const rowVals = (sel) => page.locator(sel + " .ct-svg-bar text[text-anchor=end]").allTextContents()
+            .then((xs) => xs.map(Number));
+        expect(await rowVals('[data-chart="reviews"]')).toEqual([s.overdue, s.active, s.closed]);
+        // Service-account bars, when accounts exist: up-to-date is the
+        // complement of the union, the two problem rows match the KPIs.
         if (s.saTotal > 0) {
-            const saVals = (await bars.nth(1).locator("text[text-anchor=end]").allTextContents()).map(Number);
-            expect(saVals).toContain(s.rotOverdue);
-            expect(saVals).toContain(s.expiring);
+            const saVals = await rowVals('[data-chart="service-accounts"]');
+            expect(saVals.length).toBe(3);
+            expect(saVals[1]).toBe(s.rotOverdue);
+            expect(saVals[2]).toBe(s.expiring);
+            expect(saVals[0]).toBeLessThanOrEqual(s.saTotal - Math.max(s.rotOverdue, s.expiring));
         }
     });
 });

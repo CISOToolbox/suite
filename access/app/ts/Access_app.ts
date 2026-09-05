@@ -324,10 +324,11 @@ function renderDashboard(): string {
     // Charts row (FEAT-44) — all derived from D, same predicates as the KPIs.
     h += '<div class="dash-charts ct-mb-4">';
     if (D.si_users.length) {
-        h += '<div class="dash-chart-card"><h3 class="ct-text-data">' + t("dashboard.compliance") + '</h3>';
+        h += '<div class="dash-chart-card" data-chart="compliance"><h3 class="ct-text-data">' + t("dashboard.compliance") + '</h3>';
         h += '<div class="ct-flex ct-gap-4">';
-        h += '<div class="dash-gauge">' + window._svgGauge(compPol, 100, { size: 100 }) + '<div class="ct-text-meta ct-muted">' + esc(t("user.politique_validee")) + '</div></div>';
-        h += '<div class="dash-gauge">' + window._svgGauge(compMfa, 100, { size: 100 }) + '<div class="ct-text-meta ct-muted">' + esc(t("user.mfa_active")) + '</div></div>';
+        var gTone = function(v: number): string { return v < 70 ? "red" : v < 90 ? "orange" : "green"; };
+        h += '<div class="dash-gauge">' + window._svgGauge(compPol, 100, { size: 100, color: gTone(compPol) }) + '<div class="ct-text-meta ct-muted">' + esc(t("user.politique_validee")) + '</div></div>';
+        h += '<div class="dash-gauge">' + window._svgGauge(compMfa, 100, { size: 100, color: gTone(compMfa) }) + '<div class="ct-text-meta ct-muted">' + esc(t("user.mfa_active")) + '</div></div>';
         h += '</div></div>';
 
         // IdP account state (FEAT-16 field); null = the IdP never reported.
@@ -337,7 +338,7 @@ function renderDashboard(): string {
             else if (u.account_enabled === false) accOff++;
             else accUnk++;
         });
-        h += '<div class="dash-chart-card"><h3 class="ct-text-data">' + t("dashboard.accounts_state") + '</h3>';
+        h += '<div class="dash-chart-card" data-chart="accounts"><h3 class="ct-text-data">' + t("dashboard.accounts_state") + '</h3>';
         h += window._svgDonut({ center_label: D.si_users.length, segments: [
             { label: t("dashboard.acct_active"), value: accOn, color: "green" },
             { label: t("dashboard.acct_disabled"), value: accOff, color: "gray" },
@@ -352,15 +353,21 @@ function renderDashboard(): string {
         D.applications.forEach(function(ap) { var k = ap.type || "application"; byType[k] = (byType[k] || 0) + 1; });
         var perimTones: Record<string, string> = { application: "blue", infrastructure: "violet", physique: "teal" };
         var perimSegs: CtDonutSegment[] = [];
+        var perimSeen: Record<string, boolean> = {};
         ["application", "infrastructure", "physique"].concat(Object.keys(byType).sort()).forEach(function(ty) {
-            if (!byType[ty] || perimSegs.some(function(sg) { return sg.label === (t("app.type." + ty) || ty); })) return;
-            perimSegs.push({ label: t("app.type." + ty) || ty, value: byType[ty], color: perimTones[ty] || "gray" });
+            if (!byType[ty] || perimSeen[ty]) return;
+            perimSeen[ty] = true;
+            // t() returns the key itself when the translation is missing —
+            // a legacy free-text type must show its raw value, not the key.
+            var lbl = t("app.type." + ty);
+            if (lbl === "app.type." + ty) lbl = ty;
+            perimSegs.push({ label: lbl, value: byType[ty], color: perimTones[ty] || "gray" });
         });
-        h += '<div class="dash-chart-card"><h3 class="ct-text-data">' + t("dashboard.apps_by_type") + '</h3>';
+        h += '<div class="dash-chart-card" data-chart="perimeters"><h3 class="ct-text-data">' + t("dashboard.apps_by_type") + '</h3>';
         h += window._svgDonut({ center_label: D.applications.length, segments: perimSegs }, { size: 124, thickness: 18 });
         h += '</div>';
 
-        h += '<div class="dash-chart-card"><h3 class="ct-text-data">' + t("dashboard.reviews_state") + '</h3>';
+        h += '<div class="dash-chart-card" data-chart="reviews"><h3 class="ct-text-data">' + t("dashboard.reviews_state") + '</h3>';
         h += window._svgBar({ buckets: [
             { label: t("dashboard.overdue"), value: overdue.length, color: "red" },
             { label: t("dashboard.active_reviews"), value: active, color: "orange" },
@@ -377,7 +384,7 @@ function renderDashboard(): string {
             var left = _expiryDaysLeft(sa);
             return !_isRotationOverdue(sa) && !(left !== null && left <= 30);
         }).length;
-        h += '<div class="dash-chart-card"><h3 class="ct-text-data">' + t("dashboard.service_accounts") + '</h3>';
+        h += '<div class="dash-chart-card" data-chart="service-accounts"><h3 class="ct-text-data">' + t("dashboard.service_accounts") + '</h3>';
         h += window._svgBar({ scale: saAll.length, buckets: [
             { label: t("dashboard.sa_ok"), value: saOk, color: "green" },
             { label: t("dashboard.rotation_overdue"), value: _countRotationOverdue(), color: "red" },
