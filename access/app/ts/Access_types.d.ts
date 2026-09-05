@@ -61,6 +61,8 @@ type AccessApplication = {
     reviewers?: string[];
     /** "trimestrielle" | "semestrielle" | "annuelle". */
     frequence_revue: string;
+    /** FEAT-42 — owner of the perimeter, recipient of SA-expiry alerts. */
+    owner_email?: string;
     /** "application" | "infrastructure" | "physique" (UI: "périmètre"). */
     type?: string;
     /** Free-text role names defined for this perimeter. */
@@ -138,11 +140,13 @@ type AccessServiceAccount = {
     platform: string;
     application_id: string;
     purpose?: string;
-    /** "vault" | "env_var" | "key_management" | "hardcoded" | "unknown". */
+    /** "vault" | "env_var" | "key_management" | "hardcoded" | "other" | "none" | "unknown". */
     secret_storage: string;
-    /** "30d" | "60d" | "90d" | "180d" | "365d" | "never" | "unknown". */
+    /** "30d" | "60d" | "90d" | "180d" | "365d" | "540d" | "730d" | "never" | "unknown". */
     rotation_policy: string;
     last_rotation: string;
+    /** FEAT-42 — ISO expiry date; "" = no expiry. */
+    date_expiration?: string;
     owners?: string[];
     /** "critical" | "high" | "medium" | "low". */
     risk_level: string;

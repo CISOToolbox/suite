@@ -168,6 +168,9 @@ class Application(Base):
     url = Column(String(500), nullable=True, default="")
     reviewers = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
     frequence_revue = Column(String(50), nullable=False, default="semestrielle")
+    # FEAT-42 — owner of the application/perimeter; recipient of the
+    # service-account expiry alerts (falls back to reviewers when empty).
+    owner_email = Column(String(255), nullable=False, default="", server_default="")
     # Perimeter typing (FEAT-15 Lot 2). UI labels "applications" as
     # "périmètres". type ∈ {application, infrastructure, physique}.
     type = Column(String(20), nullable=False, default="application", server_default="application")
@@ -301,6 +304,9 @@ class ServiceAccount(Base):
     secret_storage = Column(String(50), nullable=True, default="unknown")
     rotation_policy = Column(String(50), nullable=True, default="unknown")
     last_rotation = Column(String(20), nullable=True, default="")
+    # FEAT-42 — ISO date the account (certificate, key, contract) expires;
+    # empty = no expiry. Drives the J-30/15/7/1 owner alerts.
+    date_expiration = Column(String(20), nullable=True, default="")
     owners = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
     risk_level = Column(String(20), nullable=True, default="medium")
     notes = Column(Text, nullable=True, default="")

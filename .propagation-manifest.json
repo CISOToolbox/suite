@@ -1,6 +1,6 @@
 {
   "$comment": "Files replicated from a private upstream repository. Do NOT edit them here: the next propagation overwrites them and CI rejects local edits. See CONTRIBUTING.md, section 'Shared code'.",
-  "generated": "2026-09-04T20:04:38Z",
+  "generated": "2026-09-05T08:40:04Z",
   "checker": "check-replicated-files.py (run it in CI)",
   "files": {
     "access/app/css/cisotoolbox.css": "sha256:5ea2753462a3a7ca07305cd423ffb9668c2cc50d7662bfd47995dd948d660f6e",
@@ -67,6 +67,7 @@
     "access/src/connectors_common.py": "sha256:c689a61e7b4a1d5c05379b3eec9bf2cd1e5f8bda681c03a2cf170f006bf6c748",
     "access/src/default_project.py": "sha256:7bd5999cd1ffa89bd20f0ac275d29ec7db792f836a0bfbf41a74cb30f297a6ce",
     "access/src/directory_common.py": "sha256:d4a1457d7d5905d24884b50ec805f38964e7b08d3eb5bc3cf2bc278442c75b10",
+    "access/src/mailer_common.py": "sha256:71ca537032169fcf3e102e77aabb718c9ccfea632a841de3ab3883e66454dbd9",
     "access/src/schema_migrations.py": "sha256:b8cf9c7cd67cf6fb186a9e805a65e58911f9499adfc2dbd1444b4fd1efee1000",
     "access/src/settings_crypto.py": "sha256:f63ee8497095d9d3a6b68a7efb09bb98ffdd1e3414fea61b7e4df2a5942e3121",
     "access/src/ssrf_guard.py": "sha256:da6fe250be6511dc4843574200002fa0e7c8f0ad2762003418f169bb25028059",

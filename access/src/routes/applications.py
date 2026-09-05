@@ -38,6 +38,7 @@ async def create_application(project_id: uuid.UUID, body: dict, user: Optional[U
         nom=body.get("nom", ""), url=body.get("url", ""),
         reviewers=body.get("reviewers") or [],
         frequence_revue=body.get("frequence_revue", "semestrielle"),
+        owner_email=_norm_owner_email(body.get("owner_email")),
         type=_norm_type(body.get("type")),
         roles=_norm_roles(body.get("roles")),
     )
@@ -57,6 +58,8 @@ async def patch_application(project_id: uuid.UUID, app_id: str, body: dict, user
     for f in ("nom", "url", "frequence_revue"):
         if f in body:
             setattr(app, f, str(body[f]) if body[f] is not None else "")
+    if "owner_email" in body:
+        app.owner_email = _norm_owner_email(body["owner_email"])
     if "reviewers" in body:
         app.reviewers = body["reviewers"] if isinstance(body["reviewers"], list) else []
     if "type" in body:
@@ -253,6 +256,17 @@ def _norm_type(v) -> str:
     return v if v in _VALID_PERIM_TYPES else "application"
 
 
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def _norm_owner_email(v) -> str:
+    """FEAT-42 — server-side validation: '' or a plausible email, else 422."""
+    s = str(v or "").strip()
+    if s and not _EMAIL_RE.match(s):
+        raise HTTPException(status_code=422, detail="owner_email must be an email address or empty")
+    return s
+
+
 def _norm_roles(v) -> list:
     if not isinstance(v, list):
         return []
@@ -264,6 +278,7 @@ def _to_dict(a: Application) -> dict:
         "id": a.id, "nom": a.nom, "url": a.url,
         "reviewers": a.reviewers or [],
         "frequence_revue": a.frequence_revue,
+        "owner_email": a.owner_email or "",
         "type": a.type or "application",
         "roles": a.roles or [],
     }
