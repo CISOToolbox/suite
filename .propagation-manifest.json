@@ -1,6 +1,6 @@
 {
   "$comment": "Files replicated from a private upstream repository. Do NOT edit them here: the next propagation overwrites them and CI rejects local edits. See CONTRIBUTING.md, section 'Shared code'.",
-  "generated": "2026-09-05T20:36:11Z",
+  "generated": "2026-09-06T06:05:45Z",
   "checker": "check-replicated-files.py (run it in CI)",
   "files": {
     "access/app/css/cisotoolbox.css": "sha256:3143b0ac334266cfbd1878b7d992ee132425a531ce1c52954dfaf6c35c5ded09",
@@ -284,6 +284,7 @@
     "audit/src/version_common.py": "sha256:89908ccc1c6a5b7da95511dc3c79574bb2b1448d0decd8c0a5eca890e07c7329",
     "audit/tests/e2e/conftest.py": "sha256:07bc58dc6cb84019e12690fcfc5bd5621e7a5ff6b0fb6f3f2ea27cc6b5c1ea88",
     "audit/tests/e2e/test_posture.py": "sha256:1d739858144c91343f3ec5defc972e9a6c93367158c24b46624bf1d4de976b51",
+    "check-replicated-files.py": "sha256:dc673db3a6c15a1e07766588847ca47ba21be77f6b1a6f660c5d3efc33c10da9",
     "compliance/app/css/cisotoolbox.css": "sha256:3143b0ac334266cfbd1878b7d992ee132425a531ce1c52954dfaf6c35c5ded09",
     "compliance/app/css/login.css": "sha256:6f42bd1422b982ecdc267876c7bfc423c660603b0a63362a0ebc628be34cf607",
     "compliance/app/fonts/IBMPlexMono-Medium.woff2": "sha256:309f31ec72260a823fc712000504015fe43f2aba3d80835516b63ae10a10a5db",
@@ -473,7 +474,6 @@
     "risk/app/js/i18n_core_en.js": "sha256:c77e03a122414dbb4f792cf37bd63eff690eac49d0f44359bca986b8142bde64",
     "risk/app/js/i18n_core_fr.js": "sha256:44a93aa916f5f333c6b8226645d04681f2cb3c3a71652a7f3b2a2a0a8c6a09ee",
     "risk/app/js/login.js": "sha256:efd780489f8162360988a79b252c0dfe82ac5fb1647adebc550015d39824c4c9",
-    "risk/app/js/referentiels_catalog.js": "sha256:46ca91890703b5b0540c6ffa7fcbe0808665b3cc2bb59c7dbad91bc586f6cf02",
     "risk/app/ts/types/ai_backend.d.ts": "sha256:eadccd4374af615aa93de1e00bf4e7dbcb180a4b60d5a80445626a695d6708ba",
     "risk/app/ts/types/ai_common.d.ts": "sha256:24136ff532b1cb1d1a91b669992d0a29b16a60510dc91ff6c5e7c2dc3e2ebe8e",
     "risk/app/ts/types/cisotoolbox.d.ts": "sha256:208ab82b11aa73ab72ef2deb05dfb193fbedc1045b65404a8d5d2aef611fb543",
@@ -491,7 +491,6 @@
     "risk/app/ts/types/i18n_core_en.d.ts": "sha256:19c006c31760a6886a053f6cf9b9d3cd02a36f96363db972d44e45fc03980190",
     "risk/app/ts/types/i18n_core_fr.d.ts": "sha256:fa39368005b6e15cce6e8664fb3c251ecfb95d919be42ff39072de616f4f5875",
     "risk/app/ts/types/login.d.ts": "sha256:f8228a0f22d7d96bbece5676f1277f92288ba95f852c0397d37bb0f3201d298f",
-    "risk/app/ts/types/referentiels_catalog.d.ts": "sha256:6cb94fb6957590340dbe71424b649569ed34365c410451bcfe6938f037261598",
     "risk/src/ai_models_common.py": "sha256:f56a2bc042de6fc6520158af2e52f0c937c92c9eeda19b03a0cce1d2ca14c422",
     "risk/src/ai_proxy_common.py": "sha256:5f2c510a8849ab78445a7c69bc550b0f3a7dedf98a25d288a94b26bd37917c43",
     "risk/src/auth_common.py": "sha256:a6729cae84f1a819776ad05cab71534c8d3bfeea3ee7c162de86ab9cd3b7eed3",

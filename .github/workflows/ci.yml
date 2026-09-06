@@ -37,6 +37,11 @@ jobs:
         run: python3 tests/test_schema_migrations.py
       - name: contrats de suite (prompts, add-ons, secrets, SSRF…)
         run: pytest tests/test_suite_contracts.py -q
+      - name: fichiers répliqués intacts
+        # Replicated files (shared design system, i18n runtime, shared Python
+        # helpers) are generated from an upstream source and overwritten on
+        # the next sync: a local edit is silently lost. This gate rejects it.
+        run: python3 check-replicated-files.py
 
   unit:
     name: unit ${{ matrix.module }}
