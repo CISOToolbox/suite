@@ -323,3 +323,9 @@ mark.admin-term {
 
 /* Extracted from the markup: the class existed, its styling lived next to it. */
 .plg-type-card { padding:8px 10px; border:2px solid var(--ct-line); border-radius:6px; cursor:pointer; font-size:var(--ct-text-label); transition:border-color 0.15s; }
+
+/* ── Dashboard charts row (FEAT-44) ─────────────────────────────── */
+.dash-charts { display: flex; flex-wrap: wrap; gap: 12px; align-items: stretch; }
+.dash-chart-card { background: var(--ct-surface); border: 1px solid var(--ct-line); border-radius: 8px; padding: 14px; flex: 1 1 220px; max-width: 340px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.dash-chart-card h3 { margin: 0; }
+.dash-gauge { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; }
