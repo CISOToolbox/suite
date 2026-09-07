@@ -68,19 +68,27 @@ async def internal_stats(request: Request, db: AsyncSession = Depends(get_db)):
     from datetime import date as _date
 
     total_findings = await db.scalar(select(func.count()).select_from(Finding)) or 0
+    # FEAT-37 (criterion 11) — the vulnerability counters and the posture derive
+    # from OPEN findings that ARE vulnerabilities. Two exclusions:
+    #   - closed_upstream is not in the open list: the upstream source no
+    #     longer reports it, it must not weigh on the posture;
+    #   - defender_recommendation is a REMEDY (one recommendation covers many
+    #     machines), not one more vulnerability: counting it would degrade the
+    #     posture mechanically the day the connector is enabled.
     open_filter = Finding.status.in_(["new", "to_fix", "in_progress"])
+    vuln_filter = (open_filter & (Finding.type != "defender_recommendation"))
 
     crit = await db.scalar(
-        select(func.count()).select_from(Finding).where(open_filter, Finding.severity == "critical")
+        select(func.count()).select_from(Finding).where(vuln_filter, Finding.severity == "critical")
     ) or 0
     high = await db.scalar(
-        select(func.count()).select_from(Finding).where(open_filter, Finding.severity == "high")
+        select(func.count()).select_from(Finding).where(vuln_filter, Finding.severity == "high")
     ) or 0
     med = await db.scalar(
-        select(func.count()).select_from(Finding).where(open_filter, Finding.severity == "medium")
+        select(func.count()).select_from(Finding).where(vuln_filter, Finding.severity == "medium")
     ) or 0
     low = await db.scalar(
-        select(func.count()).select_from(Finding).where(open_filter, Finding.severity == "low")
+        select(func.count()).select_from(Finding).where(vuln_filter, Finding.severity == "low")
     ) or 0
     new_findings = await db.scalar(select(func.count()).select_from(Finding).where(Finding.status == "new")) or 0
     fp_findings = await db.scalar(select(func.count()).select_from(Finding).where(Finding.status == "false_positive")) or 0
@@ -115,11 +123,22 @@ async def internal_stats(request: Request, db: AsyncSession = Depends(get_db)):
     ]
     scale = max((b["value"] for b in buckets), default=1) or 1
 
-    # Top 3 hosts with the most critical/high open findings
+    # Top 3 hosts with the most critical/high open findings.
+    # FEAT-37 — group on the host a finding ATTACHES to, not on its raw
+    # target: connector findings carry an opaque stable target
+    # (machineId|cveId|productName) and name their host in the evidence.
+    # Keying on the raw target sent those strings to Pilot as "hosts" — the
+    # documented symptom of the first delivery. COALESCE(evidence->>'hostname',
+    # target) works on PostgreSQL (JSONB) and on the JSON type the unit tests
+    # substitute under SQLite.
     from sqlalchemy import case as sa_case
+    host_key = func.coalesce(
+        func.nullif(Finding.evidence["hostname"].as_string(), ""),
+        Finding.target,
+    ).label("host_key")
     host_sev = (
         select(
-            Finding.target,
+            host_key,
             func.count().label("cnt"),
             func.sum(sa_case(
                 (Finding.severity == "critical", 10),
@@ -127,8 +146,8 @@ async def internal_stats(request: Request, db: AsyncSession = Depends(get_db)):
                 else_=1,
             )).label("weight"),
         )
-        .where(open_filter, Finding.target.isnot(None), Finding.target != "")
-        .group_by(Finding.target)
+        .where(vuln_filter, Finding.target.isnot(None), Finding.target != "")
+        .group_by(host_key)
         .order_by(func.sum(sa_case(
             (Finding.severity == "critical", 10),
             (Finding.severity == "high", 3),
@@ -138,8 +157,8 @@ async def internal_stats(request: Request, db: AsyncSession = Depends(get_db)):
     )
     host_result = await db.execute(host_sev)
     top_items = [{
-        "id": row.target,
-        "label": (row.target or "")[:80],
+        "id": row.host_key,
+        "label": (row.host_key or "")[:80],
         "severity": "critical" if row.weight >= 10 else "high",
         "url": "/surface/",
         "meta": f"{row.cnt} finding(s)",
