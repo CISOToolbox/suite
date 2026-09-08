@@ -139,7 +139,7 @@ services:
     # the database answered, leaving a stanza with no base backup — and so no
     # recovery window — until the next scheduled run.
   pilot-app:
-    image: ghcr.io/cisotoolbox/ciso-pilot-suite:v1.1.2@sha256:0bef52dbb2cef3bbea2254a4ce0657199ca4ed95dd92346a268fe9945808464d
+    image: ghcr.io/cisotoolbox/ciso-pilot-suite:v1.1.3@sha256:f3db3629a4febc1ae5f315dc1d848d868a2bbf9770984f32d17c64bbd7577fe9
     container_name: ciso-pilot
     restart: unless-stopped
     read_only: true
@@ -276,7 +276,7 @@ services:
   # ════════════════════════════════════════════════════════════
 
   risk-app:
-    image: ghcr.io/cisotoolbox/ciso-risk-suite:v1.0.3@sha256:b864da284e7fc9ac8dbe4765f31780994fb094da1403b1f7d75638ee05650436
+    image: ghcr.io/cisotoolbox/ciso-risk-suite:v1.0.4@sha256:a99ba2e0a11e788bee9c232020a62a3d926fbf74936b00b9ebe0517f37b855ff
     container_name: ciso-risk
     restart: unless-stopped
     read_only: true
@@ -382,7 +382,7 @@ services:
   # ════════════════════════════════════════════════════════════
 
   vendor-app:
-    image: ghcr.io/cisotoolbox/ciso-vendor-suite:v1.1.3@sha256:7bd86bdb48de266bd7080e87a1d0a35691ed1b97d72a20789babfe62f4bbf817
+    image: ghcr.io/cisotoolbox/ciso-vendor-suite:v1.2.0@sha256:65fc6fd95f99b23d8836b84a06bbb846c3d5210ca2b8b876dd63633b47db019d
     container_name: ciso-vendor
     restart: unless-stopped
     read_only: true
@@ -487,7 +487,7 @@ services:
   # ════════════════════════════════════════════════════════════
 
   compliance-app:
-    image: ghcr.io/cisotoolbox/ciso-compliance-suite:v1.0.3@sha256:b7016534335498c124db93aafe8bc31dc90afa9cffaa1db95ca777ba31ff1ffa
+    image: ghcr.io/cisotoolbox/ciso-compliance-suite:v1.0.4@sha256:807d9de86687e6f32ee5234ea0691a73b47d37ff93b3db5a501b91b52fc14aeb
     container_name: ciso-compliance
     restart: unless-stopped
     read_only: true
@@ -592,7 +592,7 @@ services:
   # ════════════════════════════════════════════════════════════
 
   asset-app:
-    image: ghcr.io/cisotoolbox/ciso-asset-suite:v1.0.3@sha256:8fe81de71aeb9a46dcf2ace68f396f70d8bfa26f60af7d043e39b30e934637f3
+    image: ghcr.io/cisotoolbox/ciso-asset-suite:v1.1.0@sha256:f6be620af10ec3b5246fef4b7670e13aaf73224e35c6e7beb168068fa1cd9ba1
     container_name: ciso-asset
     restart: unless-stopped
     read_only: true
@@ -697,7 +697,7 @@ services:
   # ════════════════════════════════════════════════════════════
 
   audit-app:
-    image: ghcr.io/cisotoolbox/ciso-audit-suite:v1.0.3@sha256:745562aa5f70c3929d399231274536299479484a30e7148fdf42c4ea1394e0b3
+    image: ghcr.io/cisotoolbox/ciso-audit-suite:v1.0.4@sha256:4aedb45d2c7c61697f7ee3927fd6ddeb1fdf9e94b0946756aa692600e5e5f5ed
     container_name: ciso-audit
     restart: unless-stopped
     read_only: true
@@ -802,7 +802,7 @@ services:
   # ════════════════════════════════════════════════════════════
 
   access-app:
-    image: ghcr.io/cisotoolbox/ciso-access-suite:v1.1.2@sha256:2ad91a03debbc2c84187e4be19b39b6da0004d5caa37feda35c5bcbcd5cb2968
+    image: ghcr.io/cisotoolbox/ciso-access-suite:v1.2.0@sha256:47c768f37aadeec2fec2b65723afd1d92437650e59232998be52f0a4442955c5
     container_name: ciso-access
     restart: unless-stopped
     read_only: true
@@ -912,7 +912,7 @@ services:
   # ════════════════════════════════════════════════════════════
 
   surface-app:
-    image: ghcr.io/cisotoolbox/ciso-surface-suite:v1.3.1@sha256:bdfe44b6edeaf3a886558ae8cb632745f0d66a7d0e2604964440f754b70690fa
+    image: ghcr.io/cisotoolbox/ciso-surface-suite:v1.4.0@sha256:45fb38645a6fa198fc278eb4cdc2a862b3a745e2813aa5e2c2abbc14a5aa9cb4
     container_name: ciso-surface
     restart: unless-stopped
     read_only: true
@@ -1037,7 +1037,7 @@ services:
   # ════════════════════════════════════════════════════════════
 
   appsec-app:
-    image: ghcr.io/cisotoolbox/ciso-appsec-suite:v1.1.3@sha256:029809dcaa9d3aa3030771b0520522d243e2c2b9f3d8fe40f1a9539e1d7814ef
+    image: ghcr.io/cisotoolbox/ciso-appsec-suite:v1.1.4@sha256:121d8d9cf294f60fa911f8520e26c4dcc1e0b9affa12719dc28b8546bda6d6f1
     container_name: ciso-appsec
     restart: unless-stopped
     read_only: true
@@ -1151,7 +1151,7 @@ services:
   # modules: auth delegated to pilot, JWT secret derived by HKDF, settings
   # encrypted via ENCRYPTION_KEY.
   watch-app:
-    image: ghcr.io/cisotoolbox/ciso-watch-suite:v1.0.3@sha256:c40d5b15f1bd9e0ef237e7c3e81a95e694358c384ec712ae88383fa40285f321
+    image: ghcr.io/cisotoolbox/ciso-watch-suite:v1.0.4@sha256:b30a382c20c01246fda52644d841f95fab60f0204c78b75655116523333c88b8
     container_name: ciso-watch
     restart: unless-stopped
     read_only: true
