@@ -1,13 +1,12 @@
 # -----------------------------------------------------------------------------
-# REPLICATED from the private shared repository (shared/python/connectors_common.py).
-# DO NOT EDIT HERE - changes will be overwritten by the next propagation run.
-# Fix the master in the shared repository and re-propagate. See CONTRIBUTING.md.
+# Generated file - do not edit.
+# It is overwritten at every release; a change made here is lost.
+# See CONTRIBUTING.md.
 # -----------------------------------------------------------------------------
 """Shared connector framework for CISO Toolbox backend modules.
 
-This file is COPIED into each module's src/ directory. Do NOT edit the
-per-module copies — edit the original at shared/python/connectors_common.py
-and propagate (manual copy, same flow as auth_common.py).
+An identical copy of this file ships in every module's src/ directory.
+Do NOT edit the per-module copies: open an issue describing the change.
 
 ## What this module provides
 
@@ -48,7 +47,7 @@ When `CONNECTORS_MANAGED_BY_PILOT=true`, the module reports
 (returns 403). Pilot reaches the module via the bypass route
 `PUT /api/internal/connectors/<id>` authenticated by `X-Service-Token`.
 
-This mirrors the AI managed pattern from CLAUDE.md §"AI integration".
+This mirrors the AI managed pattern from the managed AI integration pattern.
 """
 from __future__ import annotations
 

@@ -3,9 +3,9 @@
  * Right-hand sliding panel for AI assistant interactions.
  * Same look & feel as Risk's ai_common.js panel, scoped to Pilot.
  */
-// cisotoolbox_backend variant (P1 factored master): Pilot must NOT unwrap
+// cisotoolbox_backend variant (P1 factored source): Pilot must NOT unwrap
 // the Pilot backup format {"module":...,"data":[...]} when importing its own
-// files. The flag is read at use time by the cisotoolbox_backend.js master —
+// files. The flag is read at use time by the cisotoolbox_backend.js source —
 // set here because pilot_ai_panel.js is the first Pilot-specific script
 // loaded by index.html (no inline script, CSP).
 window._CT_IMPORT_NO_UNWRAP = true;

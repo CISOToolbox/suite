@@ -4,7 +4,7 @@ module's connectors_common.py, not just Pilot's.
 Pilot's `connectors_admin` fans a `DELETE /api/internal/connectors/{id}` out to
 each consumer module when an admin deletes a connector. That receiver route was
 added to Pilot's copy of connectors_common.py only; access/asset (and the
-shared master) kept the older 718-line copy without it, so the fan-out hit 405
+shared source) kept the older 718-line copy without it, so the fan-out hit 405
 and the module silently kept the connector's stored credentials. The fix
 re-syncs one canonical connectors_common.py across all copies.
 """
@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from src.connectors_common import ConnectorBinding, make_router  # noqa: E402
 
-REPO = Path(__file__).resolve().parents[3]  # demo-docker root
+REPO = Path(__file__).resolve().parents[3]  # repository root
 
 
 def test_connectors_common_identical_across_modules():

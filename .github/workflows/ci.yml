@@ -1,12 +1,8 @@
-# CI for this repository — the mechanical gates of the PR flow.
+# CI for this repository — the mechanical gates of the pull-request flow.
 #
-# This file is GENERATED: do not edit it here, edit the upstream source.
-# Each gate matches a class of defect that was actually shipped on 2026-09-02
-# despite written instructions. The adversarial review covers what the
-# mechanical gates cannot see: commit claims, spec criteria, blind spots.
-# The gates that run before the code reaches this repository (i18n,
-# source-tree consistency) are held upstream, by the pre-commit hook and by
-# the publishing step.
+# Each gate matches a class of defect that was actually shipped once despite
+# written instructions. Code review covers what mechanical gates cannot see:
+# commit claims, spec criteria, blind spots.
 #
 # Actions pinned by commit: checkout v4.2.2, setup-python v5.4.0.
 name: ci
@@ -18,30 +14,43 @@ on:
 
 jobs:
   gates:
-    name: gates mécaniques
+    name: mechanical gates
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
         with:
           python-version: "3.12"
-      - name: outillage
+      - name: tooling
         run: pip install --quiet "ruff==0.6.9" pytest pytest-asyncio pydantic fastapi httpx
-      - name: noms non définis (F821) — la classe « import manquant → 500 »
+      - name: undefined names (F821) — the “missing import → 500” class
         run: ruff check --select F821 */src
-      - name: sentinelle auth (§4.4)
+      - name: auth sentinel (user is None means auth disabled)
         run: pytest tests/test_auth_sentinel.py -q
-      - name: migrations de schéma exporté (FEAT-36)
+      - name: exported schema migrations
         # Hand-written stdlib script (0 tests collected by pytest → exit 5):
         # run it the way the pre-commit hook does.
         run: python3 tests/test_schema_migrations.py
-      - name: contrats de suite (prompts, add-ons, secrets, SSRF…)
+      - name: suite contracts (prompts, add-ons, secrets, SSRF…)
         run: pytest tests/test_suite_contracts.py -q
-      - name: fichiers répliqués intacts
-        # Replicated files (shared design system, i18n runtime, shared Python
-        # helpers) are generated from an upstream source and overwritten on
-        # the next sync: a local edit is silently lost. This gate rejects it.
-        run: python3 check-replicated-files.py
+
+  release:
+    name: release gates
+    # The composition is a manifest: every tag it pins must exist on the
+    # module's repository and as a multi-arch image, and every image must be
+    # pinned by digest. Cheap, network-only, and it is what turns a forgotten
+    # tag into a red check instead of a failed deployment. --strict (pins equal
+    # to the VERSION files) only on a release/* branch: between two suite
+    # releases a module VERSION may run ahead of its pin.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: skopeo
+        run: sudo apt-get update -qq >/dev/null && sudo apt-get install -y --no-install-recommends skopeo >/dev/null
+      - name: versions, pins, matrix, public tags, images
+        run: bash tools/release-check.sh --remote ${{ startsWith(github.head_ref, 'release/') && '--strict' || '' }}
+      - name: every image pinned by digest
+        run: bash tools/pin-images.sh --check
 
   unit:
     name: unit ${{ matrix.module }}
@@ -57,22 +66,22 @@ jobs:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: ${{ matrix.module }}/requirements.txt
-      - name: dépendances du module
+      - name: module dependencies
         # aiosqlite: the unit tests substitute SQLite for PostgreSQL — a TEST
         # dependency, deliberately absent from the image requirements.
         run: pip install --quiet pytest pytest-asyncio aiosqlite -r ${{ matrix.module }}/requirements.txt
-      - name: tests unitaires
+      - name: unit tests
         # access/asset carry documented pre-existing failures (modules under
         # development): their suites run but do NOT block YET.
         # Remove this tolerance as soon as they pass.
         run: |
           cd ${{ matrix.module }}
           if [ ! -d tests/unit ]; then
-            echo "aucun tests/unit — module sans backend testé unitairement (audit)"
+            echo "no tests/unit — module without unit-tested backend (audit)"
             exit 0
           fi
           if [ "${{ matrix.module }}" = "access" ] || [ "${{ matrix.module }}" = "asset" ]; then
-            pytest tests/unit/ -q || echo "::warning::échecs préexistants tolérés (${{ matrix.module }})"
+            pytest tests/unit/ -q || echo "::warning::pre-existing failures tolerated (${{ matrix.module }})"
           else
             pytest tests/unit/ -q
           fi

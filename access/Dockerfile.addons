@@ -1,5 +1,5 @@
 # Client add-on overlay — layers selected add-on connectors on top of a core
-# Access image. Built by shared/build-client-image.sh, which stages the chosen
+# Access image. Built by tools/build-client-image.sh, which stages the chosen
 # addons into .client-addons/ (build context). NOT used by the suite image.
 #
 #   BASE = a core Access image (e.g. ciso-access:local, or a pinned

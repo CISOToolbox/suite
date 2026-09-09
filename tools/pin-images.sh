@@ -12,8 +12,9 @@
 #  resolving the tag to a digest with `skopeo inspect` (falls back to
 #  `docker buildx imagetools inspect`). An image already carrying an `@sha256:`
 #  is re-resolved from its tag, so re-running after a release refreshes the pin.
-#  An image whose repository does not exist yet in the registry is reported and
-#  left on its tag — pin it once it is published.
+#  An image absent from the registry is an error (exit 1): a compose that pins
+#  a tag nobody published is not a release. `--allow-missing` reports and
+#  leaves it on its tag instead (bootstrap of a brand-new module).
 #
 #  Run it at RELEASE time, from the suite root:
 #      bash tools/pin-images.sh              # rewrite docker-compose.yml
@@ -26,8 +27,14 @@ set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 COMPOSE="docker-compose.yml"
-CHECK=0
-[ "${1:-}" = "--check" ] && CHECK=1
+CHECK=0; ALLOW_MISSING=0
+for a in "$@"; do
+  case "$a" in
+    --check) CHECK=1 ;;
+    --allow-missing) ALLOW_MISSING=1 ;;
+    *) echo "unknown option: $a" >&2; exit 2 ;;
+  esac
+done
 
 [ -f "$COMPOSE" ] || { echo "ERROR: $COMPOSE not found (run from the suite root)" >&2; exit 2; }
 
@@ -78,7 +85,7 @@ changed=0 missing=0 already=0
 for ref in "${refs[@]}"; do
   dg="$(resolve "$ref")"
   if [ -z "$dg" ]; then
-    echo "  ??  $ref — not in the registry, left on its tag"
+    echo "  ??  $ref — not in the registry"
     missing=$((missing+1)); continue
   fi
   status="$(python3 - "$COMPOSE" "$ref" "$ref@$dg" <<'PY'
@@ -102,5 +109,12 @@ PY
 done
 echo "──"
 echo "pinned $changed, already-current $already, not-in-registry $missing"
-[ "$missing" != 0 ] && echo "NOTE: $missing image(s) not published yet — re-run after they are."
+if [ "$missing" != 0 ]; then
+  if [ "$ALLOW_MISSING" = 1 ]; then
+    echo "NOTE: $missing image(s) not published yet, left on their tag (--allow-missing)."
+    exit 0
+  fi
+  echo "ERROR: $missing image(s) not in the registry — publish them first (or --allow-missing)." >&2
+  exit 1
+fi
 exit 0

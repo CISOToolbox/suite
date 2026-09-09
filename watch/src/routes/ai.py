@@ -477,7 +477,7 @@ async def set_ai_keys(body: dict, request: Request, db: AsyncSession = Depends(g
         require_admin(user)
     async def _upsert(key: str, value: str) -> None:
         # Encrypt credentials at rest, like every other module does through
-        # shared/python/ai_proxy_common.py. Watch carries its own copy of this
+        # ai_proxy_common.py. Watch carries its own copy of this
         # route and stored the provider keys in cleartext: a stolen pg_dump
         # handed them over as-is.
         if value and is_secret_key(key):

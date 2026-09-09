@@ -36,9 +36,9 @@ App dictionaries are **authored in TypeScript** (`app/ts/…`) and compiled to
    # then edit: keep every key, translate every value
    ```
 2. Translate the **core dictionary** once (same shape as
-   `app/js/i18n_core_en.js`): it is maintained as a shared master upstream,
-   so contribute it as `i18n_core_xx` alongside your PR — maintainers wire
-   it into the shared tree and the build distributes it to every app.
+   `app/js/i18n_core_en.js`): it is shared by every app,
+   so contribute it as `i18n_core_xx` alongside your PR — the maintainers
+   ship it to every app in the next release.
 
 ### Translation rules
 

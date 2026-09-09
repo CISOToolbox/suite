@@ -3,7 +3,7 @@ from src.plugins.base import AccessPlugin
 # The registry is populated ONLY by the add-on loader below. All concrete
 # connectors now live as add-ons under addons/generic/<name>/ (shareable) or
 # addons/custom/<client>/ (client-specific), baked into an image at build time
-# via shared/build-client-image.sh. The core image ships ZERO connectors so a
+# via tools/build-client-image.sh. The core image ships ZERO connectors so a
 # client deploys only what it selects. base.py and _graph_auth.py stay here
 # (shared framework, imported by the connectors).
 PLUGIN_REGISTRY: dict[str, type[AccessPlugin]] = {}

@@ -68,7 +68,7 @@ ruvector.db
 # Claude Code session dir
 .claude/
 
-# Client add-on build staging (shared/build-client-image.sh)
+# Client add-on build staging (tools/build-client-image.sh)
 access/.client-addons/
 surface/.client-addons/
 */.client-addons/

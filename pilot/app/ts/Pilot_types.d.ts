@@ -1,5 +1,5 @@
 /**
- * Pilot_types.d.ts — data model of the Pilot front end (demo-docker).
+ * Pilot_types.d.ts — data model of the Pilot front end (backend).
  *
  * The stats v2 envelope (PilotStatsEnvelope) follows the authoritative
  * contract shared/docs/pilot-dashboard-contract.md: every backend module

@@ -5,39 +5,29 @@ suite**: Pilot plus the nine backend modules behind one nginx edge, wired by
 `docker-compose.yml`. A few things about it are unusual — please read this
 before opening a pull request.
 
-## This repository is partly replicated and partly generated
+## Generated files
 
-The suite is developed in a private monorepo and published here. Files fall into
-three categories:
+Some files in this repository are generated and must not be edited here — the
+next release overwrites them and the change is lost. They carry a header that
+says so:
 
 | Category | Where | Editable here? |
 |----------|-------|----------------|
 | Module code | `<module>/src/`, `<module>/alembic/`, `<module>/app/ts/`, `<module>/Dockerfile`, `docker-compose.yml`, `nginx.conf`, `backup-agent/` | **Yes** |
-| Replicated Python helpers | `<module>/src/*_common.py`, `<module>/src/settings_crypto.py`, `<module>/src/ssrf_guard.py`, `pilot/src/settings_crypto.py`, … | **No** |
-| Generated frontend assets | `<module>/app/js/*.js` and `app/css/*.css` carrying a `GENERATED` header | **No** |
+| Shared Python helpers | `<module>/src/*_common.py`, `<module>/src/settings_crypto.py`, `<module>/src/ssrf_guard.py`, … (header "Generated file - do not edit") | **No** |
+| Shared frontend assets | `<module>/app/js/*.js` and `app/css/*.css` carrying the same header | **No** |
 
-### Replicated Python helpers
+The shared Python helpers (`auth_common.py`, `settings_crypto.py`,
+`audit_common.py`, `backup_common.py`, `version_common.py`,
+`ai_proxy_common.py`, `ssrf_guard.py`…) are identical in every module on
+purpose: a fix that lands in one module only is exactly the class of bug they
+exist to prevent. The shared frontend (design system, i18n runtime, common
+widgets) is compiled once and shipped into each module's `app/js/` and
+`app/css/`. Module-specific TypeScript lives in `app/ts/` and **is** editable;
+a file in `app/js/` without the header is module-specific build output.
 
-Files such as `auth_common.py`, `settings_crypto.py`, `audit_common.py`,
-`backup_common.py`, `version_common.py`, `ai_proxy_common.py` and
-`ssrf_guard.py` are **verbatim copies** of a single master kept in the shared
-backend library. Each one carries a `REPLICATED` banner. Every module ships the
-same copy, so a patch applied to one here would be silently reverted on the next
-propagation *and* would leave the other modules unfixed — exactly the class of
-bug (a fix landing in one module only) the shared master exists to prevent.
-**Open an issue describing the change instead**, and it will be applied to the
-master and propagated to every module at once.
-
-### Generated frontend assets
-
-The shared TypeScript (`shared/ts/`) and stylesheets are compiled once in the
-private monorepo and distributed into each module's `app/js/` and `app/css/`,
-each file prefixed with a `GENERATED` banner. Module-specific TypeScript lives
-in `app/ts/` and **is** editable — it is compiled in place. A file in `app/js/`
-without a `GENERATED` header is module-specific build output.
-
-The practical rule for both banners is identical: **the file is overwritten on
-the next run, so do not edit it here.**
+**To change a generated file, open an issue describing the change**: it is
+applied at the source and reaches every module in the next release.
 
 ## Development
 

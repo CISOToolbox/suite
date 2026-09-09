@@ -1,5 +1,5 @@
 /**
- * AppSec — Application Security Scanner (demo-docker front).
+ * AppSec — Application Security Scanner (backend front).
  * Data-model types (objects served by the FastAPI API) + globals set by
  * appsec_api.ts / AppSec_app.ts. Pure type file (no emit).
  *

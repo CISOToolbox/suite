@@ -1,6 +1,6 @@
 """Pilot AI routes — intentionally NOT migrated to the shared ai_proxy_common.
 
-The AI-proxy factorization (shared/python/ai_proxy_common.py + make_ai_router())
+The AI-proxy factorization (ai_proxy_common.py + make_ai_router())
 covers the eight *consumer* modules. Pilot is the AI *hub/manager* and keeps
 its own purpose-built routes because its surface is deliberately different:
 
@@ -12,10 +12,10 @@ its own purpose-built routes because its surface is deliberately different:
   - it lacks the schema (AIRuntimeResponse) and infra (_custom_llm,
     routes/internal) that the shared proxy assumes.
 
-Forcing Pilot onto make_ai_router() would either weaken the shared master
+Forcing Pilot onto make_ai_router() would either weaken the shared source
 (optional imports) or graft dead endpoints onto the hub. The pure helpers below
 are identical to the shared ones — a future change could share them if the
-master's schema imports were deferred, but that churn isn't worth ~100 lines.
+source's schema imports were deferred, but that churn isn't worth ~100 lines.
 """
 from __future__ import annotations
 
@@ -51,8 +51,8 @@ async def _get_setting(key: str, db: AsyncSession) -> str:
     recognises. Reading the column raw therefore hands the CIPHERTEXT to the
     provider, which answers 401 — surfaced here as 503 "Invalid API key
     configured on server", i.e. an accusation against a key that is perfectly
-    valid. The shared master used by the modules
-    (`shared/python/ai_proxy_common.py`) has always decrypted; Pilot keeps its
+    valid. The shared source used by the modules
+    (`ai_proxy_common.py`) has always decrypted; Pilot keeps its
     own copy of this route and never got the fix.
     """
     r = await db.execute(select(AppSettings).where(AppSettings.key == key))

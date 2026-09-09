@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""HTTP E2E for the demo-docker TS FRONTEND stack (no browser).
+"""HTTP E2E for the suite frontend stack (no browser).
 
 For every module served by the proxy: the index loads, ALL of its local
 <script src>/<link href> resolve (200), the health API answers, and the

@@ -1,95 +1,120 @@
-# Tests navigateur — suite
+# Browser tests — suite
 
-Ce que ces tests regardent, et que rien d'autre ne voit : **ce qui se passe
-entre le clic et l'écran**. Une exception JS qui casse la moitié d'un panneau
-laisse le serveur répondre 200 ; ni les tests unitaires, ni la posture HTTP
-(`tests/run-posture.sh`) ne peuvent la constater.
+What these tests look at, and nothing else can see: **what happens between the
+click and the screen**. A JavaScript exception that breaks half a panel still
+leaves the server answering 200; neither the unit tests nor the HTTP posture
+(`tests/run-posture.sh`) can notice it.
 
-À ne pas confondre avec `standalone-modules/<m>/webapp/e2e/` : ces suites-là
-servent elles-mêmes une application statique sans backend. Celle-ci vise la
-stack suite derrière son proxy, avec une session.
+Not to be confused with the browser-local web apps' own end-to-end suites,
+which serve a static application without a backend. This suite targets the
+suite stack behind its proxy, with a session.
 
-## Lancer
+## Running
 
 ```bash
-bash mint-tokens.sh     # une session par module, dans tokens.json (gitignoré)
-npx playwright test     # les 10 modules
+bash mint-tokens.sh     # one session per module, in tokens.json (gitignored)
+npx playwright test     # all 10 modules
 npx playwright test --grep "risk —"
-npx playwright test --headed        # pour regarder
+npx playwright test --headed        # to watch
 ```
 
-La stack doit tourner. `mint-tokens.sh` échoue si aucun jeton n'a pu être
-frappé, plutôt que d'écrire un fichier vide qui ferait passer la suite à vide.
+The stack must be running. `mint-tokens.sh` fails if no token could be minted,
+rather than writing an empty file that would let the suite pass vacuously.
 
-## Comment la session est obtenue
+## How the session is obtained
 
-Chaque module signe avec sa propre clé, d'où un jeton par module. Le compte est
-**découvert** dans l'annuaire de Pilot, jamais codé en dur : un JWT valide ne
-suffit pas — `_is_active_upstream` demande à Pilot si le compte est actif et
-refuse tout email qu'il ne connaît pas. Un compte présent seulement dans la base
-d'un module est donc inutilisable.
+Each module signs with its own key, hence one token per module. The account is
+**discovered** in Pilot's directory, never hard-coded: a valid JWT is not
+enough — `_is_active_upstream` asks Pilot whether the account is active and
+refuses any email it does not know. An account present only in one module's
+database is therefore unusable.
 
-Pilot a son propre `src/auth.py`, dont `create_jwt` prend en plus la liste des
-modules ; les neuf autres passent par `src/auth_common.py`.
+Pilot has its own `src/auth.py`, whose `create_jwt` also takes the list of
+modules; the nine others go through `src/auth_common.py`.
 
-## Ce que le parcours fait
+## What the walk does
 
-Ouvre chaque module, puis **traverse chaque entrée de navigation**, en échouant
-à la moindre erreur console, exception, requête en échec ou réponse ≥ 400 — au
-chargement comme après chaque clic.
+Opens each module, then **walks every navigation entry**, failing on the first
+console error, exception, failed request or response ≥ 400 — on load and after
+each click.
 
-Trois choses apprises en l'écrivant, qui expliquent le code :
+Three things learnt while writing it, which explain the code:
 
-- **Les entrées sont identifiées par leurs `data-args`**, jamais par leur index
-  ni par leur texte. L'index casse parce qu'un premier clic re-rend la
-  navigation et la raccourcit (Surface) ; le texte casse parce qu'il contient du
-  dynamique — « ANSSI Hygiène 38% 16 OK 26 KO » change entre deux rendus.
-- **Le clic reprend une fois**, en re-résolvant le localisateur : sélectionner un
-  panneau re-rend la navigation, donc le nœud trouvé n'est pas toujours celui
-  qui reçoit le clic. Sans cela, un échec sur trois — et une suite navigateur
-  instable finit ignorée, ce qui est pire que pas de suite.
-- **Une réponse 404 ne déclenche pas `requestfailed`** : la requête a abouti,
-  avec un mauvais statut. D'où l'écoute séparée de `response`.
+- **Entries are identified by their `data-args`**, never by index or text. The
+  index breaks because a first click re-renders the navigation and shortens it
+  (Surface); the text breaks because it contains dynamic content — "ANSSI
+  Hygiène 38% 16 OK 26 KO" changes between two renders.
+- **A click is retried once**, re-resolving the locator: selecting a panel
+  re-renders the navigation, so the node found is not always the one that
+  receives the click. Without this, one run in three failed — and an unstable
+  browser suite ends up ignored, which is worse than no suite.
+- **A 404 response does not trigger `requestfailed`**: the request completed,
+  with a bad status. Hence the separate `response` listener.
 
-## La liste d'exclusions
+## The exclusion list
 
-`IGNORED`, dans `console.spec.js`. Toute entrée doit dire **pourquoi** : une
-liste non justifiée finit par tout contenir, et le test ne regarde plus rien.
+`IGNORED`, in `console.spec.js`. Every entry must say **why**: an unjustified
+list ends up containing everything, and the test no longer looks at anything.
 
-Elle ne contient aujourd'hui que deux entrées, toutes deux propres à
-l'environnement local : l'absence de favicon et le certificat auto-signé du
-proxy.
+It currently holds two entries, both specific to the local environment: the
+missing favicon and the proxy's self-signed certificate.
 
-## Sécurité de la campagne
+## Safety of the campaign
 
-Ces tests ouvrent des **sessions administrateur**. Trois propriétés les rendent
-sûrs, et il faut les préserver :
+These tests open **administrator sessions**. Three properties make them safe,
+and must be preserved:
 
-**Aucun identifiant n'existe.** `mint-tokens.sh` emprunte la clé de signature à
-l'intérieur du conteneur (`docker exec`). Il ne crée pas de compte, ne stocke
-pas de mot de passe, n'appelle aucune route de connexion. Qui peut faire ce
-`docker exec` contrôle déjà le processus et sa base : le mécanisme ne donne rien
-de plus, et n'est pas exploitable à distance.
+**No credential exists.** `mint-tokens.sh` borrows the signing key from inside
+the container (`docker exec`). It creates no account, stores no password, calls
+no login route. Whoever can run that `docker exec` already controls the process
+and its database: the mechanism gives nothing more and is not exploitable
+remotely.
 
-**Le compte est découvert, jamais codé en dur** — le premier administrateur de
-l'annuaire Pilot. Un compte dédié appartient à une stack de CI avec son propre
-annuaire, jamais à l'annuaire d'une production.
+**The account is discovered, never hard-coded** — the first administrator of
+Pilot's directory. A dedicated account belongs to a CI stack with its own
+directory, never to a production directory.
 
-**Le refus est explicite.** La suite s'arrête si `E2E_PROXY` n'est pas local,
-sauf `E2E_ALLOW_REMOTE=1`. Une CI mal configurée ne peut donc pas frapper des
-sessions administrateur sur un environnement portant des données réelles.
+**The refusal is explicit.** The suite stops if `E2E_PROXY` is not local,
+unless `E2E_ALLOW_REMOTE=1`. A misconfigured CI therefore cannot mint
+administrator sessions against an environment holding real data.
 
-`tokens.json` est en `600` et gitignoré. Il reste valide `JWT_EXPIRY_HOURS`
-(24 h par défaut) : l'effacer après la campagne (`rm tokens.json`) est la bonne
-habitude.
+`tokens.json` is mode `600` and gitignored. It stays valid for
+`JWT_EXPIRY_HOURS` (24 h by default): deleting it after the campaign
+(`rm tokens.json`) is the right habit.
 
-## Ce que la première exécution a trouvé
+## The write fence
 
-- `cisotoolbox.css` déclarait sept `@font-face` vers des fichiers qui
-  n'existaient nulle part. Corrigé : les cinq faces utilisées sont désormais
-  livrées depuis `private/shared/fonts/` (voir son README).
-- Pilot chargeait l'avatar de l'utilisateur depuis le fournisseur d'identité
-  dans le tableau des permissions. La CSP le bloquait, donc l'image ne s'est
-  jamais affichée : il ne restait qu'une requête vers l'IdP depuis le navigateur
-  de l'administrateur à chaque rendu. Corrigé — seules les images servies par la
-  suite sont rendues.
+`fixtures.js` is where every spec imports `test` from, and the only place the
+guards each spec used to copy live (proxy, tokens, `urlOf`):
+
+- **local only** — any proxy whose host is not `localhost` is refused
+  (`E2E_ALLOW_REMOTE=1` to override, knowingly);
+- **write fence by default** — `GET`, `HEAD` and `OPTIONS` reach the stack;
+  every other request to `/api/` issued by the page is absorbed
+  (`200 {ok:true, fenced:true}`). The page is sent to `about:blank` before the
+  test ends, so unload-time flushes (Risk sends a `keepalive` `PUT` on
+  `pagehide`) are absorbed too. The first version of one spec wrote measures
+  and a vendor into a development database; since then nothing a spec does by
+  accident on `/api/` reaches it.
+
+What the fence does not cover: routes outside `/api/` (`/auth/logout`), windows
+opened with `window.open`, and `page.request` — no spec uses them. Absorbed
+responses carry no `id`: the suite assumes an **already seeded** stack (a
+module creating its first project on load fails loudly, by design).
+
+A spec that must really write says so (`test.use({ allowWrites: true })`) and
+requires `E2E_PROJECT_ID`, the dedicated test project: only requests whose path
+carries that id as a segment, or whose JSON body says `"project_id": "<id>"`,
+go through. Absorbed writes are recorded in the `fencedWrites` fixture: an
+opted-in spec asserts `expect(fencedWrites).toEqual([])` so it cannot pass by
+accident.
+
+## What the first run found
+
+- `cisotoolbox.css` declared seven `@font-face` rules pointing at files that
+  existed nowhere. Fixed: the five faces in use are now shipped with the
+  design system.
+- Pilot loaded the user's avatar from the identity provider in the permissions
+  table. The CSP blocked it, so the image never showed; what remained was a
+  request to the IdP from the administrator's browser at every render. Fixed —
+  only images served by the suite are rendered.

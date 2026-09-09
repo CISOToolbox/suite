@@ -1,16 +1,16 @@
 // -----------------------------------------------------------------------------
-// REPLICATED from the private shared repository (shared/js/connectors_common.js).
-// DO NOT EDIT HERE - changes will be overwritten by the next propagation run.
-// Fix the master in the shared repository and re-propagate. See CONTRIBUTING.md.
+// Generated file - do not edit.
+// It is overwritten at every release; a change made here is lost.
+// See CONTRIBUTING.md.
 // -----------------------------------------------------------------------------
 /*
  * connectors_common.js — shared connector helpers for CISO Toolbox.
  *
  * Mirror of ai_common.js for any module that exposes the /api/connectors
- * routes from shared/python/connectors_common.py.
+ * routes from connectors_common.py.
  *
- * This file is COPIED into each app's app/js/ directory by the deploy
- * scripts — edit shared/js/connectors_common.js and propagate.
+ * An identical copy of this file ships in every app's app/js/ directory —
+ * keep them identical.
  *
  * Public API:
  *   _connRuntime()                   — lazy-fetch /api/connectors (cached)

@@ -27,7 +27,7 @@ local ``/api/connectors/{id}`` pattern from the shared framework router.
 ## Secrets never leave the backend
 
 Each module's GET masks secret fields as the placeholder ``"configured"``
-(see ``shared/python/connectors_common.py:_mask``). The aggregator
+(see ``connectors_common.py:_mask``). The aggregator
 forwards those masked values verbatim — neither the aggregator nor the
 browser ever sees a credential in clear.
 

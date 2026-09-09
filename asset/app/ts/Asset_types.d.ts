@@ -1,6 +1,6 @@
 /**
- * Asset Management (demo-docker variant) — data model D + app globals.
- * Base: opensource port (frontend-ts/opensource/asset/app/ts/Asset_types.d.ts),
+ * Asset Management (backend variant) — data model D + app globals.
+ * Base: browser-local port,
  * extended with the backend fields: licence, connectors (sources/manual locks,
  * ip_address, last_login_at), custom types, renewal deadlines, plugins,
  * API layer (asset_api.ts). Pure type file (no emit).

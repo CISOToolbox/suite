@@ -45,7 +45,7 @@ class Application(Base):
     repo_token_encrypted = Column(Text, default="")
     # Monorepo support: list of subdirectories to scan within the cloned
     # repo. Empty list = scan the entire repo (default). Example:
-    # ["backend-clients/demo-docker/risk", "shared"]
+    # ["risk", "shared"]
     scan_paths = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
     docker_images = Column(JSONB, default=list)
     image_token_encrypted = Column(Text, default="")
