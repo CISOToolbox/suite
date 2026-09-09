@@ -5,7 +5,7 @@
 optional `requirements.txt`.
 
 These are the catalogue/showcase connectors. They are included in a client
-image when selected at build time (see `shared/build-client-image.sh`), e.g.
+image when selected at build time (see `tools/build-client-image.sh`), e.g.
 `--addons generic`.
 
 Client-**specific** connectors go under `../custom/<client>/` instead (never

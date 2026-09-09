@@ -1,5 +1,5 @@
 /**
- * Watch (demo-docker) — server data model + app globals.
+ * Watch (backend) — server data model + app globals.
  * Watch has no local D model (app 100% driven by the REST API):
  * the interfaces describe the payloads returned by watch_api.ts.
  * Pure types file (no emit).
@@ -146,7 +146,7 @@ declare var ct_modal: CtModalApi;
 declare var ct_bulkbar: CtBulkbarApi;
 
 /** Read by _renderAudit via `typeof renderAuditLog === "function"` — NEVER
- *  defined: ct_audit.js (watch source AND master) only defines
+ *  defined: ct_audit.js (watch source) only defines
  *  `_renderAuditLog(c)`. Dead guard → audit panel = placeholder
  *  (pre-existing bug of the source, reproduced identically). */
 declare var renderAuditLog: ((c: HTMLElement, opts?: { api?: unknown }) => void) | undefined;

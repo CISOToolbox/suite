@@ -106,12 +106,12 @@ run_backup() {
         # A diff with no full on THIS repository has nothing to build on: the
         # repositories have their own cycles, repo2 may be younger.
         has_full "$m" 2 || t2="full"
-        log "backup $m ($t2) → hors site"
+        log "backup $m ($t2) → off-site"
         pgbackrest --stanza="$m" --repo=2 --type="$t2" backup 2>&1 \
             | tail -2 | sed "s/^/[$m repo2] /"
         # An off-site failure must not mask a successful local backup: these
         # are two incidents of different severity.
-        [ "${PIPESTATUS[0]}" -eq 0 ] || log "WARN: sauvegarde hors site échouée pour $m"
+        [ "${PIPESTATUS[0]}" -eq 0 ] || log "WARN: off-site backup failed for $m"
     fi
     return "$rc"
 }
@@ -172,10 +172,10 @@ run_s3_restore_test() {
     mois=$(date -u '+%-m')
     idx=$(( (mois - 1) % n + 1 ))
     eval "m=\${$idx}"
-    log "test de restauration hors site — $m (dépôt 2)"
+    log "off-site restore test — $m (repository 2)"
     restore_test "$m" 2 > "$CONF_DIR/restore-test-s3.json.tmp" \
         && mv "$CONF_DIR/restore-test-s3.json.tmp" "$CONF_DIR/restore-test-s3.json" \
-        || { log "WARN: test de restauration HORS SITE ÉCHOUÉ pour $m"
+        || { log "WARN: OFF-SITE restore test FAILED for $m"
              mv "$CONF_DIR/restore-test-s3.json.tmp" "$CONF_DIR/restore-test-s3.json" 2>/dev/null || true; }
 }
 

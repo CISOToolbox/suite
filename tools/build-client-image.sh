@@ -1,16 +1,12 @@
 #!/usr/bin/env bash
-# -----------------------------------------------------------------------------
-# REPLICATED from the private shared repository (shared/build-client-image.sh).
-# DO NOT EDIT HERE - changes will be overwritten by the next propagation run.
-# -----------------------------------------------------------------------------
 # Build a per-client backend-module image = core + selected add-ons.
 #
-# Add-ons live in demo-docker under <module>/addons/{generic,custom/<client>}/
+# Add-ons live under <module>/addons/{generic,custom/<client>}/
 # and a client image is produced by selecting which addon subtrees to bake in
 # at build time (overlay on the core image via <module>/Dockerfile.addons).
 #
 # Usage:
-#   shared/build-client-image.sh <client> [options]
+#   build-client-image.sh <client> [options]
 # Options:
 #   --module M         backend module (default: access; e.g. surface)
 #   --addons a,b,...   addon subtrees under <module>/addons/ to include
@@ -21,18 +17,21 @@
 #   --base IMG         core base image to layer on
 #                      (default: ciso-<module>:local, built unless --skip-core)
 #   --tag TAG          image tag (default: local) -> ciso-<module>-<client>:TAG
-#   --custom-dir DIR   external client add-on directory (e.g. from the private
-#                      client repo: private/clients/<client>/<module>-addons/).
+#   --custom-dir DIR   external client add-on directory (the organization's
+#                      own repository, e.g. <client>/<module>-addons/).
 #                      Staged as addons/custom/<client>/ for the build, removed
 #                      afterwards — the public tree never keeps client code.
+#   --platforms P      build a MULTI-ARCH manifest (e.g. linux/amd64,linux/arm64)
+#                      instead of the host arch only. Mandatory for GHCR:
+#                      a single-arch image will not start on the other platform.
 #   --skip-core        don't (re)build the core base; use --base as-is
 #   --push             push the resulting image (use a full --tag ref)
 #
 # Examples:
-#   shared/build-client-image.sh acme
-#   shared/build-client-image.sh acme --addons custom/acme
-#   shared/build-client-image.sh acme-smb --module surface --addons generic/smb_scan_rs
-#   shared/build-client-image.sh acme --base ghcr.io/cisotoolbox/ciso-access-suite:v0.3.6 \
+#   build-client-image.sh acme
+#   build-client-image.sh acme --addons custom/acme
+#   build-client-image.sh acme-smb --module surface --addons generic/smb_scan
+#   build-client-image.sh acme --base ghcr.io/cisotoolbox/ciso-access-suite:v0.3.6 \
 #       --skip-core --tag v0.1.0
 set -euo pipefail
 
@@ -46,17 +45,19 @@ module="access"
 addons=""
 exclude_core=""
 base=""
+platforms=""
 custom_dir=""
 tag="local"
 skip_core=false
 push=false
-langs=""   # langues i18n à embarquer (ex. "en" ou "en fr") ; défaut : i18n.conf
+langs=""   # i18n languages to bundle (e.g. "en" or "en fr"); default: i18n.conf
 while [ $# -gt 0 ]; do
     case "$1" in
         --module) module="$2"; shift 2 ;;
         --addons) addons="$2"; shift 2 ;;
         --exclude-core) exclude_core="$2"; shift 2 ;;
         --base) base="$2"; shift 2 ;;
+        --platforms) platforms="$2"; shift 2 ;;
         --custom-dir) custom_dir="$2"; shift 2 ;;
         --tag) tag="$2"; shift 2 ;;
         --langs) langs="$2"; shift 2 ;;
@@ -66,8 +67,8 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-# Layout-agnostic: works from private/shared/ (dev monorepo) AND from the
-# suite repo's tools/ directory (modules at the repo root).
+# Layout-agnostic: works from a shared tools directory next to the module
+# trees AND from the suite repo's tools/ directory (modules at the repo root).
 if [ -d "$ROOT/../public/suite-modules" ]; then
     MOD_DIR="$ROOT/../public/suite-modules/$module"
 else
@@ -85,7 +86,7 @@ _on_exit() {
 }
 trap _on_exit EXIT
 
-# External client add-ons (private repo) staged into the module tree for the
+# External client add-ons (the organization's repository) staged into the module tree for the
 # duration of the build only.
 if [ -n "$custom_dir" ]; then
     [ -d "$custom_dir" ] || { echo "!! --custom-dir not found: $custom_dir"; exit 1; }
@@ -105,12 +106,17 @@ if [ -z "$addons" ]; then
     [ -d "$MOD_DIR/addons/custom/$client" ] && addons="generic,custom/$client"
 fi
 
-img="ciso-${module}-${client}:${tag}"
+# --tag accepts either a plain tag (the name is then composed automatically),
+# or a full reference (ghcr.io/org/name:tag) to push directly.
+case "$tag" in
+    */*|*:*) img="$tag" ;;
+    *)       img="ciso-${module}-${client}:${tag}" ;;
+esac
 stage="$MOD_DIR/.client-addons"
 
-# 0. Packaging i18n (optionnel) : restreindre les langues embarquées dans
-#    l'image. Appliqué sur une sauvegarde de app/, restaurée en sortie (trap)
-#    pour ne jamais altérer l'arbre source multi-langues.
+# 0. i18n packaging (optional): restrict the languages bundled into the
+#    image. Applied on a backup of app/, restored on exit (trap) so the
+#    multi-language source tree is never altered.
 if [ -n "$langs" ]; then
     echo "── i18n packaging: langs=$langs ──"
     rm -rf "$MOD_DIR/.app-i18n-bak"; cp -r "$MOD_DIR/app" "$MOD_DIR/.app-i18n-bak"
@@ -125,7 +131,14 @@ prodver="dev"
 [ -f "$MOD_DIR/VERSION" ] && prodver="$(tr -d '[:space:]' < "$MOD_DIR/VERSION")"
 if ! $skip_core; then
     echo "── building core base $base (PRODUCT_VERSION=$prodver) ──"
-    docker build --build-arg PRODUCT_VERSION="$prodver" -t "$base" "$MOD_DIR"
+    if [ -n "$platforms" ]; then
+        podman manifest rm "$base" >/dev/null 2>&1 || true
+        podman image exists "$base" && podman rmi -f "$base" >/dev/null 2>&1 || true
+        podman build --platform "$platforms" --manifest "$base" \
+            --build-arg PRODUCT_VERSION="$prodver" "$MOD_DIR"
+    else
+        docker build --build-arg PRODUCT_VERSION="$prodver" -t "$base" "$MOD_DIR"
+    fi
 fi
 
 # 2. Stage the selected addon subtrees into the build context.
@@ -151,13 +164,43 @@ done
 excl_space="$(echo "$exclude_core" | tr ',' ' ' | xargs)"
 [ -n "$excl_space" ] && echo "── excluding core add-ons: $excl_space ──"
 echo "── building $img (base=$base) ──"
-docker build --build-arg BASE="$base" --build-arg EXCLUDE_CORE="$excl_space" \
-    --build-arg PRODUCT_VERSION="$prodver" \
-    -f "$MOD_DIR/Dockerfile.addons" -t "$img" "$MOD_DIR"
+if [ -n "$platforms" ]; then
+    # BASE is a manifest list: podman resolves the right arch per platform.
+    podman manifest rm "$img" >/dev/null 2>&1 || true
+    podman image exists "$img" && podman rmi -f "$img" >/dev/null 2>&1 || true
+    podman build --platform "$platforms" --manifest "$img" \
+        --build-arg BASE="$base" --build-arg EXCLUDE_CORE="$excl_space" \
+        --build-arg PRODUCT_VERSION="$prodver" \
+        -f "$MOD_DIR/Dockerfile.addons" "$MOD_DIR"
+else
+    docker build --build-arg BASE="$base" --build-arg EXCLUDE_CORE="$excl_space" \
+        --build-arg PRODUCT_VERSION="$prodver" \
+        -f "$MOD_DIR/Dockerfile.addons" -t "$img" "$MOD_DIR"
+fi
 rm -rf "$stage"
 
 echo "✓ built $img"
 if $push; then
     echo "── pushing $img ──"
-    docker push "$img"
+    if [ -n "$platforms" ]; then
+        podman manifest push --all "$img" "docker://$img"
+    else
+        docker push "$img"
+    fi
+    # Move `latest` too when the tag is a version, the way publish-images.sh
+    # does for the suite images. Without this a client image kept a `latest`
+    # frozen at whenever it was last built with that tag explicitly — six
+    # weeks stale at a client site, and it once sent a debugging session chasing an
+    # old image that a `docker pull` had silently produced.
+    case "$img" in
+        *:v[0-9]*)
+            latest_ref="${img%:*}:latest"
+            echo "── pushing $latest_ref ──"
+            if [ -n "$platforms" ]; then
+                podman manifest push --all "$img" "docker://$latest_ref"
+            else
+                docker tag "$img" "$latest_ref" && docker push "$latest_ref"
+            fi
+            ;;
+    esac
 fi

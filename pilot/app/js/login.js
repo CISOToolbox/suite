@@ -1,7 +1,7 @@
 // -----------------------------------------------------------------------------
-// REPLICATED from the private shared repository (shared/js/backend/login_pilot.js).
-// DO NOT EDIT HERE - changes will be overwritten by the next propagation run.
-// Fix the master in the shared repository and re-propagate. See CONTRIBUTING.md.
+// Generated file - do not edit.
+// It is overwritten at every release; a change made here is lost.
+// See CONTRIBUTING.md.
 // -----------------------------------------------------------------------------
 /**
  * Login page script — PILOT variant (the suite's central login page).
@@ -9,7 +9,7 @@
  * sends the user to the target after authentication.
  *
  * Compiled to login_pilot.js; the build script copies it as
- * app/js/login.js for the pilot module (see ts-build.sh).
+ * app/js/login.js for the pilot module.
  * See login.ts for the factorisation note.
  */
 (function () {

@@ -92,40 +92,44 @@ Rules that keep the two levels coherent:
 
 1. A module version is published **first** (tag + images), then a suite
    release may pin it. The suite never pins a tag that does not exist.
-2. The suite repo and the standalone repos carry the **same module code**
-   (one author tree, propagated). Propagation must report **0 drift**
-   before any tag — otherwise the two repos would ship different code
-   under the same number.
+2. The suite repo and the standalone repos carry the **same module code**.
+   The two trees must be identical before any tag — otherwise the two repos
+   would ship different code under the same number.
 3. Every suite release updates the matrix above, in the same commit as the
    compose pins.
 
-`tools/release-check.sh` enforces 1–3 mechanically; run it before tagging.
+`tools/release-check.sh` checks versions, pins, matrix and changelog offline;
+`--remote` adds rule 1 (every pinned tag exists on its module repository)
+and the multi-arch images on GHCR; `--strict` requires each pin to equal the
+module's VERSION (release time — between two suite releases a module VERSION
+may run ahead of its pin). CI runs `--remote` and `tools/pin-images.sh --check`
+on every pull request, with `--strict` on `release/*` branches.
 
 ## Release procedure
 
-**A module** (from the suite repo, its author tree):
+**The tag is the release.** A module or suite version exists once its
+annotated tag `vX.Y.Z` is on the public repository: that tag is the commit the
+images were built for, what the compose pins, and what a deployment checks
+out. An image without its tag, or a tag on the wrong repository, is not a
+release.
 
-```bash
-# 1. bump, in the author tree only — propagation carries it to standalone
-echo "1.1.0" > <module>/VERSION
-bash ../../private/propagation/propagate.sh --module <module> --apply   # 0 drift expected
+**A module** version exists once its tag `vX.Y.Z` and both images are on
+`CISOToolbox/<module>` and GHCR; this repository only consumes the result
+(rule 1 above).
 
-# 2. verify, then build + push BOTH images multi-arch (see README §Build)
-#    with --build-arg PRODUCT_VERSION=$(cat <module>/VERSION)
+**The suite** — after every module it pins is tagged:
 
-# 3. tag in the module's own repo
-git -C <path-to-standalone-repo> tag -a v1.1.0 -m "…" && git push --tags
-```
-
-**The suite**:
-
-```bash
-echo "0.10.0" > VERSION
-$EDITOR docker-compose.yml          # pin the module image tags
-$EDITOR RELEASING.md                # add the matrix row
-bash tools/release-check.sh         # drift, pins, matrix, VERSION coherence
-git tag -a v0.10.0 -m "…" && git push --tags
-```
+1. `VERSION` → `X.Y.Z`; every `image:` in `docker-compose.yml` points at
+   `ciso-<module>-suite:v<module VERSION>`; `bash tools/pin-images.sh`
+   re-resolves the digests (it fails on an image that is not published).
+2. Add the matrix row above and the `## X.Y.Z` section to `CHANGELOG.md`
+   (module versions moved, integration changes).
+3. `bash tools/release-check.sh --remote --strict` — all green (it refuses a
+   version without its changelog section).
+4. Open the release as a pull request titled `release: CISO Toolbox suite X.Y.Z`
+   (`main` is protected: no direct push, releases included). Merge.
+5. Tag the merge commit: `git tag -a vX.Y.Z -m "CISO Toolbox suite X.Y.Z" && git push origin vX.Y.Z`,
+   then publish the GitHub release with the changelog section as its notes.
 
 ## Current line
 

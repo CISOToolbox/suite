@@ -216,7 +216,7 @@ def test_secret_settings_are_decrypted_on_read() -> list[str]:
     the column raw hands the CIPHERTEXT to the provider. It answers 401, which
     Pilot reported as "Invalid API key configured on server" — an accusation
     against a key that was perfectly valid. Pilot keeps its own copy of the AI
-    route and had never been given the decryption the shared master does.
+    route and had never been given the decryption the shared source does.
 
     Silent on a cleartext-legacy deployment (decrypt_setting passes unmarked
     values through), which is exactly why it survived so long.
@@ -249,7 +249,7 @@ def test_secret_settings_are_decrypted_on_read() -> list[str]:
 
 
 def _py_catalogue() -> dict:
-    """AI_PROVIDERS as declared by the shared Python master (via AST)."""
+    """AI_PROVIDERS as declared by the shared Python source (via AST)."""
     path = REPO_ROOT / "pilot" / "src" / "ai_models_common.py"
     for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
         if isinstance(node, ast.AnnAssign) and getattr(node.target, "id", "") == "AI_PROVIDERS":
@@ -269,7 +269,7 @@ def test_one_model_catalogue_everywhere() -> list[str]:
     defaulted to Sonnet 5. Picking a model in Pilot could name something a
     module had never heard of.
 
-    Python side is now a single master imported by both; the browser copy
+    Python side is now a single source imported by both; the browser copy
     cannot import Python, so it is verified here instead.
     """
     problems = []
@@ -568,7 +568,7 @@ def test_externally_built_artefacts_are_verified_at_build() -> list[str]:
 
 
 def test_ai_requests_carry_no_precomposed_prompt() -> list[str]:
-    """FEAT-41 / CLAUDE.md §5.1 — the frontend sends structured fields.
+    """FEAT-41 / the server-side prompt composition rule — the frontend sends structured fields.
 
     A request model of an AI endpoint that declares a `user`, `prompt` or
     `user_prompt` field of type `str` is the signature of a prompt already
@@ -624,7 +624,7 @@ def test_ai_requests_carry_no_precomposed_prompt() -> list[str]:
                 problems.append(
                     f"{module}: {rel}: {node.name}.{name}: {annot} looks like a "
                     f"pre-composed prompt. The frontend must send structured fields "
-                    f"and routes/ai.py must build the prompt (CLAUDE.md 5.1)."
+                    f"and routes/ai.py must build the prompt (the project conventions 5.1)."
                 )
     # A migrated module must CUT OFF the generic proxy: without that, a
     # modified client bypasses every business guarantee via /api/ai/complete.

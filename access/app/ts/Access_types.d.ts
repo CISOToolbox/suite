@@ -1,5 +1,5 @@
 /**
- * Access Rights Review (demo-docker) — D data model + app globals.
+ * Access Rights Review (backend) — D data model + app globals.
  * Types derived from Access_app.ts / access_api.ts (creation in addUser /
  * addApp / startReview / addServiceAccount / addMeasure), from demo-fr.json
  * and from the Access backend routes. Pure type file (no emit).

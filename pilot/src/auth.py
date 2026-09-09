@@ -1,4 +1,4 @@
-"""Pilot's own auth module (the modules use shared/python/auth_common.py).
+"""Pilot's own auth module (the modules use auth_common.py).
 
 THE `None` CONTRACT — read this before writing an endpoint
 ----------------------------------------------------------
@@ -61,7 +61,7 @@ def _session_ttl_hours() -> int:
     long a deleted or downgraded account keeps access. Pilot mints the module
     tokens, so this value governs the whole suite's SSO session. Tighten it
     (e.g. 4–8h) to shrink the window; clamped to 1h–7d, falls back to 24 on a
-    non-numeric value. Kept in sync with shared/python/auth_common.py."""
+    non-numeric value. Kept in sync with auth_common.py."""
     try:
         return min(168, max(1, int(os.getenv("JWT_EXPIRY_HOURS", "24"))))
     except ValueError:
@@ -70,7 +70,7 @@ def _session_ttl_hours() -> int:
 
 JWT_EXPIRY_HOURS = _session_ttl_hours()
 COOKIE_NAME = "pilot_token"
-# Suite SSO trust domains (kept in sync with shared/python/auth_common.py).
+# Suite SSO trust domains (kept in sync with auth_common.py).
 #
 # Pilot is the single issuer (iss="ciso-pilot"), but there is no longer a
 # single suite-wide token: Pilot mints one token PER MODULE, each signed
@@ -90,7 +90,7 @@ def _hkdf_sha256(secret: bytes, salt: bytes, info: bytes, length: int = 32) -> b
     """HKDF-SHA256 (RFC 5869 extract-then-expand), stdlib only.
 
     Byte-for-byte identical to the modules' implementation in
-    shared/python/auth_common.py — the two MUST agree, since Pilot signs
+    auth_common.py — the two MUST agree, since Pilot signs
     what the modules verify. Cross-checked against
     cryptography.hazmat.primitives.kdf.hkdf.HKDF in the test suite.
     """
@@ -118,7 +118,7 @@ def module_audience(module: str) -> str:
 
 def module_cookie_name(module: str) -> str:
     """Cookie Pilot drops for `module`. Convention shared with the modules
-    (shared/python/auth_common.module_cookie_name) — keep both in sync."""
+    (auth_common.module_cookie_name) — keep both in sync."""
     return f"{module}_token"
 
 
@@ -159,7 +159,7 @@ def auth_enabled() -> bool:
 def assert_auth_posture() -> None:
     """Fail closed unless AUTH_MODE=none is explicit. Call once at startup.
 
-    Kept in sync with shared/python/auth_common.assert_auth_posture (Pilot has
+    Kept in sync with auth_common.assert_auth_posture (Pilot has
     its own auth module by design). An empty JWT_SECRET makes auth_enabled()
     False and serves every route as admin — refuse to boot unless disabling
     auth was requested on purpose.

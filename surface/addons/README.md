@@ -2,8 +2,8 @@
 
 This is the **reference** for how Surface add-ons work (for any future session
 touching them). It covers the registration contract, runtime discovery,
-per-target config & secrets, the **in-app help** mechanism, build/packaging,
-and propagation rules.
+per-target config & secrets, the **in-app help** mechanism and
+build/packaging.
 
 ## TL;DR
 
@@ -15,7 +15,7 @@ and propagation rules.
     ct_logs, dns_brute, takeover, email_security, typosquatting,
     sensitive_files, security_headers, js_analysis, discovery). **Bundled in
     every image** (the standard Dockerfile COPYs `addons/core` into
-    `/app/addons`) and **synced to `backend-standalone`**. Removable from a slim
+    `/app/addons`) and **shipped in the standalone image too**. Removable from a slim
     client image via `--exclude-core`.
   - **`generic/<name>/`** — shareable optional scanners (`nuclei`,
     `cve_lookup`, `shodan`, `cloud_buckets`, `screenshot`, `smb_scan_rs`) and
@@ -161,7 +161,7 @@ contain **zero** add-on doc text; the client image with the add-on serves it.
   `apt-packages.txt` (system libs), `requirements.txt` (pip), run each add-on's
   **`install.sh`**, `chmod` bundled `bin/*`, `chown`, `USER surface`,
   `ENV SURFACE_ADDON_PATHS=/app/addons`.
-- `shared/build-client-image.sh <client> --module surface` is needed **only** to
+- `tools/build-client-image.sh <client> --module surface` is needed **only** to
   layer a client's own `custom/` add-ons, or to slim an image with
   `--exclude-core` → `ciso-surface-<client>:<tag>`. Passing
   `--addons generic/<name>` is a harmless no-op: the base already has it.
@@ -177,7 +177,7 @@ contain **zero** add-on doc text; the client image with the add-on serves it.
   > ```
 - **Slim client builds** — drop unwanted core scanners with `--exclude-core`:
   ```
-  shared/build-client-image.sh acme --module surface \
+  tools/build-client-image.sh acme --module surface \
       --exclude-core shodan,cloud_buckets --tag v0.1.2
   ```
   → `ciso-surface-acme:v0.1.2` = all core scanners **except** `shodan` +
@@ -188,21 +188,18 @@ contain **zero** add-on doc text; the client image with the add-on serves it.
   hold several registry entries (e.g. `shodan` → `shodan_domain` +
   `shodan_host`; `nmap` → `nmap_quick/standard/deep`).
 - **Multi-arch for GHCR**: `podman build --platform linux/amd64,linux/arm64
-  --manifest …` then `podman manifest push --all` (see root `CLAUDE.md` §6).
+  --manifest …` then `podman manifest push --all`.
   With `--exclude-core`, pass the same args to the manifest build (the overlay
   Dockerfile honours `--build-arg EXCLUDE_CORE="shodan cloud_buckets"`).
 
-## 7. Propagation rules (important)
+## 7. What ships where
 
-- **`addons/core` AND `addons/generic` are synced** to the standalone tree by
-  the propagation engine — both tiers are open source and both ship in every
+- **`addons/core` and `addons/generic`** are open source and ship in every
   published image.
-- **`addons/custom` is NEVER synced**: it belongs to its organization and lives
-  in that organization's private repo, staged at build time via
-  `build-client-image.sh --custom-dir`.
-- Edit add-on source here (`backend-clients/demo-docker/surface/addons/…`) —
-  the source of truth. `src/scan_common.py` (shared helpers) is synced via the
-  normal `src/` path.
+- **`addons/custom`** belongs to its organization, lives in that
+  organization's own repository, and is layered at build time
+  (`build-client-image.sh --custom-dir`).
+- `src/scan_common.py` holds the helpers shared by every scanner.
 
 ## Layout
 

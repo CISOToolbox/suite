@@ -3,7 +3,7 @@ framework. Mirror of the Access bridge — adapted for AssetPlugin /
 AssetPluginConfig / asset_plugin_configs.
 
 See ``docs/CHANTIER_CONNECTEURS.md`` for the framework rationale and
-the Access bridge in ``backend-clients/demo-docker/access/src/connectors_bridge.py``
+the Access bridge in ``access/src/connectors_bridge.py``
 for the canonical implementation. Asset differs in a few small ways:
 ``priority`` field instead of ``application_id``/``group_filters``, and
 fewer registered plugin types (2 today: ldap_ad, cloudtemple).

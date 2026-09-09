@@ -17,11 +17,11 @@ RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 # 23 connectors live under addons/generic. A "plain core build" therefore
 # shipped an image with ZERO connectors, and nothing said so: the loader logs a
 # warning at most, and the UI simply renders an empty type grid. The README
-# documents these connectors as a standard Access feature and propagation sends
-# them to the public standalone tree, so they belong in the image.
+# documents these connectors as a standard Access feature and the standalone
+# image ships them too, so they belong in the image.
 #
 # addons/custom/<client>/ stays out, and is layered by Dockerfile.addons via
-# shared/build-client-image.sh.
+# build-client-image.sh.
 COPY addons/generic/ /tmp/addons/
 # `find -exec … \;` returns 0 even when pip fails: a connector with broken
 # deps produced a green image with an unusable add-on. The loop fails

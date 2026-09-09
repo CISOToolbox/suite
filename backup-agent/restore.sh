@@ -19,7 +19,7 @@
 #   psql -h /tmp/restore-<module> -p 5433 -U <module> -d <module>
 #   pg_dump -h /tmp/restore-<module> -p 5433 -U <module> <module> > /var/lib/pgbackrest/agent/<module>-restored.sql
 #
-# The runbook (private/docs/runbooks/pitr-restore.md) covers the full
+# The restore runbook covers the full
 # N1 (object) / N2 (module) / N3 (suite) procedures, including the
 # mandatory `alembic upgrade head` step when T predates a migration and
 # the Pilot measures resync afterwards.
@@ -51,7 +51,7 @@ done
 # amounts to asking for two contradictory targets; pgBackRest would silently
 # pick one, which is the worst possible behavior for a restore.
 if [ -n "$TIME" ] && [ -n "$SET" ]; then
-    echo "!! --time et --set sont exclusifs : choisissez un instant OU une sauvegarde" >&2
+    echo "!! --time and --set are exclusive: choose a point in time OR a backup set" >&2
     exit 2
 fi
 
@@ -66,7 +66,7 @@ fi
 mkdir -p "$SCRATCH" "$SOCKDIR"
 chmod 700 "$SCRATCH"
 
-echo ">>> pgbackrest restore ($MOD${TIME:+ @ $TIME}${SET:+ set $SET}, dépôt $RREPO)"
+echo ">>> pgbackrest restore ($MOD${TIME:+ @ $TIME}${SET:+ set $SET}, repository $RREPO)"
 if [ -n "$TIME" ]; then
     pgbackrest --stanza="$MOD" --repo="$RREPO" --pg1-path="$SCRATCH" \
         --type=time --target="$TIME" --target-action=promote restore
