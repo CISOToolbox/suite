@@ -10,19 +10,7 @@
 //
 // Three behaviours, each one paid for by a finding of the 2026-09-02 review.
 // Prerequisites: stack running + `bash mint-tokens.sh` (cf. console.spec.js).
-const fs = require("fs");
-const path = require("path");
-const { test, expect } = require("@playwright/test");
-
-const PROXY = (process.env.E2E_PROXY || "https://localhost:8443").replace(/\/+$/, "");
-const TOKENS_FILE = path.join(__dirname, "tokens.json");
-const TOKENS = fs.existsSync(TOKENS_FILE)
-    ? JSON.parse(fs.readFileSync(TOKENS_FILE, "utf8")) : {};
-
-const IS_LOCAL = /^https?:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/.test(PROXY);
-if (!IS_LOCAL && process.env.E2E_ALLOW_REMOTE !== "1") {
-    throw new Error(`E2E_PROXY pointe vers ${PROXY} — voir console.spec.js.`);
-}
+const { test, expect, PROXY, TOKENS } = require("./fixtures");
 
 const ANCIEN_DETAILS = "MFA active sur les portails web.";
 const AJOUT = "Étendre la couverture aux comptes de service.";

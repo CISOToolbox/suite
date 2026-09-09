@@ -8,20 +8,10 @@
 //
 // Prerequisites: `bash mint-tokens.sh` (one session per module) and the stack
 // running. Without tokens.json, the suite fails instead of passing vacuously.
-const fs = require("fs");
-const path = require("path");
-const { test, expect } = require("@playwright/test");
+const { test, expect, PROXY, TOKENS, urlOf } = require("./fixtures");
 
-const PROXY = (process.env.E2E_PROXY || "https://localhost:8443").replace(/\/+$/, "");
 const MODULES = ["access", "appsec", "asset", "audit", "compliance",
                  "pilot", "risk", "surface", "vendor", "watch"];
-
-const TOKENS_FILE = path.join(__dirname, "tokens.json");
-const TOKENS = fs.existsSync(TOKENS_FILE)
-    ? JSON.parse(fs.readFileSync(TOKENS_FILE, "utf8")) : {};
-
-// Pilot is served at the proxy root; the others under /<module>/.
-const urlOf = (m) => (m === "pilot" ? PROXY + "/" : `${PROXY}/${m}/`);
 
 // Known noise, unrelated to the application code. Every entry added here must
 // say WHY: an unjustified exclusion list ends up containing everything, and the
@@ -36,13 +26,6 @@ const IGNORED = [
 // `docker exec` already controls the process — but there is no reason to point
 // an acceptance campaign at an environment holding real data. The refusal is
 // explicit rather than left to common sense.
-const IS_LOCAL = /^https?:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/.test(PROXY);
-if (!IS_LOCAL && process.env.E2E_ALLOW_REMOTE !== "1") {
-    throw new Error(
-        `E2E_PROXY pointe vers ${PROXY}, qui n'est pas local. Ces tests ouvrent ` +
-        `des sessions administrateur : lancez-les contre une stack de recette, ` +
-        `ou forcez avec E2E_ALLOW_REMOTE=1 si vous savez ce que vous faites.`);
-}
 
 const isNoise = (text) => IGNORED.some((rx) => rx.test(text));
 

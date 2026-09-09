@@ -9,23 +9,9 @@
 //     entries, with one dot per event (max 8).
 //
 // Prerequisites: stack up + `bash mint-tokens.sh` (cf. console.spec.js).
-const fs = require("fs");
-const path = require("path");
-const { test, expect } = require("@playwright/test");
-
-const PROXY = (process.env.E2E_PROXY || "https://localhost:8443").replace(/\/+$/, "");
-const TOKENS_FILE = path.join(__dirname, "tokens.json");
-const TOKENS = fs.existsSync(TOKENS_FILE)
-    ? JSON.parse(fs.readFileSync(TOKENS_FILE, "utf8")) : {};
+const { test, expect, PROXY, TOKENS } = require("./fixtures");
 
 // Same guard as console.spec.js: admin sessions, local stacks only.
-const IS_LOCAL = /^https?:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/.test(PROXY);
-if (!IS_LOCAL && process.env.E2E_ALLOW_REMOTE !== "1") {
-    throw new Error(
-        `E2E_PROXY pointe vers ${PROXY}, qui n'est pas local. Ces tests ouvrent ` +
-        `des sessions administrateur : lancez-les contre une stack de recette, ` +
-        `ou forcez avec E2E_ALLOW_REMOTE=1 si vous savez ce que vous faites.`);
-}
 
 test.describe("asset dashboard charts (FEAT-43)", () => {
     test.beforeEach(async ({ page }) => {
