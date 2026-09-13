@@ -659,6 +659,23 @@ def run_semgrep(repo_dir: str, app_id: str, scan_paths: list[str] | None = None)
 SEMGREP_SEVERITY = {"ERROR": "high", "WARNING": "medium", "INFO": "low"}
 
 
+def semgrep_severity(extra: dict) -> str:
+    """Severity of a semgrep match: the rule's level (ERROR/WARNING/INFO),
+    tempered by the rule metadata. A rule that is itself unsure of its
+    match — confidence LOW — with a likelihood no better than MEDIUM is a
+    lead to check, not a defect to fix: it rates low whatever its level.
+    Likelihood HIGH keeps the level even at low confidence."""
+    base = SEMGREP_SEVERITY.get(str(extra.get("severity", "")).upper(), "medium")
+    meta = extra.get("metadata")
+    if not isinstance(meta, dict):        # a malformed rule never breaks the scan
+        meta = {}
+    likelihood = str(meta.get("likelihood", "")).strip().upper()
+    confidence = str(meta.get("confidence", "")).strip().upper()
+    if confidence == "LOW" and likelihood in ("LOW", "MEDIUM"):
+        return "low"
+    return base
+
+
 def semgrep_finding(match: dict, filepath: str, rule_id: str, line: int,
                     seen: dict[str, int]) -> dict:
     """Normalize one semgrep match. Pure — the identity tests call this."""
@@ -672,7 +689,7 @@ def semgrep_finding(match: dict, filepath: str, rule_id: str, line: int,
     return {
         "scanner": "semgrep",
         "type": "sast",
-        "severity": SEMGREP_SEVERITY.get(extra.get("severity", ""), "medium"),
+        "severity": semgrep_severity(extra),
         "title": f"{rule_id}",
         "description": (extra.get("message", "") or "")[:3000],
         # The line is WHERE to look — kept in target and evidence, refreshed on
