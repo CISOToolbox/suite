@@ -250,24 +250,16 @@ async def internal_measures(request: Request, db: AsyncSession = Depends(get_db)
     """Return measures (only) — findings stay local until triaged to to_fix."""
     _check_service_token(request)
     result = await db.execute(
-        select(Measure, Finding).join(Finding, Measure.finding_id == Finding.id).order_by(Measure.sort_order)
+        # Outer join: a corrective measure created for a non-conformity
+        # (FEAT-45) has no finding and still belongs to the action plan.
+        select(Measure, Finding).outerjoin(Finding, Measure.finding_id == Finding.id).order_by(Measure.sort_order)
     )
     out = []
     for m, f in result.all():
-        out.append({
-            "source_id": m.id,
-            "entity_id": str(f.id),
-            "entity_name": f.target or f.title,
-            "title": m.title,
-            "description": m.description or "",
-            "status": _normalize_status(m.statut),
-            "assignee": m.responsable or "",
-            "due_date": m.echeance or "",
-            "progress_log": m.progress_log or [],
-            "type": f.type,
-            "severity": f.severity,
-            "source_module": MODULE_NAME,
-        })
+        row = _measure_to_pilot_payload(m, f)
+        row["progress_log"] = m.progress_log or []
+        row["source_module"] = MODULE_NAME
+        out.append(row)
     return out
 
 
