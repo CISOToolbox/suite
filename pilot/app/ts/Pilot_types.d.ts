@@ -316,6 +316,7 @@ interface PilotAiPanelParts {
 
 declare var ct_modal: CtModalApi;
 declare var ct_table: CtTableApi;
+declare var ct_nonconformity: CtNonconformityApi;
 declare var ct_bulkbar: CtBulkbarApi;
 declare var ct_measure_modal: CtMeasureModalApi;
 declare var ct_userpicker: {

@@ -83,6 +83,43 @@ def classify_due(due: str | None, today: date, upcoming_days: int) -> tuple[str,
     return None
 
 
+async def collect_derogation_items(db: AsyncSession, prefs: NotificationPrefs,
+                                   user: User, today: date | None = None) -> list[dict]:
+    """Approved derogations, by end of validity: the risk owner and the
+    approver are reminded ahead, and told once it has expired. Read live from
+    the modules; a module that cannot be reached is simply absent."""
+    today = today or date.today()
+    wanted_modules = set(prefs.modules or [])
+    try:
+        from src.routes.nonconformities import fetch_register
+        approved, _e1 = await fetch_register(db, "derogations", "approved")
+        expired, _e2 = await fetch_register(db, "derogations", "expired")
+    except Exception:  # noqa: BLE001 — never let a reminder break the digest
+        logger.debug("derogations skipped in digest", exc_info=True)
+        return []
+    items: list[dict] = []
+    for d in approved + expired:
+        if wanted_modules and d.get("module") not in wanted_modules:
+            continue
+        cls = classify_due(d.get("valid_until"), today, prefs.upcoming_days)
+        if cls is None:
+            continue
+        # An expiry is told once: only the ones of the last week are listed.
+        if d.get("status") == "expired" and (cls[0] != "overdue" or cls[1] > 7):
+            continue
+        who = (d.get("risk_owner") or "", d.get("approver") or "")
+        if prefs.scope != "all" and not any(matches_user(w, user.email, user.name) for w in who):
+            continue
+        items.append({
+            "kind": cls[0], "days": cls[1], "due": (d.get("valid_until") or "")[:10],
+            "ref": d.get("reference") or "", "title": d.get("title") or d.get("subject_label") or "",
+            "modules": [d.get("module")], "module": d.get("module") or "",
+            "entity_id": "", "source_id": d.get("id") or "", "group_id": "",
+            "type": "derogation",
+        })
+    return items
+
+
 async def collect_items(db: AsyncSession, prefs: NotificationPrefs,
                         user: User, today: date | None = None) -> list[dict]:
     """Overdue/upcoming measures for one recipient, deduplicating grouped
@@ -114,6 +151,8 @@ async def collect_items(db: AsyncSession, prefs: NotificationPrefs,
             "entity_id": mc.entity_id or "", "source_id": mc.source_id,
             "group_id": "",
         })
+
+    items.extend(await collect_derogation_items(db, prefs, user, today))
 
     groups = (await db.execute(
         select(MeasureGroup).where(MeasureGroup.status.in_(_OPEN_STATUSES))
@@ -158,6 +197,7 @@ _L = {
         "overdue": "Échéances dépassées ({n})",
         "upcoming": "À échéance sous {days} jours ({n})",
         "late": "{d} j de retard",
+        "derogation": "Dérogation",
         "left_0": "aujourd'hui",
         "left": "dans {d} j",
         "open": "Ouvrir",
@@ -170,6 +210,7 @@ _L = {
         "overdue": "Overdue ({n})",
         "upcoming": "Due within {days} days ({n})",
         "late": "{d} d late",
+        "derogation": "Derogation",
         "left_0": "today",
         "left": "in {d} d",
         "open": "Open",
@@ -200,6 +241,9 @@ def _item_url(item: dict, ext_urls: dict[str, str], pilot_url: str) -> str:
     base = _abs(ext_urls.get(item["module"], ""))
     if not base:
         return ""
+    if item.get("type") == "derogation":
+        from urllib.parse import quote
+        return base.rstrip("/") + "/?der=" + quote(item["source_id"]) + "#nonconformities"
     from urllib.parse import quote
     return (base.rstrip("/") + "/?entity=" + quote(item["entity_id"])
             + "&measure=" + quote(item["source_id"]) + "#measures")
@@ -228,7 +272,7 @@ def render_digest_html(items: list[dict], user_name: str, lang: str,
             link = ('<a href="' + e(url) + '" style="color:#2563eb">' + e(L["open"]) + " ↗</a>") if url else ""
             h += ('<tr style="border-bottom:1px solid #e5e7eb">'
                   '<td style="padding:7px 10px;white-space:nowrap;font-family:monospace;font-size:12px;color:#6b7280">'
-                  + e(i["ref"]) + "</td>"
+                  + e(i["ref"]) + (('<span style="margin-left:6px;font-size:11px;color:#6b7280">' + e(L["derogation"]) + "</span>") if i.get("type") == "derogation" else "") + "</td>"
                   '<td style="padding:7px 10px">' + e(i["title"]) + "</td>"
                   '<td style="padding:7px 10px">' + mods + "</td>"
                   '<td style="padding:7px 10px;white-space:nowrap">' + e(i["due"]) + "</td>"
