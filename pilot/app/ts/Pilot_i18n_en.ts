@@ -412,6 +412,7 @@ _registerTranslations("en", {
   "pilot.groups.resync": "Resync group",
   "pilot.groups.resynced": "Group resynced to the modules",
   "pilot.groups.saved": "Meta-measure saved and propagated to the modules",
+  "pilot.groups.no_cancel": "A group is not cancelled as a whole: cancel its measures one by one.",
   "pilot.groups.saved_with_errors": "Saved, but {n} write-back(s) failed (check modules)",
   "pilot.groups.title_prompt": "Meta-measure title:",
   "pilot.measure.status.planned": "Planned",

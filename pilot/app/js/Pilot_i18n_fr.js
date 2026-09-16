@@ -414,6 +414,7 @@ _registerTranslations("fr", {
     "pilot.groups.resync": "Resynchroniser le groupe",
     "pilot.groups.resynced": "Groupe resynchronisé vers les modules",
     "pilot.groups.saved": "Méta-mesure enregistrée et propagée aux modules",
+    "pilot.groups.no_cancel": "Un groupe ne s'abandonne pas en bloc : abandonner ses mesures une à une.",
     "pilot.groups.saved_with_errors": "Enregistré, mais {n} write-back en échec (voir modules)",
     "pilot.groups.title_prompt": "Titre de la méta-mesure :",
     "pilot.measure.status.planned": "Planifié",
