@@ -28,6 +28,7 @@ from src.routes.kpis import router as kpis_router
 from src.routes.measure_groups import router as measure_groups_router
 from src.routes.measures import router as measures_router
 from src.routes.evidences import router as evidences_router
+from src.routes.nonconformities import router as nonconformities_router
 from src.routes.internal import router as internal_router
 from src.routes.modules import router as modules_router
 from src.routes.notifications import router as notifications_router
@@ -94,6 +95,7 @@ app.include_router(measures_router)
 app.include_router(measure_groups_router)
 app.include_router(restore_router)
 app.include_router(evidences_router)
+app.include_router(nonconformities_router)
 app.include_router(kpis_router)
 app.include_router(awareness_router)
 app.include_router(projects_router)

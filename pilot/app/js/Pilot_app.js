@@ -36,8 +36,16 @@
         }
         if (resp.status === 204)
             return null;
-        if (!resp.ok)
-            throw new Error("API " + resp.status);
+        if (!resp.ok) {
+            // Keep the server's own message: a relayed module refusal (409, 422)
+            // is meant to be read by the user.
+            var body = "";
+            try {
+                body = await resp.text();
+            }
+            catch (e) { }
+            throw new Error("API " + resp.status + (body ? ": " + body.substring(0, 300) : ""));
+        }
         return resp.json();
     }
     // Expose for sibling panel modules (Pilot_kpis.js etc.)
@@ -173,6 +181,9 @@
                 break;
             case "evidences":
                 _renderEvidences(c);
+                break;
+            case "nonconformities":
+                _renderNonconformities(c);
                 break;
             case "kpis":
                 _renderKpis(c);
@@ -3030,6 +3041,91 @@
         valide: { color: "var(--ct-low)" },
         na: { color: "#94a3b8" },
     };
+    // ── Non-conformities and derogations (FEAT-45) ─────────────────
+    // The register lives in the modules; the console reads them live and relays
+    // what it may decide (approvals, refusals) or declare. Records keep their
+    // module so a relayed write goes to the right one.
+    var _ncModuleOf = {};
+    var _ncRegistryModules = [];
+    function _ncRegisterOptions() {
+        var remember = function (items) {
+            items.forEach(function (it) { if (it.id && it.module)
+                _ncModuleOf[it.id] = it.module; });
+        };
+        return {
+            listNc: function (status) {
+                return _fetch("/nonconformities" + (status ? "?status=" + encodeURIComponent(status) : "")).then(function (r) {
+                    remember(r.items || []);
+                    if (r.errors && Object.keys(r.errors).length)
+                        showStatus(t("pilot.nc.partial", { modules: Object.keys(r.errors).join(", ") }), true);
+                    return r;
+                });
+            },
+            listDer: function (filters) {
+                var parts = [];
+                if (filters)
+                    for (var k in filters)
+                        if (filters[k])
+                            parts.push(encodeURIComponent(k) + "=" + encodeURIComponent(filters[k]));
+                return _fetch("/derogations" + (parts.length ? "?" + parts.join("&") : "")).then(function (r) { remember(r.items || []); return r; });
+            },
+            createNc: function (body) { return _fetch("/nonconformities", { method: "POST", body: body }); },
+            decideDer: function (id, approve, note) {
+                var mod = _ncModuleOf[id];
+                if (!mod)
+                    return Promise.reject(new Error(t("pilot.nc.unknown_module")));
+                return _fetch("/derogations/" + encodeURIComponent(mod) + "/" + encodeURIComponent(id) + "/decision", { method: "POST", body: { approve: approve, note: note } });
+            },
+            isAdmin: function () { return !!(window._currentUser && window._currentUser.role === "admin"); },
+            subjectTypes: [],
+            modules: _ncRegistryModules,
+            openSettings: _openNcSettings,
+            onChange: function () { return Promise.resolve(); }
+        };
+    }
+    function _renderNonconformities(c) {
+        // The modules that keep a register are those answering the settings probe.
+        _fetch("/nonconformities-settings").then(function (r) {
+            _ncRegistryModules = ((r && r.items) || []).map(function (it) { return { value: it.module, label: it.module_name || it.module }; });
+        }).catch(function () { _ncRegistryModules = []; }).then(function () {
+            ct_nonconformity.renderPanel(c, _ncRegisterOptions());
+        });
+    }
+    // Per-module maximum derogation duration, edited from the console.
+    function _openNcSettings() {
+        _fetch("/nonconformities-settings").then(function (r) {
+            var items = (r && r.items) || [];
+            var h = '<div class="fs-xs ct-muted ct-mb-3">' + esc(t("pilot.nc.settings_help")) + '</div>';
+            if (!items.length)
+                h += '<div class="ct-muted">' + esc(t("pilot.nc.settings_empty")) + '</div>';
+            items.forEach(function (it) {
+                h += '<label class="ct-block ct-mb-2"><span class="fs-xs ct-muted">' + esc(it.module_name || it.module) + '</span>'
+                    + '<input type="number" min="1" max="3650" class="w-full" id="ct-nc-days-' + esc(it.module) + '" value="' + esc(String(it.max_derogation_days || 365)) + '" /></label>';
+            });
+            return ct_modal.open({ title: t("pilot.nc.settings_title"), body: h, size: "sm", buttons: [
+                    { id: "cancel", label: t("pilot.action.cancel") },
+                    { id: "save", label: t("pilot.action.save"), primary: true, result: function () {
+                            var out = {};
+                            items.forEach(function (it) {
+                                var el = document.getElementById("ct-nc-days-" + it.module);
+                                var n = el ? parseInt(el.value, 10) : NaN;
+                                if (n >= 1 && n <= 3650 && n !== it.max_derogation_days)
+                                    out[it.module] = n;
+                            });
+                            return { changes: out };
+                        } }
+                ] });
+        }).then(function (r) {
+            if (!r || !r.changes)
+                return;
+            var mods = Object.keys(r.changes);
+            if (!mods.length)
+                return;
+            return Promise.all(mods.map(function (m) {
+                return _fetch("/nonconformities-settings/" + encodeURIComponent(m), { method: "PUT", body: { max_derogation_days: r.changes[m] } });
+            })).then(function () { showStatus(t("pilot.nc.settings_saved")); });
+        }).catch(function (e) { showStatus((e && e.message) || t("pilot.nc.error"), true); });
+    }
     function _renderEvidences(c) {
         var h = '<div class="ct-flex ct-items-center ct-gap-3 ct-row-wrap"><h2 class="ct-m-0">' + t("pilot.evidences.title") + '</h2>';
         h += '<button class="ct-btn mt-8" data-write data-variant="primary" data-click="_syncEvidencesNow">&#x21bb; ' + t("pilot.action.sync") + '</button></div>';
