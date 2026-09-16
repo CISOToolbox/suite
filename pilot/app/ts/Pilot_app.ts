@@ -763,7 +763,9 @@ function _wireKanbanDnD() {
     cards.forEach(function(card) {
         card.addEventListener("dragstart", function(e) {
             e.dataTransfer!.effectAllowed = "move";
-            e.dataTransfer!.setData("text/plain", card.getAttribute("data-measure-id")!);
+            // A measure carries its id, a consolidated group "group:<id>".
+            var gid = card.getAttribute("data-group-id");
+            e.dataTransfer!.setData("text/plain", gid ? "group:" + gid : card.getAttribute("data-measure-id")!);
             card.classList.add("dragging");
         });
         card.addEventListener("dragend", function() {
@@ -786,7 +788,8 @@ function _wireKanbanDnD() {
             var id = e.dataTransfer!.getData("text/plain");
             var newStatus = col.getAttribute("data-status");
             if (!id || !newStatus) return;
-            _moveMeasureStatus(id, newStatus);
+            if (id.indexOf("group:") === 0) _moveGroupStatus(id.slice(6), newStatus);
+            else _moveMeasureStatus(id, newStatus);
         });
     });
 }
@@ -806,6 +809,36 @@ function _moveMeasureStatus(measureId: string, newStatus: string) {
         showStatus(t("pilot.measures.status_set", { status: t("pilot.measure.status." + newStatus) }));
     }).catch(function(err) {
         m!.status = prevStatus;
+        _renderPanel();
+        showStatus(t("pilot.common.error_msg", { msg: err.message || err }), true);
+    });
+}
+
+// Same optimistic move for a consolidated group. The server propagates the
+// status to the members, so on success the measures are reloaded (as the
+// group modal does) rather than left with a stale local state; a member
+// whose write-back failed is reported, as in the modal.
+function _moveGroupStatus(groupId: string, newStatus: string) {
+    var g = _groups.find(function(x) { return x.id === groupId; });
+    if (!g) return;
+    if (g.status === newStatus) return;
+    if (newStatus === "cancelled") {
+        // A group is never cancelled as a whole; its members are, one by one.
+        showStatus(t("pilot.groups.no_cancel"), true);
+        return;
+    }
+    var prevStatus = g.status;
+    g.status = newStatus;
+    _renderPanel();
+    _fetch("/measure-groups/" + encodeURIComponent(groupId), {
+        method: "PATCH", body: { status: newStatus }
+    }).then(function(updated: any) {
+        var errs = (updated && updated.propagation_errors) || [];
+        showStatus(errs.length ? t("pilot.groups.saved_with_errors", { n: errs.length })
+                               : t("pilot.measures.status_set", { status: t("pilot.measure.status." + newStatus) }), !!errs.length);
+        return _loadMeasures().then(_renderPanel);
+    }).catch(function(err) {
+        g!.status = prevStatus;
         _renderPanel();
         showStatus(t("pilot.common.error_msg", { msg: err.message || err }), true);
     });
@@ -859,7 +892,7 @@ function _groupRows(groups: PilotMeasureGroup[]): Array<Record<string, unknown>>
 
 function _renderGroupCard(g: PilotMeasureGroup, today: string): string {
     var overdue = g.due_date && g.due_date < today && g.status !== "completed";
-    var h = '<div class="pilot-kanban-card' + (overdue ? ' overdue' : '') + '" data-click="_openGroupRow" data-args=\'' + _da(g.id) + '\'>';
+    var h = '<div class="pilot-kanban-card' + (overdue ? ' overdue' : '') + '" draggable="true" data-group-id="' + esc(g.id) + '" data-click="_openGroupRow" data-args=\'' + _da(g.id) + '\'>';
     h += '<div class="pilot-kanban-card-top"><span class="ct-badge" data-size="sm" data-tone="info">' + _icon("link", 10) + ' ' + esc(_groupModulesBadge(g)) + '</span>' + (g.ref ? ' <span class="ct-mono ct-text-meta ct-muted">' + esc(g.ref) + '</span>' : '') + '</div>';
     h += '<div class="pilot-kanban-card-title">' + esc(g.title || t("pilot.common.untitled")) + '</div>';
     h += '<div class="pilot-kanban-card-foot">';
