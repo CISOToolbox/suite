@@ -13,7 +13,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database import async_session, get_db
-from src.models import AppSettings, Application, Measure, Project, RequestedEntitlement, Review, ServiceAccount, SiUser
+from src.models import AppSettings, Application, Measure, Project, RequestedEntitlement, Review, ReviewEntry, ServiceAccount, SiUser
 from src.proof_rules import enforce_proof_evidence
 from src.settings_crypto import decrypt_setting, encrypt_setting_or_plain
 
@@ -305,7 +305,19 @@ async def internal_stats(request: Request, db: AsyncSession = Depends(get_db)):
             "url": "/access/",
         })
 
+    # FEAT-45 — the register's view of the posture: under derogation is a
+    # category of its own; the review-closure score is untouched by it.
+    decisions = {d: int(n) for d, n in (await db.execute(
+        select(ReviewEntry.decision, func.count()).group_by(ReviewEntry.decision))).all()}
+    declared = await _declared_counts(db)
+
     return {
+        "nonconformities": {
+            "derogated": decisions.get("derogated", 0) + declared.pop("derogated", 0),
+            "detected_open": decisions.get("non_conforme", 0),
+            "with_measure": 0,
+            **declared,
+        },
         "entity_count": total_apps,
         "entity_label": "Applications",
         "measures": {
@@ -1102,3 +1114,13 @@ async def expiry_notify_run(request: Request, db: AsyncSession = Depends(get_db)
     result = await run_now(db)
     await db.commit()
     return result
+
+
+async def _declared_counts(db: AsyncSession) -> dict:
+    try:
+        from src.models import Nonconformity
+        from src.nonconformity_common import declared_counts
+        return await declared_counts(db, Nonconformity)
+    except Exception as e:  # noqa: BLE001 — the register is optional in the envelope
+        logger.warning("nonconformities block unavailable: %s", e)
+        return {"to_qualify": 0, "open": 0, "derogated": 0}

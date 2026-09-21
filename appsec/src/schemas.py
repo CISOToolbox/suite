@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 from typing import Any, Optional
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from src.ssrf_guard import resolve_safe_target
 
@@ -334,6 +334,8 @@ class FindingResponse(BaseModel):
     triaged_at: datetime | None
     triaged_by: str | None
     triage_notes: str
+    # FEAT-45 — set while the finding is under an approved derogation.
+    derogation_id: uuid.UUID | None = None
     last_seen_at: datetime
     created_at: datetime
     updated_at: datetime
@@ -372,6 +374,7 @@ class FindingsStats(BaseModel):
     to_fix: int = 0
     false_positive: int = 0
     fixed: int = 0
+    derogated: int = 0
     by_scanner: dict[str, int] = {}
     by_app: dict[str, int] = {}
     by_app_severity: dict[str, dict[str, int]] = {}  # {app: {critical: N, high: N, ...}}
@@ -419,6 +422,14 @@ class SBOMResponse(BaseModel):
 
 
 # ── Measures ──────────────────────────────────────────────────
+
+class MeasureCreate(BaseModel):
+    """FEAT-45 — a measure on its own (no finding): a record's corrective measure."""
+    title: str = Field(min_length=1, max_length=500)
+    description: str = ""
+    responsable: str = ""
+    echeance: str = ""
+
 
 class MeasureUpdate(BaseModel):
     title: Optional[str] = None

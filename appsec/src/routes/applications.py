@@ -164,6 +164,12 @@ async def delete_application(
     if not app:
         raise HTTPException(status_code=404, detail="Application not found")
     await log_action(db, user, request, "app.delete", target=app.name)
+    # FEAT-45 — the findings go with the application: any derogation on them is settled.
+    from src.models import Derogation, Finding
+    from src.nonconformity_common import revoke_for_subject
+    actor = (user.email if user else None) or "system"
+    for fid in (await db.execute(select(Finding.id).where(Finding.application_id == app.id))).scalars().all():
+        await revoke_for_subject(db, Derogation, "finding", str(fid), "application deleted", actor=actor)
     await db.delete(app)
     await db.commit()
 

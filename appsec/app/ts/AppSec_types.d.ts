@@ -58,6 +58,8 @@ type AppSecFinding = {
     cve_id?: string;
     evidence?: AppSecEvidence | null;
     measure_id?: string | null;
+    /** FEAT-45 — set while the finding is under an approved derogation. */
+    derogation_id?: string | null;
     created_at?: string;
     last_seen_at?: string;
     triaged_at?: string;
@@ -85,6 +87,8 @@ type AppSecStats = {
     info?: number;
     cve_total?: number;
     cve_with_patch?: number;
+    /** FEAT-45 — findings under an approved derogation. */
+    derogated?: number;
     by_app?: Record<string, number>;
     by_app_severity?: Record<string, Record<string, number>>;
 };
@@ -219,6 +223,20 @@ interface AppSecApiType {
     listScans(appId?: string | number): Promise<AppSecScan[]>;
     resetStuckScans(appId: string | number): Promise<{ reset_count?: number }>;
     listMeasures(): Promise<AppSecMeasure[]>;
+    createMeasure(data: Partial<AppSecMeasure>): Promise<AppSecMeasure>;
+    /* FEAT-45 — non-conformities and derogations (shared register component) */
+    listNonconformities(status?: string): Promise<{ items: CtNcRecord[] }>;
+    createNonconformity(body: Record<string, unknown>): Promise<CtNcRecord>;
+    patchNonconformity(id: string, body: Record<string, unknown>): Promise<CtNcRecord>;
+    qualifyNonconformity(id: string, body: Record<string, unknown>): Promise<CtNcRecord>;
+    rejectNonconformity(id: string, note: string): Promise<CtNcRecord>;
+    closeNonconformity(id: string, evidence: string): Promise<CtNcRecord>;
+    listDerogations(filters?: Record<string, string>): Promise<{ items: CtDerRecord[] }>;
+    createDerogation(body: Record<string, unknown>): Promise<CtDerRecord>;
+    decideDerogation(id: string, approve: boolean, note: string): Promise<CtDerRecord>;
+    revokeDerogation(id: string, reason: string): Promise<CtDerRecord>;
+    nonconformitySettings(): Promise<{ max_derogation_days: number }>;
+    saveNonconformitySettings(days: number): Promise<unknown>;
     updateMeasure(id: string, data: Record<string, unknown>): Promise<any>;
     deleteMeasure(id: string): Promise<any>;
     listSBOM(params?: AppSecQueryParams): Promise<{ items?: AppSecSbomEntry[]; total?: number; ecosystems?: string[] }>;
@@ -231,6 +249,7 @@ declare var ct_table: CtTableApi;
 declare var ct_bulkbar: CtBulkbarApi;
 declare var ct_modal: CtModalApi;
 declare var ct_measure_modal: CtMeasureModalApi;
+declare var ct_nonconformity: CtNonconformityApi;
 declare var ct_finding_view: CtFindingViewApi;
 /** Set by ai_common.js on window (bare calls in _aiTriageFinding). */
 declare function _aiCallAPI(systemPrompt: string, userPrompt: string): Promise<string>;
@@ -292,6 +311,7 @@ interface Window {
     _backToFindings: typeof _backToFindings;
     _appsecTriageDetail: (status: string) => void;
     _deleteAppsecFinding: () => void;
+    _requestDerogationDetail: () => void;
     _aiTriageFinding: () => void;
     _aiTriageRun: () => Promise<void>;
 

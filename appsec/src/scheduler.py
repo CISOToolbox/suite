@@ -425,7 +425,7 @@ async def _close_unseen_findings(db: AsyncSession, app_id: uuid.UUID,
         sa_update(Finding)
         .where(Finding.application_id == app_id,
                Finding.scanner == scanner_name,
-               Finding.status != "fixed",
+               Finding.status.notin_(["fixed", "derogated"]),    # FEAT-45: a live derogation is not closed by silence
                Finding.last_seen_at < scan_started)
         .values(status="fixed", updated_at=datetime.now(timezone.utc))
     )
@@ -706,7 +706,24 @@ async def _loop() -> None:
 
         await _tick()
         await _purge()
+        # FEAT-45 — derogations past their end of validity, once an hour: the
+        # finding goes back to to_fix and the register shows it.
+        if tick_counter % 60 == 0:
+            try:
+                await _expire_derogations()
+            except Exception:
+                logger.exception("scheduler: derogation expiry crashed")
         await asyncio.sleep(TICK_SECONDS)
+
+
+async def _expire_derogations() -> None:
+    from src.models import Derogation, Nonconformity
+    from src.nonconformity_common import expire_derogations
+    from src.routes.nonconformities import FINDING_HOOK
+    async with async_session() as db:
+        n = await expire_derogations(db, Derogation, FINDING_HOOK, Nonconformity)
+        if n:
+            logger.info("scheduler: %d derogation(s) expired", n)
 
 
 _scheduler_task = None

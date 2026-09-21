@@ -43,6 +43,8 @@
         }
         return resp.json();
     }
+    // The register belongs to the active project (the module is project-scoped).
+    function _pid() { return (window.getActiveProjectId && window.getActiveProjectId()) || ""; }
     window.AccessAPI = {
         list: function () { return _fetch("/projects"); },
         get: function (id) { return _fetch("/projects/" + id); },
@@ -84,6 +86,33 @@
         deleteReview: function (pid, rid) { return _fetch("/projects/" + pid + "/reviews/" + rid, { method: "DELETE" }); },
         // Measures
         listMeasures: function (pid) { return _fetch("/projects/" + pid + "/measures"); },
+        // FEAT-45 — non-conformities and derogations (module-wide, not per project)
+        listNonconformities: function (status) {
+            var q = [];
+            if (status)
+                q.push("status=" + encodeURIComponent(status));
+            if (_pid())
+                q.push("project_id=" + encodeURIComponent(_pid()));
+            return _fetch("/nonconformities" + (q.length ? "?" + q.join("&") : ""));
+        },
+        createNonconformity: function (body) { return _fetch("/nonconformities", { method: "POST", body: Object.assign({ project_id: _pid() }, body) }); },
+        patchNonconformity: function (id, body) { return _fetch("/nonconformities/" + id, { method: "PATCH", body: body }); },
+        qualifyNonconformity: function (id, body) { return _fetch("/nonconformities/" + id + "/qualify", { method: "POST", body: body }); },
+        rejectNonconformity: function (id, note) { return _fetch("/nonconformities/" + id + "/reject", { method: "POST", body: { note: note } }); },
+        closeNonconformity: function (id, evidence) { return _fetch("/nonconformities/" + id + "/close", { method: "POST", body: { closure_evidence: evidence } }); },
+        listDerogations: function (filters) {
+            var parts = [];
+            if (_pid())
+                parts.push("project_id=" + encodeURIComponent(_pid()));
+            Object.keys(filters || {}).forEach(function (k) { if (filters[k])
+                parts.push(encodeURIComponent(k) + "=" + encodeURIComponent(filters[k])); });
+            return _fetch("/derogations" + (parts.length ? "?" + parts.join("&") : ""));
+        },
+        createDerogation: function (body) { return _fetch("/derogations", { method: "POST", body: Object.assign({ project_id: _pid() }, body) }); },
+        decideDerogation: function (id, approve, note) { return _fetch("/derogations/" + id + "/decision", { method: "POST", body: { approve: approve, note: note } }); },
+        revokeDerogation: function (id, reason) { return _fetch("/derogations/" + id + "/revoke", { method: "POST", body: { reason: reason } }); },
+        nonconformitySettings: function () { return _fetch("/nonconformities-settings"); },
+        saveNonconformitySettings: function (days) { return _fetch("/nonconformities-settings", { method: "PUT", body: { max_derogation_days: days } }); },
         createMeasure: function (pid, data) { return _fetch("/projects/" + pid + "/measures", { method: "POST", body: data }); },
         patchMeasure: function (pid, mid, fields) { return _fetch("/projects/" + pid + "/measures/" + mid, { method: "PATCH", body: fields }); },
         deleteMeasure: function (pid, mid) { return _fetch("/projects/" + pid + "/measures/" + mid, { method: "DELETE" }); },
@@ -261,8 +290,13 @@
     // ─── Toolbar user pill (name + admin + logout) ──────────────────
     function _initAuth() {
         fetch("auth/providers").then(function (r) { return r.json(); }).then(function (data) {
-            if (!data.auth_enabled)
+            // No auth = full access, the server's own contract: publish the role
+            // the gates would read, so the UI offers what the API accepts.
+            if (!data.auth_enabled) {
+                window._moduleRole = "admin";
+                document.dispatchEvent(new CustomEvent("ct-role-ready"));
                 return;
+            }
             fetch("auth/me", { credentials: "same-origin" }).then(function (r) {
                 if (!r.ok) {
                     var _rp = window.location.pathname.replace(/[^/]*$/, "");
@@ -290,6 +324,7 @@
                 }).then(function (roleInfo) {
                     var role = roleInfo.role || "";
                     window._moduleRole = role;
+                    document.dispatchEvent(new CustomEvent("ct-role-ready"));
                     if (role)
                         document.body.classList.add("ct-role-" + role);
                     if (user.role === "admin")

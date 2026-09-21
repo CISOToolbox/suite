@@ -305,4 +305,23 @@ async def run_scheduler() -> None:
             raise
         except Exception:
             logger.exception("sa-expiry tick failed")
+        # FEAT-45 — derogations past their end of validity: the review entry
+        # goes back to non-compliant and the register shows it.
+        try:
+            await _expire_derogations()
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("derogation expiry failed")
         await asyncio.sleep(TICK_SECONDS)
+
+
+async def _expire_derogations() -> None:
+    from src.database import async_session
+    from src.models import Derogation, Nonconformity
+    from src.nonconformity_common import expire_derogations
+    from src.routes.nonconformities import ENTRY_HOOK
+    async with async_session() as db:
+        n = await expire_derogations(db, Derogation, ENTRY_HOOK, Nonconformity)
+        if n:
+            logger.info("%d derogation(s) expired", n)

@@ -174,6 +174,7 @@ async def findings_stats(
         to_fix=by_status.get("to_fix", 0),
         false_positive=by_status.get("false_positive", 0),
         fixed=by_status.get("fixed", 0),
+        derogated=by_status.get("derogated", 0),
         by_scanner={s: c for s, c in scanner_q},
         by_app={n: c for n, c in app_q},
         by_app_severity=by_app_severity,
@@ -218,6 +219,15 @@ async def triage_finding(
     app_name = finding.application.name if finding.application else "?"
     old_status = finding.status
     now = datetime.now(timezone.utc)
+    # FEAT-45 — a triage is the analyst's decision: it supersedes an approved
+    # derogation, and a request still pending on a finding that leaves the
+    # actionable states is moot. The register says so.
+    if old_status == "derogated" or body.status not in ("new", "to_fix"):
+        from src.models import Derogation
+        from src.nonconformity_common import revoke_for_subject
+        await revoke_for_subject(db, Derogation, "finding", str(finding.id), f"finding triaged to '{body.status}'",
+                                 actor=(user.email if user else None) or "system")
+        finding.derogation_id = None
     finding.status = body.status
     if body.triage_notes is not None:
         finding.triage_notes = body.triage_notes
@@ -342,6 +352,15 @@ async def bulk_triage(
     now = datetime.now(timezone.utc)
     triaged_by = user.email if user else "anonymous"
 
+    # FEAT-45 — the bulk decision lifts any derogation on the findings concerned.
+    settled = [f for f in findings if f.status == "derogated" or body.status not in ("new", "to_fix")]
+    if settled:
+        from src.models import Derogation
+        from src.nonconformity_common import revoke_for_subject
+        for f in settled:
+            await revoke_for_subject(db, Derogation, "finding", str(f.id), f"finding triaged to '{body.status}'",
+                                     actor=(user.email if user else None) or "system")
+            f.derogation_id = None
     # Update status/notes on every finding in the request
     for f in findings:
         f.status = body.status
