@@ -201,3 +201,16 @@ async def test_digest_reminds_the_risk_owner_of_an_expiring_derogation(db, modul
     # someone else gets nothing under scope "mine"
     other = User(id=uuid.uuid4(), email="nobody@medsecure.example", name="Nobody", role="user")
     assert await collect_derogation_items(db, prefs, other, today=date.today()) == []
+
+
+def test_dashboard_sums_the_register_blocks_of_the_modules():
+    from src.routes.dashboard import summarize_nonconformities
+    cards = [
+        {"id": "surface", "stats": {"nonconformities": {"derogated": 2, "detected_open": 40, "with_measure": 5, "to_qualify": 1, "open": 3}}},
+        {"id": "compliance", "stats": {"nonconformities": {"derogated": 1, "detected_open": "7", "to_qualify": 0, "open": 0}}},
+        {"id": "risk", "stats": {}},                       # no register
+        {"id": "watch", "stats": {"nonconformities": "garbage"}},
+    ]
+    out = summarize_nonconformities(cards)
+    assert out == {"derogated": 3, "detected_open": 47, "with_measure": 5, "to_qualify": 1, "open": 3,
+                   "modules": {"surface": 2, "compliance": 1}}

@@ -51,6 +51,28 @@ if SERVICE_TOKEN:
 #   3. Merge all activity feeds + derive `upcoming` from MeasureCache.
 # ═══════════════════════════════════════════════════════════════════════
 
+def summarize_nonconformities(module_cards: list) -> dict:
+    """Sum of the modules' `nonconformities` blocks (contract §nonconformities);
+    `modules` keeps the per-module derogated count for the tile's detail."""
+    out = {"derogated": 0, "detected_open": 0, "with_measure": 0, "to_qualify": 0, "open": 0, "modules": {}}
+    for card in module_cards:
+        block = ((card.get("stats") or {}).get("nonconformities")) or {}
+        if not isinstance(block, dict):
+            continue
+        for k in ("derogated", "detected_open", "with_measure", "to_qualify", "open"):
+            try:
+                out[k] += int(block.get(k) or 0)
+            except (TypeError, ValueError):
+                pass
+        try:
+            d = int(block.get("derogated") or 0)
+        except (TypeError, ValueError):
+            d = 0
+        if d:
+            out["modules"][card.get("id", "")] = d
+    return out
+
+
 # Module weights for the weighted posture_global KPI. "kpis" is the local
 # Pilot KPI panel (see _compute_kpi_posture below) — given a non-trivial
 # weight so the top-level Posture aligns with what the KPI panel shows.
@@ -331,6 +353,7 @@ async def get_dashboard(user: User = Depends(get_current_user), db: AsyncSession
         "expiring_soon": sum(1 for e in _ev_rows if (e.data or {}).get("status") == "bientot"),
     }
     critical_breakdown: dict[str, int] = {}
+    nc_summary = summarize_nonconformities(module_cards)
 
     for card in module_cards:
         stats = card.get("stats") or {}
@@ -414,6 +437,9 @@ async def get_dashboard(user: User = Depends(get_current_user), db: AsyncSession
         "evidences": evidences_summary,
         "critical_count": sum(critical_breakdown.values()),
         "critical_breakdown": critical_breakdown,
+        # FEAT-45 — under derogation / to qualify, summed over the modules
+        # that keep a register (contract §nonconformities).
+        "nonconformities": nc_summary,
     }
 
     # ── Backup health (FEAT-30 phase 3) ──

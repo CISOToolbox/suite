@@ -176,6 +176,8 @@ _registerTranslations("fr", {
   "pilot.connectors.types_declared": "{n} type(s) déclaré(s)",
   "pilot.connectors.used_by": "Utilisé par :",
   "pilot.dashboard.critical_items": "Items critiques",
+  "pilot.dashboard.derogated": "Sous dérogation",
+  "pilot.dashboard.to_qualify_n": "{n} à qualifier",
   "pilot.dashboard.done_30d": "+{n} terminées (30j)",
   "pilot.dashboard.all_modules_badge": "tous modules",
   "pilot.dashboard.expiring_soon": "bientôt expirée(s)",

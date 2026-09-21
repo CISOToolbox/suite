@@ -93,6 +93,12 @@ async def internal_stats(request: Request, db: AsyncSession = Depends(get_db)):
     new_findings = await db.scalar(select(func.count()).select_from(Finding).where(Finding.status == "new")) or 0
     fp_findings = await db.scalar(select(func.count()).select_from(Finding).where(Finding.status == "false_positive")) or 0
     tofix_findings = await db.scalar(select(func.count()).select_from(Finding).where(Finding.status == "to_fix")) or 0
+    derogated_findings = await db.scalar(select(func.count()).select_from(Finding).where(Finding.status == "derogated")) or 0
+    # FEAT-45 — a derogated finding leaves the open counters (its own category)
+    # but keeps weighing on the score: a derogation never greens the posture.
+    derogated_by_sev = {sev: int(n) for sev, n in (await db.execute(
+        select(Finding.severity, func.count()).select_from(Finding)
+        .where(Finding.status == "derogated", Finding.type != "defender_recommendation").group_by(Finding.severity))).all()}
 
     measure_rows = (await db.execute(
         select(Measure.statut, func.count()).group_by(Measure.statut)
@@ -112,7 +118,9 @@ async def internal_stats(request: Request, db: AsyncSession = Depends(get_db)):
 
     progress_pct = round(completed / total_measures * 100) if total_measures else 0
 
-    penalty = crit * 10 + high * 3 + med * 1
+    declared = await _declared_counts(db)
+    penalty = ((crit + derogated_by_sev.get("critical", 0)) * 10 + (high + derogated_by_sev.get("high", 0)) * 3
+               + (med + derogated_by_sev.get("medium", 0)))
     posture_score = max(0, min(100, 100 - penalty))
 
     buckets = [
@@ -202,6 +210,14 @@ async def internal_stats(request: Request, db: AsyncSession = Depends(get_db)):
         },
         "top_items": top_items,
         "alerts": alerts,
+        # FEAT-45 — the register's view of the posture: under derogation is a
+        # category of its own, never counted as handled nor as open.
+        "nonconformities": {
+            "derogated": derogated_findings + declared.pop("derogated", 0),
+            "detected_open": new_findings + tofix_findings,
+            "with_measure": tofix_findings,
+            **declared,
+        },
         # Legacy
         "total_findings": total_findings,
         "new_findings": new_findings,
@@ -212,6 +228,16 @@ async def internal_stats(request: Request, db: AsyncSession = Depends(get_db)):
         "total_measures": total_measures,
         "measures_progress": progress_pct,
     }
+
+
+async def _declared_counts(db: AsyncSession) -> dict:
+    try:
+        from src.models import Nonconformity
+        from src.nonconformity_common import declared_counts
+        return await declared_counts(db, Nonconformity)
+    except Exception as e:  # noqa: BLE001 — the register is optional in the envelope
+        logger.warning("nonconformities block unavailable: %s", e)
+        return {"to_qualify": 0, "open": 0, "derogated": 0}
 
 
 def _posture_label(score):
