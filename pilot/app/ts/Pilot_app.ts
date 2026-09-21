@@ -235,6 +235,21 @@ function _renderDashboard(c: HTMLElement) {
     h += '</div>';
     h += '</div></div>';
 
+    // FEAT-45 — under derogation, across the modules that keep a register.
+    var ncs = (kpis as any).nonconformities || {};
+    var derogated = ncs.derogated || 0;
+    var toQualify = ncs.to_qualify || 0;
+    h += '<div class="ct-kpi ct-clickable"' + (derogated ? ' data-emphasis="value" data-tone="neutral"' : '') + ' data-click="selectPanel" data-args=\'["nonconformities"]\'><div class="ct-kpi-tone"></div><div class="ct-kpi-body">';
+    h += '<div class="ct-kpi-label">' + esc(t("pilot.dashboard.derogated")) + '</div>';
+    h += '<div class="ct-kpi-value">' + derogated + '</div>';
+    h += '<div class="ct-kpi-split">';
+    Object.keys(ncs.modules || {}).sort().forEach(function(k) {
+        h += '<span class="ct-badge" data-tone="neutral">' + esc(k) + ' ' + ncs.modules[k] + '</span>';
+    });
+    if (toQualify > 0) h += '<span class="ct-badge" data-tone="medium">' + esc(t("pilot.dashboard.to_qualify_n", { n: toQualify })) + '</span>';
+    h += '</div>';
+    h += '</div></div>';
+
     // FEAT-08 — cross-module evidence expiry (EvidenceCache); the legacy
     // compliance-only proofs_expired_10d feeds the badge detail.
     var evx = (kpis as any).evidences || {};
@@ -3013,7 +3028,7 @@ var _EV_STATUS_META: Record<string, { color: string }> = {
 // what it may decide (approvals, refusals) or declare. Records keep their
 // module so a relayed write goes to the right one.
 var _ncModuleOf: Record<string, string> = {};
-var _ncRegistryModules: CtNcMeasureOption[] = [];
+var _ncRegistryModules: CtNcItemOption[] = [];
 
 function _ncRegisterOptions(): CtNcOptions {
     var remember = function(items: Array<{ id: string; module?: string }>) {
@@ -3050,7 +3065,7 @@ function _ncRegisterOptions(): CtNcOptions {
 function _renderNonconformities(c: HTMLElement) {
     // The modules that keep a register are those answering the settings probe.
     _fetch("/nonconformities-settings").then(function(r: any) {
-        _ncRegistryModules = ((r && r.items) || []).map(function(it: any) { return { value: it.module, label: it.module_name || it.module }; });
+        _ncRegistryModules = ((r && r.items) || []).map(function(it: any) { return { id: it.module, label: it.module_name || it.module }; });
     }).catch(function() { _ncRegistryModules = []; }).then(function() {
         ct_nonconformity.renderPanel(c, _ncRegisterOptions());
     });
