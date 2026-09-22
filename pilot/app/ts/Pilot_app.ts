@@ -3054,7 +3054,10 @@ function _ncRegisterOptions(): CtNcOptions {
             return _fetch("/derogations/" + encodeURIComponent(mod) + "/" + encodeURIComponent(id) + "/decision",
                           { method: "POST", body: { approve: approve, note: note } });
         },
+        // The console has no module role: its own account role is the authority,
+        // the same one Pilot's relay checks (admin decides, a viewer writes nothing).
         isAdmin: function() { return !!(window._currentUser && window._currentUser.role === "admin"); },
+        canWrite: function() { var u = window._currentUser; return !u || u.role !== "viewer"; },
         subjectTypes: [],
         modules: _ncRegistryModules,
         openSettings: _openNcSettings,

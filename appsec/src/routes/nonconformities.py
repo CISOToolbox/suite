@@ -1,24 +1,25 @@
-"""FEAT-45 — non-conformities and derogations, Surface flavour.
+"""FEAT-45 — non-conformities and derogations, AppSec flavour.
 
 The mechanics (states, validation, router, expiry) are shared; this file
-says what a derogation covers here — a finding — and what "derogated" does
-to it: the finding leaves the open queue, is silenced on re-detection, and
-comes back to `to_fix` when the derogation ends.
+says what a derogation covers here — a finding of an application — and what
+"derogated" does to it: the finding leaves the open queue, is silenced on
+re-detection, and comes back to `to_fix` when the derogation ends.
 """
 from __future__ import annotations
 
 import uuid
-
-from fastapi import HTTPException
 from datetime import datetime, timezone
 from typing import Any, Optional
 
+from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.models import Measure, Derogation, Finding, Nonconformity
+from src.models import Derogation, Finding, Measure, Nonconformity
 from src.nonconformity_common import make_internal_router, make_router
-from src.auth import SURFACE_ROLES, require_min_role
+from src.auth import require_min_role
+
+_APPSEC_ROLES = ["viewer", "triager", "admin"]
 
 
 class FindingHook:
@@ -33,7 +34,7 @@ class FindingHook:
             return None
         if f.status not in ("new", "to_fix"):
             raise HTTPException(status_code=409, detail=f"finding is '{f.status}': only a new or to-fix finding can be derogated")
-        return f"{f.target or ''} — {f.title or f.id}"[:500]
+        return f"{f.cve_id or f.title or f.id}{' — ' + f.target if f.target else ''}"[:500]
 
     async def apply(self, db: AsyncSession, derogation: Any) -> None:
         f = await db.get(Finding, uuid.UUID(derogation.subject_id))
@@ -54,12 +55,10 @@ class FindingHook:
         f.triaged_by = "system"
         f.triage_notes = ((f.triage_notes or "") + f"\n[Derogation {derogation.reference} {reason}]").strip()
 
-
     async def missing_measures(self, db: AsyncSession, ids: list, project_id: str = "") -> list:
         rows = (await db.execute(select(Measure.id).where(Measure.id.in_(ids)))).scalars().all()
         found = set(rows)
         return [i for i in ids if i not in found]
-
 
     async def measure_states(self, db: AsyncSession, ids: list, project_id: str = "") -> dict:
         rows = (await db.execute(select(Measure.id, Measure.statut).where(Measure.id.in_(ids)))).all()
@@ -68,7 +67,7 @@ class FindingHook:
 
 FINDING_HOOK = FindingHook()
 router = make_router(Nonconformity, Derogation, FINDING_HOOK, subject_types=("finding",),
-                     require_writer=lambda u: require_min_role(u, "triager", SURFACE_ROLES))
+                     require_writer=lambda u: require_min_role(u, "triager", _APPSEC_ROLES))
 
 # Pilot's view of the register (service token): the same operations, relayed
 # with the Pilot user as actor. The token check is the module's own.

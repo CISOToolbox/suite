@@ -47,10 +47,11 @@ function _initDataAndRender(cb) {
             alert(e && e.message ? e.message : String(e));
         }
     }
-    _panel = "dashboard";
+    // FEAT-45 — a deep link from the console (or a record's button) opens the register directly.
+    _panel = location.hash === "#nonconformities" ? "nonconformities" : "dashboard";
     _selectedUser = _selectedApp = _selectedReview = _selectedSA = null;
     renderAll();
-    _loadPlugins(function () { renderPanel(); });
+    _loadPlugins(function () { _updateSidebarAccordion(_panel); renderPanel(); });
     _installLiveReload();
     if (cb)
         cb();
@@ -147,6 +148,9 @@ function renderPanel() {
             break;
         case "plugins":
             c.innerHTML = renderPlugins();
+            break;
+        case "nonconformities":
+            ct_nonconformity.renderPanel(c, _ncOptions());
             break;
         default: c.innerHTML = renderDashboard();
     }
@@ -327,6 +331,10 @@ function renderDashboard() {
     h += _card(D.applications.length, t("dashboard.apps"));
     h += _card(active, t("dashboard.active_reviews"), _kpiTone(active, { warn: 1 }));
     h += _card(closed, t("dashboard.closed_reviews"));
+    var derogated = 0;
+    D.reviews.forEach(function (r) { (r.entries || []).forEach(function (e) { if (e.decision === "derogated")
+        derogated++; }); });
+    h += _card(derogated, t("dashboard.derogated"));
     h += _card(nc, t("dashboard.measures"));
     var mProgress = nc ? Math.round(mDone / nc * 100) : null;
     h += _card(nc ? mProgress + "%" : "-", t("dashboard.measures_progress"), _kpiTone(mProgress, { dir: "up", amber: 90, red: 70 }));
@@ -1903,6 +1911,13 @@ function renderReviewDetail() {
         if (isClosed) {
             // Closed review: the decision is a statement of fact, not a control.
             h += '<span class="ct-badge" data-tone="' + (e.decision === "conforme" ? "low" : e.decision === "non_conforme" ? "critical" : "neutral") + '">' + esc(_decisionLabel(e.decision)) + '</span>';
+            if (e.decision === "non_conforme")
+                h += ' <button type="button" class="ct-btn" data-size="xs" data-write data-click="_requestEntryDerogation" data-args=\'' + _da(x.idx) + '\'>' + esc(t("review.derogation_btn")) + '</button>';
+        }
+        else if (e.decision === "derogated") {
+            // FEAT-45 — under an approved derogation: the register lifts it, not the
+            // review. The badge opens the derogation that covers the entry.
+            h += '<span class="ct-badge ct-clickable" data-tone="neutral" data-click="_requestEntryDerogation" data-args=\'' + _da(x.idx) + '\' title="' + esc(t("review.decision.derogated_help")) + '">' + esc(_decisionLabel(e.decision)) + '</span>';
         }
         else {
             // .ct-choice: the state goes through aria-pressed (announced by screen
@@ -1911,6 +1926,8 @@ function renderReviewDetail() {
             h += '<button type="button" data-tone="low" aria-pressed="' + (e.decision === "conforme") + '" data-click="setDecision" data-args=\'' + _da(x.idx, "conforme") + '\'>✓</button> ';
             h += '<button type="button" data-tone="critical" aria-pressed="' + (e.decision === "non_conforme") + '" data-click="setDecision" data-args=\'' + _da(x.idx, "non_conforme") + '\'>✗</button>';
             h += '</div>';
+            if (e.decision === "non_conforme")
+                h += ' <button type="button" class="ct-btn" data-size="xs" data-write data-click="_requestEntryDerogation" data-args=\'' + _da(x.idx) + '\'>' + esc(t("review.derogation_btn")) + '</button>';
         }
         h += '</td></tr>';
     });
@@ -1968,6 +1985,20 @@ function _applyDecision(r, entry, idx, decision) {
     }
     renderPanel();
 }
+// FEAT-45 — the reviewer chose the derogation over a measure: the decision
+// is recorded first (the register only covers a non-compliant entry), then
+// the request form opens on the entry.
+function _decideThenDerogate(r, entry, idx) {
+    entry.decision = "non_conforme";
+    entry.decided_at = _today();
+    entry.decided_by = (window._currentUser && window._currentUser.name) || "";
+    var pid = window.getActiveProjectId ? getActiveProjectId() : null;
+    var saved = (pid && window.AccessAPI)
+        ? AccessAPI.patchEntry(pid, r.id, entry.id, { decision: "non_conforme", decided_by: entry.decided_by, decided_at: entry.decided_at })
+        : Promise.resolve();
+    saved.then(function () { renderPanel(); window._requestEntryDerogation(idx); })
+        .catch(function (e) { showStatus(e.message || String(e), true); });
+}
 function _openNonConformeMeasureModal(r, entry, idx) {
     var app = _findApp(r.application_id);
     var appName = app ? app.nom : r.application_id;
@@ -1983,10 +2014,16 @@ function _openNonConformeMeasureModal(r, entry, idx) {
             { value: "termine", label: t("measure.s.termine") || "Terminé" }
         ],
         defaultStatus: "a_faire",
-        ownerPicker: { pickerId: "access-nc-measure-owner", directoryUrl: "api/directory" }
+        ownerPicker: { pickerId: "access-nc-measure-owner", directoryUrl: "api/directory" },
+        // FEAT-45 — the other treatment of an anomaly: a derogation instead of a measure.
+        extraButtons: [{ id: "derog", label: t("review.derogation_btn"), result: function () { return { __derogation: true }; } }]
     }).then(function (result) {
         if (!result)
             return; // cancel → keep decision pending
+        if (result.__derogation) {
+            _decideThenDerogate(r, entry, idx);
+            return;
+        }
         // 1. Apply the decision (patch entry)
         entry.decision = "non_conforme";
         entry.decided_at = _today();
@@ -3064,3 +3101,93 @@ if (typeof window.ct_handleMeasureDeepLink === "function") {
             return true;
         } });
 }
+// ── Non-conformities and derogations (FEAT-45) ─────────────────
+// The register itself is the shared ct_nonconformity component; Access only
+// supplies its transport and its objects: the entitlement anomalies (review
+// entries found non-compliant — a record's objects, a derogation's subject)
+// and the project's measures. Objects are keyed by project.
+function _entryKey(r, e) { return (getActiveProjectId() || "") + ":" + r.id + ":" + e.id; }
+function _entryLabel(r, e) {
+    var app = D.applications.find(function (a) { return a.id === r.application_id; });
+    return e.email_or_login + (app && app.nom ? " — " + app.nom : "") + " (" + r.id + ")";
+}
+function _ncOptions() {
+    var pid = getActiveProjectId() || "";
+    return {
+        listNc: function (status) { return AccessAPI.listNonconformities(status); },
+        createNc: function (body) { return AccessAPI.createNonconformity(body); },
+        patchNc: function (id, body) { return AccessAPI.patchNonconformity(id, body); },
+        qualifyNc: function (id, body) { return AccessAPI.qualifyNonconformity(id, body); },
+        rejectNc: function (id, note) { return AccessAPI.rejectNonconformity(id, note); },
+        closeNc: function (id, evidence) { return AccessAPI.closeNonconformity(id, evidence); },
+        listDer: function (filters) { return AccessAPI.listDerogations(filters); },
+        createDer: function (body) { return AccessAPI.createDerogation(body); },
+        decideDer: function (id, approve, note) { return AccessAPI.decideDerogation(id, approve, note); },
+        revokeDer: function (id, reason) { return AccessAPI.revokeDerogation(id, reason); },
+        getSettings: function () { return AccessAPI.nonconformitySettings(); },
+        saveSettings: function (days) { return AccessAPI.saveNonconformitySettings(days); },
+        actor: function () { var u = window._currentUser; return (u && (u.name || u.email)) || ""; },
+        subjectTypes: ["review_entry"],
+        directoryUrl: "api/directory",
+        items: {
+            options: function () {
+                var out = [];
+                D.reviews.forEach(function (r) {
+                    (r.entries || []).forEach(function (e) { if (e.decision === "non_conforme")
+                        out.push({ id: _entryKey(r, e), label: _entryLabel(r, e) }); });
+                });
+                return out;
+            },
+            open: function (id) {
+                var rid = id.split(":")[1];
+                var idx = D.reviews.findIndex(function (r) { return r.id === rid; });
+                if (idx < 0)
+                    return;
+                _panel = "reviews";
+                _selectedReview = idx;
+                renderPanel();
+            },
+        },
+        measures: {
+            options: function () {
+                return D.measures.map(function (m) {
+                    var st = m.statut || "a_faire";
+                    return { id: pid + ":" + m.id, label: m.id + " " + (m.title || "").substring(0, 60), statusLabel: t("measure.s." + st) || st, done: st === "termine" };
+                });
+            },
+            create: function (draft) {
+                return ct_measure_modal.open({ title: draft.title, description: draft.description }, {
+                    title: t("measure.new") || "New measure",
+                    hideFields: ["type", "statut"],
+                    titleRequired: true,
+                    ownerPicker: { pickerId: "access-nc-measure-owner", directoryUrl: "api/directory" }
+                }).then(function (data) {
+                    if (!data || data.__deleted || !pid)
+                        return null;
+                    return AccessAPI.createMeasure(pid, { title: data.title, description: data.description || "",
+                        responsable: data.responsable || "", echeance: data.echeance || "", statut: "a_faire" })
+                        .then(function (m) {
+                        D.measures.push(m);
+                        return { id: pid + ":" + m.id, label: m.id + " " + (m.title || "").substring(0, 60) };
+                    }).catch(function (e) { showStatus(e.message || String(e), true); return null; });
+                });
+            },
+            open: function (id) { if (window._editAccessMeasureRow)
+                window._editAccessMeasureRow({ id: id.split(":").slice(1).join(":") }); },
+        },
+        onChange: function () { return AccessAPI.listMeasures(pid).then(function (list) { D.measures = list || []; }).catch(function () { }); }
+    };
+}
+// From a review entry found non-compliant: the derogation form, with the entry as its subject.
+window._requestEntryDerogation = function (idx) {
+    var r = _selectedReview !== null ? D.reviews[_selectedReview] : null;
+    var e = r ? (r.entries || [])[Number(idx)] : null;
+    if (!r || !e)
+        return;
+    ct_nonconformity.requestDerogation(_ncOptions(), {
+        subject_type: "review_entry", subject_id: _entryKey(r, e), subject_label: _entryLabel(r, e), title: _entryLabel(r, e).substring(0, 200)
+    }).then(function (d) { if (d) {
+        window.location.hash = "#reviews";
+        renderPanel();
+    } });
+};

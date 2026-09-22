@@ -80,7 +80,9 @@ async def upsert_findings(
                 stats["silenced"] += 1
             else:
                 stats["refreshed"] += 1
-        elif existing.status in ("false_positive", "to_fix"):
+        elif existing.status in ("false_positive", "to_fix", "derogated"):
+            # derogated (FEAT-45): accepted for a bounded time, so a re-detection is
+            # expected; the scheduler brings it back to to_fix when the derogation ends.
             existing.evidence = raw.get("evidence", existing.evidence)
             existing.last_seen_at = now
             stats["silenced"] += 1

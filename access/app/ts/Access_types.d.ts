@@ -7,7 +7,7 @@
 
 /* ── D model ───────────────────────────────────────────────────── */
 
-type AccessDecision = "pending" | "conforme" | "non_conforme";
+type AccessDecision = "pending" | "conforme" | "non_conforme" | "a_investiguer" | "derogated";
 
 type AccessSiUser = {
     id: string;
@@ -299,6 +299,19 @@ interface AccessApi {
     deleteReview(pid: string, rid: string): Promise<unknown>;
 
     listMeasures(pid: string): Promise<AccessMeasure[]>;
+    /* FEAT-45 — non-conformities and derogations (shared register component) */
+    listNonconformities(status?: string): Promise<{ items: CtNcRecord[] }>;
+    createNonconformity(body: Record<string, unknown>): Promise<CtNcRecord>;
+    patchNonconformity(id: string, body: Record<string, unknown>): Promise<CtNcRecord>;
+    qualifyNonconformity(id: string, body: Record<string, unknown>): Promise<CtNcRecord>;
+    rejectNonconformity(id: string, note: string): Promise<CtNcRecord>;
+    closeNonconformity(id: string, evidence: string): Promise<CtNcRecord>;
+    listDerogations(filters?: Record<string, string>): Promise<{ items: CtDerRecord[] }>;
+    createDerogation(body: Record<string, unknown>): Promise<CtDerRecord>;
+    decideDerogation(id: string, approve: boolean, note: string): Promise<CtDerRecord>;
+    revokeDerogation(id: string, reason: string): Promise<CtDerRecord>;
+    nonconformitySettings(): Promise<{ max_derogation_days: number }>;
+    saveNonconformitySettings(days: number): Promise<unknown>;
     createMeasure(pid: string, data: Partial<AccessMeasure>): Promise<AccessMeasure>;
     patchMeasure(pid: string, mid: string, fields: Partial<AccessMeasure>): Promise<AccessMeasure>;
     deleteMeasure(pid: string, mid: string): Promise<unknown>;
@@ -340,6 +353,7 @@ declare var ct_table: CtTableApi;
 declare var ct_bulkbar: CtBulkbarApi;
 declare var ct_modal: CtModalApi;
 declare var ct_measure_modal: CtMeasureModalApi;
+declare var ct_nonconformity: CtNonconformityApi;
 declare function _dirGetSource(): string;
 declare function _dirMultiPicker(currentIds: string[] | null | undefined, addHandler: string, removeHandler: string): string;
 /** Truth-tested bare in renderAppDetail → declared possibly undefined. */
@@ -351,6 +365,8 @@ declare var _setDataReady: (() => void) | undefined;
 /* ── Window: properties set by access_api.js / Access_app.js ────── */
 
 interface Window {
+    /* FEAT-45 */
+    _requestEntryDerogation?: (idx: number | string) => void;
     /* access_api.js */
     AccessAPI?: AccessApi;
     getActiveProjectId?: () => string | null;

@@ -650,6 +650,12 @@ async def patch_entry(
     if body.decision is not None:
         if body.decision not in _DECISION_VALUES:
             raise HTTPException(status_code=400, detail=f"Invalid decision (allowed: {sorted(_DECISION_VALUES)})")
+        if old_decision == "derogated" and body.decision != old_decision:
+            # FEAT-45 — the reviewer's decision supersedes the derogation covering the entry.
+            from src.models import Derogation
+            from src.nonconformity_common import revoke_for_subject
+            await revoke_for_subject(db, Derogation, "review_entry", f"{project_id}:{review_id}:{entry_id}",
+                                     f"entry decided '{body.decision}'", actor=(user.name if user else None) or (user.email if user else None) or "system")
         entry.decision = body.decision
     if body.decided_by is not None:
         entry.decided_by = _clean_single_line(body.decided_by)
@@ -763,9 +769,12 @@ async def delete_review(project_id: uuid.UUID, review_id: str, user: Optional[Us
         raise HTTPException(status_code=404, detail="Review not found")
     if review.status != "en_cours":
         raise HTTPException(status_code=400, detail="Cannot delete closed review")
-    await db.execute(
-        select(ReviewEntry).where(ReviewEntry.project_id == project_id, ReviewEntry.review_id == review_id)
-    )
+    # FEAT-45 — the entries go with the review: any derogation on them is settled.
+    from src.models import Derogation
+    from src.nonconformity_common import revoke_for_subject
+    _actor = (user.name if user else None) or (user.email if user else None) or "system"
+    for eid in (await db.execute(select(ReviewEntry.id).where(ReviewEntry.project_id == project_id, ReviewEntry.review_id == review_id))).scalars().all():
+        await revoke_for_subject(db, Derogation, "review_entry", f"{project_id}:{review_id}:{eid}", "review deleted", actor=_actor)
     from sqlalchemy import delete
     await db.execute(delete(ReviewEntry).where(ReviewEntry.project_id == project_id, ReviewEntry.review_id == review_id))
     await db.delete(review)

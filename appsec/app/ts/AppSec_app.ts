@@ -97,7 +97,7 @@ function _sevBadge(sev?: string): string { return badgeTone(t("misc." + sev) || 
 // A single table, so that the same state carries the same tone everywhere.
 var _APPSEC_TONES: Record<string, string> = {
     // finding statuses
-    new: "critical", to_fix: "high", false_positive: "neutral", fixed: "low",
+    new: "critical", to_fix: "high", false_positive: "neutral", fixed: "low", derogated: "neutral",
     // scan statuses
     pending: "info", running: "info", completed: "low", failed: "critical", skipped: "neutral",
     // scanners (identity, not severity)
@@ -215,12 +215,23 @@ window.selectPanel = function(id: string) {
 // the translation only applied after a page reload.
 (window as unknown as { renderAll?: () => void }).renderAll = renderPanel;
 
+var _bootDone = false;
 function _loadAndRender(): void {
+    // FEAT-45 — a deep link from the console (or a record's button) opens the register directly.
+    if (!_bootDone) {
+        _bootDone = true;
+        if (location.hash === "#nonconformities") { selectPanel("nonconformities"); return; }
+    }
     var p1 = AppSecAPI.listApps().then(function(d) { _apps = d || []; }).catch(function() { _apps = []; });
     var p2 = AppSecAPI.findingsStats().then(function(d) { _stats = d || {}; }).catch(function() { _stats = {}; });
     var p3 = AppSecAPI.listScans().then(function(d) { _scans = d || []; }).catch(function() { _scans = []; });
     Promise.all([p1, p2, p3]).then(function() { renderPanel(); });
 }
+
+// The module role lands after a couple of round trips: whatever was drawn
+// before it (a deep link, a finding detail) is drawn again with the right
+// actions instead of staying read-only.
+document.addEventListener("ct-role-ready", function() { renderPanel(); });
 
 function renderPanel(): void {
     var c = document.getElementById("content");
@@ -234,6 +245,7 @@ function renderPanel(): void {
         case "measures":     _renderMeasures(c); break;
         case "ignore_rules": _renderIgnoreRules(c); break;
         case "audit":        _renderAuditLog(c); break;
+        case "nonconformities": _renderNonconformities(c); break;
         default:             _renderDashboard(c);
     }
     var tr = document.getElementById("toolbar-right");
@@ -264,6 +276,9 @@ function _renderDashboard(c: HTMLElement): void {
     h += '<div class="ct-kpi ct-clickable" data-emphasis="value"' + (_nHigh > 0 ? ' data-tone="high"' : '') + ' data-click="_dashNavSev" data-args=\'["high"]\'><div class="ct-kpi-tone"></div><div class="ct-kpi-body"><div class="ct-kpi-label">' + esc(t("dashboard.high")) + '</div><div class="ct-kpi-value">' + _nHigh + '</div></div></div>';
     h += '<div class="ct-kpi ct-clickable" data-emphasis="value"' + (_nMed > 0 ? ' data-tone="medium"' : '') + ' data-click="_dashNavSev" data-args=\'["medium"]\'><div class="ct-kpi-tone"></div><div class="ct-kpi-body"><div class="ct-kpi-label">' + esc(t("dashboard.medium")) + '</div><div class="ct-kpi-value">' + _nMed + '</div></div></div>';
     h += '<div class="ct-kpi ct-clickable" data-emphasis="value"' + (_nLow > 0 ? ' data-tone="low"' : '') + ' data-click="_dashNavSev" data-args=\'["low"]\'><div class="ct-kpi-tone"></div><div class="ct-kpi-body"><div class="ct-kpi-label">' + esc(t("dashboard.low")) + '</div><div class="ct-kpi-value">' + _nLow + '</div></div></div>';
+    // FEAT-45 — under derogation: its own category, neither open nor handled.
+    var _nDerog = (s.derogated || 0);
+    h += '<div class="ct-kpi ct-clickable" data-emphasis="value"' + (_nDerog > 0 ? ' data-tone="neutral"' : '') + ' data-click="_dashNav" data-args=\'["nonconformities"]\' title="' + esc(t("dashboard.derogated_help")) + '"><div class="ct-kpi-tone"></div><div class="ct-kpi-body"><div class="ct-kpi-label">' + esc(t("dashboard.derogated")) + '</div><div class="ct-kpi-value">' + _nDerog + '</div></div></div>';
     // Patch availability tile — actionable signal for prioritising remediation.
     if (s.cve_total && s.cve_total > 0) {
         var pct = Math.round(((s.cve_with_patch || 0) / s.cve_total) * 100);
@@ -532,7 +547,8 @@ async function _renderAppDetail(c: HTMLElement): Promise<void> {
         { v: "new",            l: t("findings.status_new") },
         { v: "to_fix",        l: t("findings.status_to_fix") },
         { v: "false_positive", l: t("findings.status_false_positive") },
-        { v: "fixed",          l: t("findings.status_fixed") }
+        { v: "fixed",          l: t("findings.status_fixed") },
+        { v: "derogated",      l: t("findings.status_derogated") }
     ].forEach(function(o) {
         var on = adf.status === o.v ? " active" : "";
         h += '<button class="filter-pill status-pill-' + (o.v || "all") + on + '" data-click="_adSetStatus" data-args=\'' + _da(o.v) + '\'>' + esc(o.l) + '</button>';
@@ -821,7 +837,8 @@ function _renderFindings(c: HTMLElement): void {
         { v: "new",            l: t("findings.status_new") },
         { v: "to_fix",        l: t("findings.status_to_fix") },
         { v: "false_positive", l: t("findings.status_false_positive") },
-        { v: "fixed",          l: t("findings.status_fixed") }
+        { v: "fixed",          l: t("findings.status_fixed") },
+        { v: "derogated",      l: t("findings.status_derogated") }
     ].forEach(function(o) {
         var on = f.status === o.v ? " active" : "";
         h += '<button class="filter-pill status-pill-' + (o.v || "all") + on + '" data-click="_setFStatus" data-args=\'' + _da(o.v) + '\'>' + esc(o.l) + '</button>';
@@ -1176,6 +1193,8 @@ async function _renderFindingDetail(c: HTMLElement): Promise<void> {
         aiEnabled: !!(window._aiIsEnabled && window._aiIsEnabled()),
         aiHandler: "_aiTriageFinding",
         deleteHandler: "_deleteAppsecFinding",
+        // Offered only to an account the server would let request one.
+        derogationHandler: ct_nonconformity.canWrite() ? "_requestDerogationDetail" : undefined,
         // null → undefined: CtFvRenderOpts.linkedMeasure rejects null (same falsy semantics).
         linkedMeasure: linked || undefined,
         infoRows: extraRows,
@@ -1187,6 +1206,86 @@ async function _renderFindingDetail(c: HTMLElement): Promise<void> {
 }
 
 var _selectedFindingObj: AppSecFinding | null = null;
+
+// ── Non-conformities and derogations (FEAT-45) ─────────────────
+// The register itself is the shared ct_nonconformity component; AppSec only
+// supplies its transport and its objects: the findings still to be handled
+// (a record's objects, a derogation's subject) and the action plan's measures.
+function _ncOptions(): CtNcOptions {
+    return {
+        listNc: function(status) { return AppSecAPI.listNonconformities(status); },
+        createNc: function(body) { return AppSecAPI.createNonconformity(body); },
+        patchNc: function(id, body) { return AppSecAPI.patchNonconformity(id, body); },
+        qualifyNc: function(id, body) { return AppSecAPI.qualifyNonconformity(id, body); },
+        rejectNc: function(id, note) { return AppSecAPI.rejectNonconformity(id, note); },
+        closeNc: function(id, evidence) { return AppSecAPI.closeNonconformity(id, evidence); },
+        listDer: function(filters) { return AppSecAPI.listDerogations(filters); },
+        createDer: function(body) { return AppSecAPI.createDerogation(body); },
+        decideDer: function(id, approve, note) { return AppSecAPI.decideDerogation(id, approve, note); },
+        revokeDer: function(id, reason) { return AppSecAPI.revokeDerogation(id, reason); },
+        getSettings: function() { return AppSecAPI.nonconformitySettings(); },
+        saveSettings: function(days) { return AppSecAPI.saveNonconformitySettings(days); },
+        actor: function() { var u = window._currentUser; return (u && (u.name || u.email)) || ""; },
+        subjectTypes: ["finding"],
+        directoryUrl: "api/directory",
+        items: {
+            options: function() {
+                var out: CtNcItemOption[] = [];
+                for (var i = 0; i < _findings.length; i++) {
+                    var f = _findings[i];
+                    if (f.status !== "new" && f.status !== "to_fix") continue;
+                    out.push({ id: f.id, label: _findingTitle(f) + (f.application_name ? " · " + f.application_name : "") });
+                }
+                return out;
+            },
+            open: function(id) { _panel = "findings"; window._openFinding(id); },
+        },
+        measures: {
+            options: function() {
+                return (_appsecMeasures || []).map(function(m) {
+                    var st = m.statut || "a_faire";
+                    return { id: m.id, label: m.id + " " + (m.title || m.description || "").substring(0, 60), statusLabel: t("measures.status_" + st) || st, done: st === "termine" };
+                });
+            },
+            create: function(draft) {
+                return ct_measure_modal.open({ title: draft.title, description: draft.description }, {
+                    title: t("measures.new_title") || "New measure",
+                    hideFields: ["type", "statut"],
+                    titleRequired: true,
+                    ownerPicker: { pickerId: "appsec-nc-measure-owner", directoryUrl: "api/directory" }
+                }).then(function(data: any) {
+                    if (!data || data.__deleted) return null;
+                    return AppSecAPI.createMeasure({ title: data.title, description: data.description || "",
+                                                     responsable: data.responsable || "", echeance: data.echeance || "" })
+                        .then(function(m: AppSecMeasure) {
+                            _appsecMeasures.push(m);
+                            return { id: m.id, label: m.id + " " + (m.title || "").substring(0, 60) };
+                        }).catch(function(e: any) { showStatus(e.message || t("common.error"), true); return null; });
+                });
+            },
+            open: function(id) { return window._editAppsecMeasureRow!({ id: id }); },
+        },
+        onChange: function() { return AppSecAPI.listMeasures().then(function(m) { _appsecMeasures = m || []; }).then(function() { _loadAndRender(); }); }
+    };
+}
+
+function _renderNonconformities(c: HTMLElement): void {
+    // The objects and measures the fields offer come from the module's lists.
+    Promise.all([
+        AppSecAPI.listFindings({ limit: 2000 }).then(function(d) { _findings = (d && d.items) || []; }).catch(function() {}),
+        AppSecAPI.listMeasures().then(function(m) { _appsecMeasures = m || []; }).catch(function() {}),
+    ]).then(function() { ct_nonconformity.renderPanel(c, _ncOptions()); });
+}
+
+window._requestDerogationDetail = function() {
+    var f = _selectedFindingObj;
+    if (!f) return;
+    ct_nonconformity.requestDerogation(_ncOptions(), {
+        subject_type: "finding", subject_id: f.id,
+        subject_label: _findingTitle(f) + (f.application_name ? " · " + f.application_name : ""),
+        title: _findingTitle(f)
+    });
+};
 
 function _runAppsecTriage(finding: AppSecFinding, status: string): Promise<void> {
     return ct_finding_view.openTriageModal(finding, status, {

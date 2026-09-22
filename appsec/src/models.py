@@ -106,6 +106,8 @@ class Finding(Base):
     triaged_at = Column(DateTime(timezone=True), nullable=True)
     triaged_by = Column(String(255), nullable=True)
     triage_notes = Column(Text, default="")
+    # FEAT-45 — the approved derogation covering the finding while it is "derogated".
+    derogation_id = Column(UUID(as_uuid=True), nullable=True)
     last_seen_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
@@ -234,3 +236,9 @@ class NotificationPrefs(Base):
     updated_at = Column(DateTime(timezone=True), nullable=False,
                         default=lambda: datetime.now(timezone.utc),
                         onupdate=lambda: datetime.now(timezone.utc))
+
+
+# FEAT-45 — non-conformities and derogations: the shared shape, on this Base.
+from src.nonconformity_common import define_models as _define_nc_models  # noqa: E402
+
+Nonconformity, Derogation = _define_nc_models(Base)
