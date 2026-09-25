@@ -3324,7 +3324,7 @@ function _rstRender(c: HTMLElement) {
 
     // ── Selector: module + instant ──
     h += '<div class="ct-bordered ct-r-lg ct-p-4 ct-mb-5">';
-    h += '<div class="ct-flex ct-gap-3 ct-flex-wrap" style="align-items:flex-end">';
+    h += '<div class="ct-flex ct-gap-3 ct-flex-wrap ct-items-end">';
     h += '<div><label class="ct-label">' + t("pilot.col.module") + '</label>'
         + '<select id="restore-module" class="ct-select" data-change="_rstModuleChanged" data-pass-value>';
     Object.keys(_rstWindow).forEach(function(m) {
