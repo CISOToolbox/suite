@@ -213,16 +213,16 @@ mark.admin-term {
 }
 
 /* ── User / detail form styles (ported from vendor TPRM.css) ─────── */
-.ct-form-grid > .ct-form-row { margin-bottom: 0; }
 .form-section {
     font-size: 0.78em; font-weight: 700; text-transform: uppercase;
     letter-spacing: 0.5px; color: var(--ct-ink-2);
     margin: 16px 0 8px; padding-top: 12px; border-top: 1px solid var(--ct-line);
 }
-/* Checkbox rows shouldn't force uppercase labels */
-.ct-tprm-form .ct-form-row > label[style*="inline-flex"] {
-    text-transform: none; font-weight: 500; color: inherit; letter-spacing: normal;
-}
+
+/* A rule here keyed on label[style*="inline-flex"] to stop checkbox labels
+   being uppercased. The markup moved to class="ct-inline-flex", so it had
+   stopped matching anything and the labels are uppercase again: removed as
+   dead, intent to restore on the class — BUG-37. */
 
 /* ── Review filter pills ─────────────────────────────── */
 .review-pill {

@@ -269,13 +269,13 @@
 /* Image overlay (fullscreen) */
 .img-overlay {
     display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0,0,0,0.85); z-index: 600; justify-content: center; align-items: center;
+    background: var(--ct-scrim-deep); z-index: 600; justify-content: center; align-items: center;
     cursor: pointer;
 }
 .img-overlay.open { display: flex; }
 .img-overlay-content { text-align: center; max-width: 90vw; max-height: 90vh; }
 .img-overlay-content img { max-width: 90vw; max-height: 85vh; object-fit: contain; border-radius: 4px; }
-.img-overlay-name { color: rgba(255,255,255,0.7); font-size: 0.82em; margin-top: 8px; }
+.img-overlay-name { color: var(--ct-onsolid); opacity: 0.7; font-size: 0.82em; margin-top: 8px; }
 
 
 /* ── Responsive ──────────────────────────────────────────────── */
@@ -283,7 +283,7 @@
    Intermediate step aligned with the KPIs dropping to ~5 per row:
    2 charts per row (full-width radar below), then 1 per row
    under 768px. */
-@media (max-width: 1100px) {
+@media (max-width: 1024px) {
     .dash-charts-grid { grid-template-columns: 1fr 1fr; }
     .dash-radar-card { grid-column: 1 / -1; }
 }
