@@ -76,7 +76,11 @@ async def test_apps_needing_review_count_after_n1_fix():
             ])
             await db.commit()
 
-            req = SimpleNamespace(headers={"X-Service-Token": "test-service-token"})
+            # src.routes.internal freezes SERVICE_TOKEN at import time, and
+            # another test module may have imported it first with its own
+            # default: send the token the module actually holds.
+            from src.routes import internal as _internal
+            req = SimpleNamespace(headers={"X-Service-Token": _internal.SERVICE_TOKEN})
             out = await internal_stats(req, db)
 
         texts = " | ".join(a.get("text", "") for a in out.get("alerts", []))

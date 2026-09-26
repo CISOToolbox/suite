@@ -18,7 +18,7 @@ TODAY = date(2026, 6, 8)
 
 
 def _asset(aid, nom="", fin_support="", fin_vie="", licence=None):
-    return SimpleNamespace(id=aid, nom=nom, fin_support=fin_support,
+    return SimpleNamespace(id=aid, project_id="P-1", nom=nom, fin_support=fin_support,
                            fin_vie=fin_vie, licence=licence or {})
 
 
@@ -31,6 +31,8 @@ def test_licence_within_default_notice_is_selected():
     out = compute_due_echeances([a], TODAY)
     assert len(out) == 1
     assert out[0]["kind"] == "licence" and out[0]["days"] == 20
+    # The notifier groups deadlines per project: each one must carry it.
+    assert out[0]["project_id"] == "P-1"
 
 
 def test_licence_beyond_notice_is_excluded():

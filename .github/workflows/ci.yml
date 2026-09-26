@@ -71,17 +71,10 @@ jobs:
         # dependency, deliberately absent from the image requirements.
         run: pip install --quiet pytest pytest-asyncio aiosqlite -r ${{ matrix.module }}/requirements.txt
       - name: unit tests
-        # access/asset carry documented pre-existing failures (modules under
-        # development): their suites run but do NOT block YET.
-        # Remove this tolerance as soon as they pass.
         run: |
           cd ${{ matrix.module }}
           if [ ! -d tests/unit ]; then
             echo "no tests/unit — module without unit-tested backend (audit)"
             exit 0
           fi
-          if [ "${{ matrix.module }}" = "access" ] || [ "${{ matrix.module }}" = "asset" ]; then
-            pytest tests/unit/ -q || echo "::warning::pre-existing failures tolerated (${{ matrix.module }})"
-          else
-            pytest tests/unit/ -q
-          fi
+          pytest tests/unit/ -q

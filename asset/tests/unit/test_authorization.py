@@ -48,16 +48,14 @@ class TestUserPermissions:
         assert "delete" in perms
         assert "share" in perms
 
-    def test_owner_gets_full_access(self, monkeypatch):
-        monkeypatch.setenv("OIDC_CLIENT_ID", "test")
-        import importlib
-        import routes.auth_helpers as ah
-        importlib.reload(ah)
+    def test_owner_gets_no_extra_rights(self, monkeypatch):
+        # Shared-inventory model: ownership is not a role. The owner of a
+        # project is a plain user — read+edit, no delete/share.
         import routes.projects as rp
-        importlib.reload(rp)
+        monkeypatch.setattr(rp, "auth_enabled", lambda: True)
         project = SimpleNamespace(owner_id="user-1", shared_with=[])
         user = SimpleNamespace(id="user-1", role="user")
-        assert rp._user_permissions(project, user) == ["read", "edit", "delete", "share"]
+        assert rp._user_permissions(project, user) == ["read", "edit"]
 
     def test_viewer_role_is_read_only(self, monkeypatch):
         # Shared-inventory model: a viewer (incl. a suite-wide "viewer") reads
@@ -79,16 +77,13 @@ class TestUserPermissions:
         project = SimpleNamespace(owner_id=None, shared_with=[])
         assert rp._user_permissions(project, user) == ["read", "edit"]
 
-    def test_unowned_project_gives_full_access(self, monkeypatch):
-        monkeypatch.setenv("OIDC_CLIENT_ID", "test")
-        import importlib
-        import routes.auth_helpers as ah
-        importlib.reload(ah)
+    def test_unowned_project_gives_no_extra_rights(self, monkeypatch):
+        # No owner does not mean open: a plain user still reads and edits only.
         import routes.projects as rp
-        importlib.reload(rp)
+        monkeypatch.setattr(rp, "auth_enabled", lambda: True)
         project = SimpleNamespace(owner_id=None, shared_with=[])
         user = SimpleNamespace(id="anyone", role="user")
-        assert rp._user_permissions(project, user) == ["read", "edit", "delete", "share"]
+        assert rp._user_permissions(project, user) == ["read", "edit"]
 
 
 # ── require_admin ─────────────────────────────────────────────────

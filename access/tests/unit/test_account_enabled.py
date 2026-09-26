@@ -9,11 +9,14 @@ import os
 from src.plugins.base import UserRecord
 
 HERE = os.path.dirname(__file__)
-PLUGINS = os.path.join(HERE, "..", "..", "src", "plugins")
+# Connectors live in addons/generic/<name>/<name>.py (bundled, loaded by
+# src/plugins/__init__.py), not in src/plugins.
+ADDONS = os.path.join(HERE, "..", "..", "addons", "generic")
 
 
 def _src(name: str) -> str:
-    with open(os.path.join(PLUGINS, name)) as f:
+    stem = name[:-3] if name.endswith(".py") else name
+    with open(os.path.join(ADDONS, stem, name)) as f:
         return f.read()
 
 
