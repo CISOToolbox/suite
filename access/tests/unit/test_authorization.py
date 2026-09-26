@@ -46,16 +46,14 @@ class TestUserPermissions:
         user = SimpleNamespace(id="admin-id", role="admin")
         assert "delete" in rp._user_permissions(project, user)
 
-    def test_owner_gets_full_access(self, monkeypatch):
-        monkeypatch.setenv("OIDC_CLIENT_ID", "test")
-        import importlib
-        import routes.auth_helpers as ah
-        importlib.reload(ah)
+    def test_owner_gets_no_extra_rights(self, monkeypatch):
+        # Single shared project: ownership is not a role. The owner is a plain
+        # user — read+edit, no delete/share.
         import routes.projects as rp
-        importlib.reload(rp)
+        monkeypatch.setattr(rp, "auth_enabled", lambda: True)
         project = SimpleNamespace(owner_id="user-1", shared_with=[])
         user = SimpleNamespace(id="user-1", role="user")
-        assert rp._user_permissions(project, user) == ["read", "edit", "delete", "share"]
+        assert rp._user_permissions(project, user) == ["read", "edit"]
 
     def test_viewer_role_is_read_only(self, monkeypatch):
         # A viewer (incl. a suite-wide "viewer") can SEE the review data
@@ -147,7 +145,14 @@ class TestInternalServiceToken:
 
 # ── Source analysis ───────────────────────────────────────────────
 
-def _find_routes_with(pattern: str):
+def _is_route(node) -> bool:
+    """A function registered on a router (@router.get/post/…), i.e. one that
+    receives a request. Helpers and adapter methods that are handed an
+    already-authenticated user are not routes."""
+    return any("router" in ast.dump(d) for d in node.decorator_list)
+
+
+def _find_routes_with(pattern: str, routes_only: bool = False):
     result = set()
     for fname in os.listdir(ROUTES_DIR):
         if not fname.endswith(".py") or fname == "__init__.py":
@@ -157,6 +162,8 @@ def _find_routes_with(pattern: str):
             tree = ast.parse(f.read(), filename=fpath)
         for node in ast.walk(tree):
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                if routes_only and not _is_route(node):
+                    continue
                 if pattern in ast.dump(node):
                     result.add((fname, node.name))
     return result
@@ -178,7 +185,8 @@ class TestRouteProtection:
     def test_all_write_project_routes_use_auth(self):
         """Write routes in projects.py, measures.py, etc. use get_current_user."""
         auth_routes = _find_routes_with("get_current_user")
-        project_routes = _find_routes_with("get_project_or_404")
+        project_routes = _find_routes_with("get_project_or_404", routes_only=True)
+        assert project_routes, "no route found: the scan proves nothing"
         # Every ROUTE using get_project_or_404 must also use get_current_user
         # (skip helper modules like auth_helpers.py which are not routes)
         for fname, func_name in project_routes:

@@ -12,12 +12,13 @@ import os
 import re
 
 HERE = os.path.dirname(__file__)
-SRC = os.path.join(HERE, "..", "..", "src", "plugins")
+# Connectors live in addons/generic/<name>/<name>.py, not in src/plugins.
+ADDONS = os.path.join(HERE, "..", "..", "addons", "generic")
 PLUGINS = ["entra_id.py", "m365.py"]
 
 
 def _source(name: str) -> str:
-    with open(os.path.join(SRC, name)) as f:
+    with open(os.path.join(ADDONS, name[:-3], name)) as f:
         return f.read()
 
 

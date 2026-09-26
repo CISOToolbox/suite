@@ -1,9 +1,11 @@
 import os
 import sys
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
+# The connector lives in addons/generic and imports `src.plugins.base`:
+# the module root goes on the path, as for the addon loader's tests.
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
-from plugins.hr_generic import _extract_list, _map_employee
+from addons.generic.hr_generic.hr_generic import _extract_list, _map_employee  # noqa: E402
 
 
 class TestMapEmployee:
