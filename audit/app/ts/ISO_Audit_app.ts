@@ -707,7 +707,7 @@ function renderJournal(): void {
         }
         h += '<div class="journal-entry">';
         h += '<span class="journal-time">' + esc(time) + '</span>';
-        h += '<span class="journal-type" style="background:' + typeColor + ';color:var(--ct-onsolid)">' + esc(typeLabel) + '</span>';
+        h += '<span class="journal-type ct-text-onsolid" style="background:' + typeColor + '">' + esc(typeLabel) + '</span>';
         h += '<span class="journal-text">' + esc(text) + '</span>';
         if (entry.author) h += '<span style="font-size:0.8em;color:var(--ct-ink-2)">' + esc(entry.author) + '</span>';
         h += '</div>';
