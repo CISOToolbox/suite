@@ -30,8 +30,6 @@
 /* ── Empty state ──────────────────────────────────────────── */
 /* ── Responsive ───────────────────────────────────────────── */
 @media (max-width: 768px) {
-    .ct-tprm-form { padding: 12px; }
-    .ct-form-grid { grid-template-columns: 1fr; }
     .vendor-tabs { flex-direction: column; }
     .vendor-tab { padding: 10px; font-size: 0.85em; }
     table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
