@@ -1442,7 +1442,14 @@ function renderGroupeDetail() {
     }
     return h;
 }
-function switchGroupeTab(tab) { _groupeTab = tab; renderPanel(); }
+/** On a narrow screen the tab bar scrolls sideways (BUG-53) and re-rendering
+ *  resets it to the start: bring the active tab back into view. */
+function _revealActiveTab() {
+    var active = document.querySelector(".vendor-tabs .vendor-tab.active");
+    if (active && active.scrollIntoView)
+        active.scrollIntoView({ inline: "nearest", block: "nearest" });
+}
+function switchGroupeTab(tab) { _groupeTab = tab; renderPanel(); _revealActiveTab(); }
 window.switchGroupeTab = switchGroupeTab;
 function backToGroupes() { _selectedGroupe = null; renderPanel(); }
 window.backToGroupes = backToGroupes;
