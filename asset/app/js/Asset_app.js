@@ -157,12 +157,21 @@ function _typeColor(type) {
         serveur_physique: "#dc2626", serveur_virtuel: "#ea580c", systeme_exploitation: "#65a30d",
         application: "#d97706", donnees: "#be185d"
     };
-    if (colors[type])
+    // Own keys only: a type id such as "constructor" must not resolve to a
+    // prototype member before reaching the allowlist below.
+    if (Object.prototype.hasOwnProperty.call(colors, type))
         return colors[type];
     var custom = _getCustomTypes().find(function (x) { return x.id === type; });
-    if (custom && custom.color)
-        return custom.color;
-    return "var(--ct-ink-2)";
+    return _customTypeColor(custom ? custom.color : "");
+}
+// The colour of a custom type is data rendered into a style attribute: only a
+// #rrggbb value is used, anything else (an import, a row stored before the
+// server validated it) falls back to the default data colour.
+function _customTypeColor(value) {
+    // Trimmed and lower-cased like the server does, so a colour typed with
+    // stray spaces or in upper case renders as it will once stored.
+    var v = typeof value === "string" ? value.trim().toLowerCase() : "";
+    return /^#[0-9a-f]{6}$/.test(v) ? v : CT_COLORS.gray.vivid;
 }
 // CT series-color names for the dashboard donut. _svgDonut resolves color
 // NAMES through _svgSeriesColor, never raw hex — these mirror the hues of
@@ -189,7 +198,7 @@ function _badge(text, bg, color) {
 }
 function _typeBadge(type) {
     var c = _typeColor(type);
-    return '<span class="ct-badge" data-type="' + esc(type) + '" style="background:' + c + '20;color:' + c + '">' + esc(_typeLabel(type)) + '</span>';
+    return '<span class="ct-badge" data-type="' + esc(type) + '" style="background:' + esc(c) + '20;color:' + esc(c) + '">' + esc(_typeLabel(type)) + '</span>';
 }
 function _critBadge(val) {
     var c = _critColor(val);
@@ -254,7 +263,7 @@ function renderDashboard() {
             ordered.push(type); });
         var fb = 0;
         var segs = ordered.map(function (type) {
-            var color = _TYPE_SERIES[type] || _TYPE_SERIES_FALLBACK[(fb++) % _TYPE_SERIES_FALLBACK.length];
+            var color = (Object.prototype.hasOwnProperty.call(_TYPE_SERIES, type) ? _TYPE_SERIES[type] : "") || _TYPE_SERIES_FALLBACK[(fb++) % _TYPE_SERIES_FALLBACK.length];
             return { label: _typeLabel(type), value: counts[type], color: color };
         });
         h += '<div class="dash-section">';
@@ -534,7 +543,7 @@ function renderAssetList() {
     h += '<select class="ct-filter" data-change="filterAssetType" data-pass-value>';
     h += '<option value="">' + t("asset.all_types") + '</option>';
     ASSET_TYPES.forEach(function (type) {
-        h += '<option value="' + type + '"' + (_assetTypeFilter === type ? " selected" : "") + '>' + esc(_typeLabel(type)) + '</option>';
+        h += '<option value="' + esc(type) + '"' + (_assetTypeFilter === type ? " selected" : "") + '>' + esc(_typeLabel(type)) + '</option>';
     });
     h += '</select>';
     h += '<select class="ct-filter" data-change="filterAssetCrit" data-pass-value>';
@@ -936,7 +945,7 @@ function _renderAssetTypesModal() {
             h += '<td><code class="ct-text-label">' + esc(ct.id) + '</code></td>';
             h += '<td>' + esc(ct.label || "") + '</td>';
             h += '<td>' + esc(ct.label_en || "") + '</td>';
-            h += '<td><span style="display:inline-block;width:16px;height:16px;border-radius:3px;vertical-align:middle;background:' + esc(ct.color || "var(--ct-ink-2)") + '"></span> <code class="ct-text-label">' + esc(ct.color || "") + '</code></td>';
+            h += '<td><span style="display:inline-block;width:16px;height:16px;border-radius:3px;vertical-align:middle;background:' + esc(_customTypeColor(ct.color)) + '"></span> <code class="ct-text-label">' + esc(ct.color || "") + '</code></td>';
             h += '<td class="ct-ta-r"><button class="ct-btn mt-8 ct-text-label ct-py-1 ct-px-2" data-write data-variant="danger" data-click="_deleteCustomType" data-args=\'' + _da(i) + '\' data-size="xs" data-icon>' + _icon("trash", 14) + '</button></td>';
             h += '</tr>';
         });

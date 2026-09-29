@@ -144,7 +144,9 @@ async def _reconstruct_data(db: AsyncSession, project_id: uuid.UUID) -> dict:
         "assets": assets_data,
         "groupes": [_group_to_dict(g) for g in groups],
         # Per-project user-defined asset types (flat list).
-        "custom_asset_types": (meta.custom_asset_types or []) if meta else [],
+        # Cleaned on the way out too: rows stored before colours were
+        # validated are served safe without a migration.
+        "custom_asset_types": _clean_custom_types(meta.custom_asset_types) if meta else [],
         "measures": [
             {
                 "id": m.id, "title": m.title, "description": m.description or "",
@@ -195,6 +197,46 @@ def _sanitize_ip(val) -> str:
         return ""
 
 
+# Default colour of a custom asset type — the neutral grey of the shared data
+# palette (CT_COLORS.gray.vivid), the same the browser offers.
+DEFAULT_TYPE_COLOR = "#94a3b8"
+_TYPE_COLOR = re.compile(r"#[0-9a-f]{6}")
+
+
+def _clean_custom_types(raw: object) -> list[dict]:
+    """Normalise the per-project custom asset types.
+
+    Each entry must be a dict with an id; ids are lower-cased and deduplicated,
+    labels truncated. The colour is rendered into a style attribute, so only a
+    ``#rrggbb`` value is kept (lower-cased); anything else becomes
+    ``DEFAULT_TYPE_COLOR`` rather than failing the save or the import.
+
+    Args:
+        raw: the ``custom_asset_types`` value as received or stored.
+
+    Returns:
+        The cleaned list, safe to store and to serve.
+    """
+    clean: list[dict] = []
+    seen: set[str] = set()
+    for ct in raw if isinstance(raw, list) else []:
+        if not isinstance(ct, dict):
+            continue
+        cid = str(ct.get("id") or "").strip().lower()
+        if not cid or cid in seen:
+            continue
+        seen.add(cid)
+        color = ct.get("color")
+        color = color.strip().lower() if isinstance(color, str) else ""
+        clean.append({
+            "id": cid[:64],
+            "label": str(ct.get("label") or cid)[:100],
+            "label_en": str(ct.get("label_en") or "")[:100],
+            "color": color if _TYPE_COLOR.fullmatch(color) else DEFAULT_TYPE_COLOR,
+        })
+    return clean
+
+
 async def _decompose_data(db: AsyncSession, project_id: uuid.UUID, data: dict):
     """Decompose a D object into relational child rows."""
     # Metadata
@@ -205,22 +247,7 @@ async def _decompose_data(db: AsyncSession, project_id: uuid.UUID, data: dict):
     custom_types = data.get("custom_asset_types")
     if custom_types is None:
         custom_types = meta.get("custom_asset_types") or []
-    # Light validation: each entry must be a dict with at least an id + label.
-    clean_types = []
-    seen_ids = set()
-    for ct in custom_types if isinstance(custom_types, list) else []:
-        if not isinstance(ct, dict):
-            continue
-        cid = str(ct.get("id") or "").strip().lower()
-        if not cid or cid in seen_ids:
-            continue
-        seen_ids.add(cid)
-        clean_types.append({
-            "id": cid[:64],
-            "label": str(ct.get("label") or cid)[:100],
-            "label_en": str(ct.get("label_en") or "")[:100],
-            "color": str(ct.get("color") or "#6b7280")[:16],
-        })
+    clean_types = _clean_custom_types(custom_types)
     db.add(ProjectMetadata(
         project_id=project_id,
         organization=meta.get("organization", ""),
