@@ -422,10 +422,7 @@
 .kpi-detail-add-fw input { font-size: 0.85em; padding: 3px 6px; }
 .kpi-detail-add-fw button { font-size: 0.82em; padding: 3px 9px; }
 
-.kpi-detail-tune {
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
-    margin-bottom: 10px;
-}
+.kpi-detail-tune { margin-bottom: 10px; }
 .kpi-detail-tune label {
     display: flex; flex-direction: column; gap: 3px;
     font-size: 0.82em; color: var(--ct-ink-2);
@@ -435,9 +432,6 @@
     display: flex; gap: 8px; justify-content: space-between; align-items: center;
 }
 
-@media (max-width: 768px) {
-    .kpi-detail-tune { grid-template-columns: 1fr; }
-}
 
 /* Toolbar count badge on the "+ KPI automatique" button */
 /* .ct-badge modifier: count pill on a button. */

@@ -38,14 +38,11 @@
 .status-btn[data-status="na"].active { background: var(--ct-surface-2); border-color: var(--ct-neutral); color: var(--ct-ink-2); }
 
 /* ── Finding fields ──────────────────────────────────────────── */
-.ctrl-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .ctrl-field { display: flex; flex-direction: column; }
 .ctrl-field label { font-size: 0.75em; font-weight: 600; color: var(--ct-ink-2); text-transform: uppercase; margin-bottom: var(--ct-s1); }
 .ctrl-field textarea { min-height: 50px; font-size: 0.85em; resize: vertical; }
-.ecart-fields {
-    display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px;
-    padding-top: 8px; border-top: 1px dashed var(--ct-line);
-}
+/* The grid is the socle's (.ct-form-grid); this only separates the gap block. */
+.ecart-fields { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--ct-line); }
 .ecart-fields .ctrl-field label { color: var(--ct-critical); }
 
 /* ── Questions panel ─────────────────────────────────────────── */
@@ -184,7 +181,7 @@
 .journal-text { flex: 1 1 12em; min-width: 0; }
 
 /* ── Meta fields (dashboard) ─────────────────────────────────── */
-.meta-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--ct-s3); margin-bottom: 16px; }
+.meta-grid { margin-bottom: 16px; }
 .meta-field { display: flex; flex-direction: column; }
 .meta-field label { font-size: 0.75em; font-weight: 600; color: var(--ct-ink-2); text-transform: uppercase; margin-bottom: var(--ct-s1); }
 .meta-field input, .meta-field select { padding: var(--ct-s1) var(--ct-s2); border: 1px solid var(--ct-line); border-radius: 4px; font-size: 0.85em; }
@@ -342,8 +339,6 @@
     .hds-grid { grid-template-columns: 1fr; }
     .dash-charts-grid { grid-template-columns: 1fr; }
     .dash-radar-card { grid-column: auto; }
-    .ctrl-fields, .ecart-fields { grid-template-columns: 1fr; }
-    .meta-grid { grid-template-columns: 1fr; }
     .audit-filters-bar { flex-direction: column; align-items: stretch; }
     .search-panel { max-width: 95%; }
     .search-header { flex-direction: column; }

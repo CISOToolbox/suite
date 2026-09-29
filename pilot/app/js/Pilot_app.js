@@ -1526,7 +1526,7 @@
             h += '<button class="ct-btn ct-ml-auto" data-variant="danger" data-click="_deleteProject" data-args=\'' + _da(p.id) + '\'>' + t("pilot.action.delete") + '</button>';
         h += '</div>';
         // Form
-        h += '<div class="ct-grid ct-grid-2 ct-gap-3 ct-mb-5">';
+        h += '<div class="ct-form-grid ct-mb-5">';
         h += '<div><label class="pilot-label">' + t("pilot.projects.name_label") + '</label><input type="text" id="pj-name" class="ct-input" value="' + esc(p.name || '') + '"></div>';
         h += '<div><label class="pilot-label">' + t("pilot.col.owner") + '</label><div id="pj-responsible-slot"></div></div>';
         h += '<div><label class="pilot-label">' + t("pilot.col.status") + '</label><select id="pj-status" class="ct-select">';
@@ -2758,7 +2758,7 @@
         var h = '';
         var bullets = "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022";
         if (provider === "anthropic") {
-            h += '<div class="ct-grid ct-grid-2 ct-gap-3">';
+            h += '<div class="ct-form-grid">';
             h += '<div><label class="pilot-label">' + t("pilot.settings.model") + '</label><select id="set-ai-model" class="ct-select">';
             ["claude-sonnet-5", "claude-opus-5", "claude-fable-5", "claude-haiku-4-5-20251001", "claude-opus-4-8", "claude-sonnet-4-6"].forEach(function (m) {
                 h += '<option value="' + m + '"' + (s.ai_model === m ? ' selected' : '') + '>' + m + '</option>';
@@ -2770,7 +2770,7 @@
             h += '</div>';
         }
         else if (provider === "openai") {
-            h += '<div class="ct-grid ct-grid-2 ct-gap-3">';
+            h += '<div class="ct-form-grid">';
             h += '<div><label class="pilot-label">' + t("pilot.settings.model") + '</label><select id="set-ai-model" class="ct-select">';
             ["gpt-5.6", "gpt-5.6-terra", "gpt-5.5", "gpt-5.4-mini", "gpt-4o"].forEach(function (m) {
                 h += '<option value="' + m + '"' + (s.ai_model === m ? ' selected' : '') + '>' + m + '</option>';
@@ -2782,7 +2782,7 @@
             h += '</div>';
         }
         else if (provider === "gemini") {
-            h += '<div class="ct-grid ct-grid-2 ct-gap-3">';
+            h += '<div class="ct-form-grid">';
             h += '<div><label class="pilot-label">' + t("pilot.settings.model") + '</label><select id="set-ai-model" class="ct-select">';
             ["gemini-3.6-flash", "gemini-3.5-flash-lite"].forEach(function (m) {
                 h += '<option value="' + m + '"' + (s.ai_model === m ? ' selected' : '') + '>' + m + '</option>';
@@ -2795,7 +2795,7 @@
         }
         else if (provider === "custom") {
             h += '<p class="ct-text-label ct-muted ct-mb-2">' + t("pilot.settings.custom_hint") + '</p>';
-            h += '<div class="ct-grid ct-grid-2 ct-gap-3 ct-mb-2">';
+            h += '<div class="ct-form-grid ct-mb-2">';
             h += '<div><label class="pilot-label">' + t("pilot.settings.display_name") + '</label><input type="text" id="set-custom-label" class="ct-input" placeholder="Ollama Llama3" value="' + esc(s.ai_custom_label || '') + '"></div>';
             h += '<div><label class="pilot-label">' + t("pilot.settings.model") + '</label><input type="text" id="set-ai-model" class="ct-input" placeholder="llama3, mistral-large, ..." value="' + esc(s.ai_model || s.ai_custom_model || '') + '"></div>';
             h += '</div>';
@@ -2872,7 +2872,7 @@
         h += '<div class="ct-bordered ct-r-lg ct-p-4 ct-mb-5">';
         h += '<h3 class="ct-text-data ct-mb-3">' + t("pilot.settings.proxy_config") + '</h3>';
         h += '<p class="ct-text-label ct-muted ct-mb-3">' + t("pilot.settings.proxy_hint") + '</p>';
-        h += '<div class="ct-grid ct-grid-2 ct-gap-3 ct-mb-3">';
+        h += '<div class="ct-form-grid ct-mb-3">';
         h += '<div><label class="pilot-label">HTTP_PROXY</label><input type="text" id="set-http-proxy" class="ct-input" placeholder="http://proxy:3128" value="' + esc(s.http_proxy || '') + '"></div>';
         h += '<div><label class="pilot-label">HTTPS_PROXY</label><input type="text" id="set-https-proxy" class="ct-input" placeholder="http://proxy:3128" value="' + esc(s.https_proxy || '') + '"></div>';
         h += '</div>';
@@ -2883,16 +2883,16 @@
         h += '<div class="ct-bordered ct-r-lg ct-p-4 ct-mb-5">';
         h += '<h3 class="ct-text-data ct-mb-3">' + t("pilot.settings.smtp_section") + '</h3>';
         h += '<p class="ct-text-label ct-muted ct-mb-3">' + t("pilot.settings.smtp_hint") + '</p>';
-        h += '<div style="display:grid;grid-template-columns:2fr 1fr;gap:var(--ct-s3);margin-bottom:var(--ct-s3)">';
+        h += '<div class="ct-form-grid ct-mb-3" data-cols="2-1">';
         h += '<div><label class="pilot-label">' + t("pilot.settings.smtp_host") + '</label><input type="text" id="set-smtp-host" class="ct-input" placeholder="smtp.example.com" value="' + esc(s.smtp_host || '') + '"></div>';
         h += '<div><label class="pilot-label">' + t("pilot.settings.smtp_port") + '</label><input type="text" id="set-smtp-port" class="ct-input" placeholder="587" value="' + esc(s.smtp_port || '') + '"></div>';
         h += '</div>';
-        h += '<div class="ct-grid ct-grid-2 ct-gap-3 ct-mb-3">';
+        h += '<div class="ct-form-grid ct-mb-3">';
         h += '<div><label class="pilot-label">' + t("pilot.settings.smtp_user") + '</label><input type="text" id="set-smtp-user" class="ct-input" placeholder="watch@example.com" value="' + esc(s.smtp_user || '') + '"></div>';
         h += '<div><label class="pilot-label">' + t("pilot.settings.smtp_password") + '</label><input type="password" id="set-smtp-password" class="ct-input" placeholder="' + (s.smtp_password === "configured" ? bullets : '') + '" value="' + (s.smtp_password === "configured" ? bullets : '') + '">';
         h += '<div style="font-size:var(--ct-text-label);color:' + (s.smtp_password === "configured" ? 'var(--ct-low)' : 'var(--ct-ink-2)') + ';margin-top:2px">' + (s.smtp_password === "configured" ? t("pilot.settings.pwd_configured") : t("pilot.settings.pwd_not_configured")) + '</div></div>';
         h += '</div>';
-        h += '<div style="display:grid;grid-template-columns:2fr 1fr;gap:var(--ct-s3)">';
+        h += '<div class="ct-form-grid" data-cols="2-1">';
         h += '<div><label class="pilot-label">' + t("pilot.settings.smtp_from") + '</label><input type="text" id="set-smtp-from" class="ct-input" placeholder="watch@example.com" value="' + esc(s.smtp_from || '') + '"></div>';
         h += '<div><label class="pilot-label">TLS</label><select id="set-smtp-tls" class="ct-select"><option value="true"' + ((s.smtp_tls || 'true') === 'true' ? ' selected' : '') + '>' + t("pilot.settings.tls_on") + '</option><option value="false"' + ((s.smtp_tls || '') === 'false' ? ' selected' : '') + '>' + t("pilot.settings.tls_off") + '</option></select></div>';
         h += '</div>';

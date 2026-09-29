@@ -623,7 +623,7 @@
         if (_isAdmin()) {
             h += '<div class="kpi-detail-section">';
             h += '<div class="kpi-detail-section-title">' + t("pilot.kpi.settings_admin") + '</div>';
-            h += '<div class="kpi-detail-tune">';
+            h += '<div class="kpi-detail-tune ct-form-grid" data-cols="3">';
             h += '<label class="pilot-label">' + t("pilot.kpi.target") + '<input type="number" step="any" id="kpi-detail-target" class="ct-input" value="' + (k.target != null ? k.target : '') + '"></label>';
             h += '<label class="pilot-label">' + t("pilot.kpi.threshold_amber") + '<input type="number" step="any" id="kpi-detail-amber" class="ct-input" value="' + (k.threshold_amber != null ? k.threshold_amber : '') + '"></label>';
             h += '<label class="pilot-label">' + t("pilot.kpi.threshold_red") + '<input type="number" step="any" id="kpi-detail-red" class="ct-input" value="' + (k.threshold_red != null ? k.threshold_red : '') + '"></label>';
@@ -998,7 +998,7 @@
         if (!_isAdmin())
             return;
         var body = '';
-        body += '<div class="ct-grid ct-grid-2 ct-gap-2">';
+        body += '<div class="ct-form-grid">';
         body += '<div><label class="pilot-label">' + t("pilot.kpi.field_code") + '</label><input type="text" id="kpi-new-code" class="ct-input ct-w-full" placeholder="' + esc(t("pilot.kpi.code_placeholder")) + '"></div>';
         body += '<div><label class="pilot-label">' + t("pilot.kpi.field_category") + '</label><select id="kpi-new-cat" class="ct-select ct-w-full">' +
             CAT_ORDER.map(function (c) { return '<option value="' + c + '">' + esc(_catLabel(c)) + '</option>'; }).join('') + '</select></div>';

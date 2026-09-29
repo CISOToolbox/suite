@@ -153,13 +153,13 @@ function cardHTML(c: AuditControl, f: AuditFinding): string {
     });
     h += '</div>';
     // Fields
-    h += '<div class="ctrl-fields">';
+    h += '<div class="ctrl-fields ct-form-grid">';
     h += '<div class="ctrl-field"><label>' + t("audit.field.preuve") + '</label><textarea data-change="setField" data-args=\'' + _da(c.id, "preuve") + '\' data-pass-value>' + esc(f.preuve) + '</textarea></div>';
     h += '<div class="ctrl-field"><label>' + t("audit.field.constats") + '</label><textarea data-change="setField" data-args=\'' + _da(c.id, "constats") + '\' data-pass-value>' + esc(f.constats) + '</textarea></div>';
     h += '</div>';
     // Ecart fields (only if NC/PS/PP)
     if (hasEcart) {
-        h += '<div class="ecart-fields">';
+        h += '<div class="ecart-fields ct-form-grid">';
         h += '<div class="ctrl-field"><label>' + t("audit.field.ecart_critere") + '</label><textarea data-change="setField" data-args=\'' + _da(c.id, "ecart_critere") + '\' data-pass-value>' + esc(f.ecart_critere) + '</textarea></div>';
         h += '<div class="ctrl-field"><label>' + t("audit.field.ecart_constat") + '</label><textarea data-change="setField" data-args=\'' + _da(c.id, "ecart_constat") + '\' data-pass-value>' + esc(f.ecart_constat) + '</textarea></div>';
         h += '<div class="ctrl-field"><label>' + t("audit.field.ecart_cause") + '</label><textarea data-change="setField" data-args=\'' + _da(c.id, "ecart_cause") + '\' data-pass-value>' + esc(f.ecart_cause) + '</textarea></div>';
