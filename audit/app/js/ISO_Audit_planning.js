@@ -205,8 +205,12 @@ function generatePlanning() {
     for (var day = 0; day < days; day++) {
         var dateStr = "";
         if (startDate) {
+            // "YYYY-MM-DD" parses as UTC midnight: step the day in UTC too.
+            // Stepping in local time lands on the previous UTC day once the
+            // clocks go forward: two days came out with one date and every
+            // later day one day early.
             var d = new Date(startDate);
-            d.setDate(d.getDate() + day);
+            d.setUTCDate(d.getUTCDate() + day);
             dateStr = d.toISOString().slice(0, 10);
         }
         else {
