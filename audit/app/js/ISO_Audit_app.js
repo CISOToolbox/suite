@@ -356,13 +356,13 @@ function renderDashboard() {
     h += '</div>';
     // Generate report button (only if AI is enabled)
     if (typeof _aiIsEnabled === "function" && _aiIsEnabled()) {
-        h += '<div style="margin-bottom:16px;text-align:right"><button class="btn-report" data-click="generateReport">' + t("audit.dash.generate_report") + '</button></div>';
+        h += '<div class="ct-ta-r ct-mb-4"><button class="btn-report" data-click="generateReport">' + t("audit.dash.generate_report") + '</button></div>';
     }
     // Charts row: Gauge + Donut + Radar (radar slightly enlarged)
     h += '<div class="dash-charts-grid">';
     h += '<div class="dash-card"><h3>' + t("audit.dash.gauge_title") + '</h3>';
     h += '<div class="dash-chart">' + buildGauge(S) + '</div>';
-    h += '<div style="font-size:0.72em;color:var(--ct-ink-2);margin-top:6px">' + t("audit.dash.maturity_formula") + '</div>';
+    h += '<div class="ct-text-label ct-muted ct-mt-2">' + t("audit.dash.maturity_formula") + '</div>';
     h += '</div>';
     h += '<div class="dash-card"><h3>' + t("audit.dash.donut_title") + '</h3>';
     h += '<div class="dash-chart">' + buildDonut(S) + '</div>';
@@ -372,16 +372,16 @@ function renderDashboard() {
     h += '</div>';
     h += '</div>';
     // Stacked bar chart per domain
-    h += '<div class="dash-card" style="margin-bottom:16px"><h3>' + t("audit.dash.stacked_title") + '</h3>';
+    h += '<div class="dash-card ct-mb-4"><h3>' + t("audit.dash.stacked_title") + '</h3>';
     h += buildStackedBars(S);
     h += '</div>';
     // Domain score bars
-    h += '<div class="dash-card" style="margin-bottom:16px"><h3>' + t("audit.dash.by_domain") + '</h3>';
+    h += '<div class="dash-card ct-mb-4"><h3>' + t("audit.dash.by_domain") + '</h3>';
     h += buildDomainBars(S);
     h += '</div>';
     // HDS breakdown
     if (D.meta.hds === "oui" || D.meta.hds === "partiel") {
-        h += '<div class="dash-card" style="margin-bottom:16px"><h3>' + t("audit.dash.hds_title") + '</h3>';
+        h += '<div class="dash-card ct-mb-4"><h3>' + t("audit.dash.hds_title") + '</h3>';
         h += buildHDSBreakdown(S);
         h += '</div>';
     }
@@ -461,7 +461,7 @@ function buildDonut(S) {
     if (todo > 0)
         data.push({ label: t("audit.dash.non_audited"), value: todo, color: "var(--ct-line)" });
     if (data.length === 0)
-        return '<div style="text-align:center;color:var(--ct-ink-2);padding:20px">&mdash;</div>';
+        return '<div class="dash-empty">&mdash;</div>';
     var total = data.reduce(function (sum, d) { return sum + d.value; }, 0);
     var cx = 80, cy = 80, outerR = 70, innerR = 42;
     var svg = '<svg viewBox="0 0 160 160">';
@@ -485,9 +485,9 @@ function buildDonut(S) {
     svg += '<text x="' + cx + '" y="' + (cy + 12) + '" text-anchor="middle" font-size="8" fill="var(--ct-ink-2)">' + t("audit.dash.audited").toUpperCase() + '</text>';
     svg += '</svg>';
     // Legend
-    svg += '<div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:8px">';
+    svg += '<div class="dash-legend">';
     data.forEach(function (d) {
-        svg += '<span style="font-size:0.72em"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + d.color + ';margin-right:3px"></span>' + esc(d.label) + ' ' + d.value + '</span>';
+        svg += '<span class="dash-legend-item"><span class="dash-legend-dot" style="background:' + d.color + '"></span>' + esc(d.label) + ' ' + d.value + '</span>';
     });
     svg += '</div>';
     return svg;
@@ -573,7 +573,7 @@ function buildStackedBars(S) {
             { val: ds.total - ds.audited, color: "var(--ct-line)" }
         ];
         h += '<div class="stacked-row">';
-        h += '<div class="stacked-label">' + esc(domLabel(dom)) + ' <span style="color:var(--ct-ink-2);font-size:0.85em">' + ds.total + ' mesures</span></div>';
+        h += '<div class="stacked-label">' + esc(domLabel(dom)) + ' <span class="ct-muted ct-text-meta">' + esc(t("audit.dash.measures_count", { n: ds.total })) + '</span></div>';
         h += '<div class="stacked-track">';
         segs.forEach(function (seg) {
             if (seg.val > 0)
@@ -600,7 +600,7 @@ function buildHDSBreakdown(S) {
         else if (f.status)
             target.other++;
     });
-    var h = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">';
+    var h = '<div class="hds-grid">';
     h += buildHDSBar(hds, "HDS (" + hds.total + ")");
     h += buildHDSBar(nonhds, "Non-HDS (" + nonhds.total + ")");
     h += '</div>';
@@ -613,7 +613,7 @@ function buildHDSBar(F, label) {
         { l: t("audit.dash.hds_nc"), v: F.nc, color: statusColor("ncmaj") },
         { l: t("audit.dash.hds_other"), v: F.other, color: statusColor("ps") }
     ];
-    var h = '<div><div style="font-weight:600;font-size:0.85em;margin-bottom:6px">' + esc(label) + '</div>';
+    var h = '<div><div class="ct-strong ct-text-data ct-mb-2">' + esc(label) + '</div>';
     rows.forEach(function (r) {
         h += '<div class="hds-bar-row">';
         h += '<span class="hds-bar-label">' + esc(r.l) + '</span>';
@@ -625,28 +625,28 @@ function buildHDSBar(F, label) {
     return h;
 }
 function buildDomainBars(S) {
-    var h = '<div style="display:flex;flex-direction:column;gap:6px">';
+    var h = '<div class="domain-bars">';
     DOMAINS.forEach(function (dom) {
         var ds = S.domains[dom.id];
         if (!ds)
             return;
         var scorePct = ds.score;
         var scoreColor = scorePct >= 80 ? "var(--ct-low)" : scorePct >= 50 ? "var(--ct-medium)" : "var(--ct-critical)";
-        h += '<div style="display:flex;align-items:center;gap:8px;font-size:0.8em">';
-        h += '<span style="min-width:160px;font-weight:600">' + esc(domLabel(dom)) + '</span>';
-        h += '<div style="flex:1;height:16px;background:var(--ct-surface-2);border-radius:8px;overflow:hidden;position:relative">';
+        h += '<div class="domain-bar-row">';
+        h += '<span class="domain-bar-label">' + esc(domLabel(dom)) + '</span>';
+        h += '<div class="domain-bar-track">';
         if (ds.c > 0)
-            h += '<div style="position:absolute;height:100%;width:' + (ds.c / ds.total * 100) + '%;background:var(--ct-low)"></div>';
+            h += '<div class="domain-bar-seg" data-s="c" style="width:' + (ds.c / ds.total * 100) + '%"></div>';
         if (ds.ncmaj > 0)
-            h += '<div style="position:absolute;height:100%;left:' + (ds.c / ds.total * 100) + '%;width:' + (ds.ncmaj / ds.total * 100) + '%;background:var(--ct-critical)"></div>';
+            h += '<div class="domain-bar-seg" data-s="ncmaj" style="left:' + (ds.c / ds.total * 100) + '%;width:' + (ds.ncmaj / ds.total * 100) + '%"></div>';
         if (ds.ncmin > 0)
-            h += '<div style="position:absolute;height:100%;left:' + ((ds.c + ds.ncmaj) / ds.total * 100) + '%;width:' + (ds.ncmin / ds.total * 100) + '%;background:var(--ct-high)"></div>';
+            h += '<div class="domain-bar-seg" data-s="ncmin" style="left:' + ((ds.c + ds.ncmaj) / ds.total * 100) + '%;width:' + (ds.ncmin / ds.total * 100) + '%"></div>';
         if (ds.ps > 0)
-            h += '<div style="position:absolute;height:100%;left:' + ((ds.c + ds.ncmaj + ds.ncmin) / ds.total * 100) + '%;width:' + (ds.ps / ds.total * 100) + '%;background:var(--ct-medium)"></div>';
+            h += '<div class="domain-bar-seg" data-s="ps" style="left:' + ((ds.c + ds.ncmaj + ds.ncmin) / ds.total * 100) + '%;width:' + (ds.ps / ds.total * 100) + '%"></div>';
         if (ds.pp > 0)
-            h += '<div style="position:absolute;height:100%;left:' + ((ds.c + ds.ncmaj + ds.ncmin + ds.ps) / ds.total * 100) + '%;width:' + (ds.pp / ds.total * 100) + '%;background:var(--ct-info)"></div>';
+            h += '<div class="domain-bar-seg" data-s="pp" style="left:' + ((ds.c + ds.ncmaj + ds.ncmin + ds.ps) / ds.total * 100) + '%;width:' + (ds.pp / ds.total * 100) + '%"></div>';
         h += '</div>';
-        h += '<span style="min-width:40px;text-align:right;font-weight:600;color:' + scoreColor + '">' + scorePct + '%</span>';
+        h += '<span class="domain-bar-score" style="color:' + scoreColor + '">' + scorePct + '%</span>';
         h += '</div>';
     });
     h += '</div>';
@@ -672,7 +672,7 @@ function renderJournal() {
     if (!el)
         return;
     if (!D.journal || D.journal.length === 0) {
-        el.innerHTML = '<div style="color:var(--ct-ink-2);text-align:center;padding:20px">' + t("audit.journal.empty") + '</div>';
+        el.innerHTML = '<div class="dash-empty">' + t("audit.journal.empty") + '</div>';
         return;
     }
     var h = '';
@@ -695,7 +695,7 @@ function renderJournal() {
         h += '<span class="journal-type ct-text-onsolid" style="background:' + typeColor + '">' + esc(typeLabel) + '</span>';
         h += '<span class="journal-text">' + esc(text) + '</span>';
         if (entry.author)
-            h += '<span style="font-size:0.8em;color:var(--ct-ink-2)">' + esc(entry.author) + '</span>';
+            h += '<span class="ct-text-meta ct-muted">' + esc(entry.author) + '</span>';
         h += '</div>';
     });
     el.innerHTML = h;
@@ -748,17 +748,17 @@ function onSearchInput(val) {
             return;
         var fields = [];
         if (_searchScope === "all") {
-            fields.push({ k: "Mesure", v: ctrl.t || "" });
-            fields.push({ k: "Description", v: ctrl.desc || "" });
+            fields.push({ k: t("audit.search.field.title"), v: ctrl.t || "" });
+            fields.push({ k: t("audit.search.field.desc"), v: ctrl.desc || "" });
             fields.push({ k: "ID", v: ctrl.id || "" });
         }
         if (_searchScope === "all" || _searchScope === "findings" || _searchScope === "nc") {
-            fields.push({ k: "Preuves", v: f.preuve || "" });
-            fields.push({ k: "Constats", v: f.constats || "" });
-            fields.push({ k: "Constat écart", v: f.ecart_constat || "" });
-            fields.push({ k: "Cause", v: f.ecart_cause || "" });
-            fields.push({ k: "Action", v: f.ecart_action || "" });
-            fields.push({ k: "Critère", v: f.ecart_critere || "" });
+            fields.push({ k: t("audit.field.preuve"), v: f.preuve || "" });
+            fields.push({ k: t("audit.field.constats"), v: f.constats || "" });
+            fields.push({ k: t("audit.field.ecart_constat"), v: f.ecart_constat || "" });
+            fields.push({ k: t("audit.field.ecart_cause"), v: f.ecart_cause || "" });
+            fields.push({ k: t("audit.field.ecart_action"), v: f.ecart_action || "" });
+            fields.push({ k: t("audit.field.ecart_critere"), v: f.ecart_critere || "" });
         }
         var matchField = null, matchVal = "";
         for (var i = 0; i < fields.length; i++) {
@@ -790,17 +790,17 @@ function onSearchInput(val) {
         var r = results[i];
         var statusH = "";
         if (r.f.status && STATUS_MAP[r.f.status]) {
-            statusH = '<span class="ct-badge" data-tone="' + statusTone(r.f.status) + '" style="margin-left:6px">' + esc(statusLabel(r.f.status)) + '</span>';
+            statusH = '<span class="ct-badge ct-ml-2" data-tone="' + statusTone(r.f.status) + '">' + esc(statusLabel(r.f.status)) + '</span>';
         }
         h += '<div class="search-result-item" data-click="goToSearchResult" data-args=\'' + _da(r.ctrl.id) + '\'>';
         h += '<span class="search-result-id">' + esc(r.ctrl.id) + '</span>';
         h += '<div class="search-result-content">';
         h += '<div class="search-result-title">' + esc(ctrlT(r.ctrl)) + statusH + '</div>';
-        h += '<div class="search-result-match"><em style="font-size:0.9em;color:var(--ct-ink-2)">' + esc(r.matchField) + '</em> — ' + r.snippet + '</div>';
+        h += '<div class="search-result-match"><em class="ct-muted">' + esc(r.matchField) + '</em> — ' + r.snippet + '</div>';
         h += '</div></div>';
     }
     if (results.length > 50) {
-        h += '<div style="text-align:center;padding:10px;font-size:0.78em;color:var(--ct-ink-2)">' + t("audit.search.more", { count: results.length - 50 }) + '</div>';
+        h += '<div class="search-more">' + t("audit.search.more", { count: results.length - 50 }) + '</div>';
     }
     resultsEl.innerHTML = h;
 }
@@ -912,9 +912,9 @@ function generateReport() {
         window._lastAIReport = response;
         var p = _aiEnsurePanel();
         p.title.textContent = t("audit.report.title");
-        p.body.innerHTML = '<div style="white-space:pre-wrap;font-size:0.88em;line-height:1.6;padding:8px">' + esc(response) + '</div>';
-        p.footer.innerHTML = '<button class="ct-pwd-btn ct-pwd-ok" id="export-report-word" style="background:var(--ct-accent)">' + t("audit.report.export_word") + '</button>'
-            + '<button class="ct-pwd-btn ct-pwd-ok" id="copy-report-btn">' + t("audit.report.copy") + '</button>';
+        p.body.innerHTML = '<div class="audit-report-text">' + esc(response) + '</div>';
+        p.footer.innerHTML = '<div class="ct-row"><button class="ct-btn" data-variant="primary" id="export-report-word">' + t("audit.report.export_word") + '</button>'
+            + '<button class="ct-btn" id="copy-report-btn">' + t("audit.report.copy") + '</button></div>';
         document.getElementById("copy-report-btn").onclick = function () {
             if (navigator.clipboard) {
                 navigator.clipboard.writeText(response);

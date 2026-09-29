@@ -287,8 +287,8 @@
         _closePicker();
         var overlay = document.createElement("div");
         overlay.id = "audit-picker-overlay";
-        overlay.style.cssText = "position:fixed;inset:0;background:var(--ct-scrim);z-index:1000;display:flex;align-items:center;justify-content:center";
-        overlay.innerHTML = '<div id="audit-picker" style="background:var(--ct-surface);border:1px solid var(--ct-line);border-radius:10px;max-width:760px;width:92%;max-height:80vh;display:flex;flex-direction:column;padding:var(--ct-s4)"></div>';
+        overlay.className = "ct-modal-overlay";
+        overlay.innerHTML = '<div id="audit-picker" class="ct-modal" data-width="lg"></div>';
         overlay.addEventListener("mousedown", function (e) { if (e.target === overlay)
             _closePicker(); });
         document.body.appendChild(overlay);
@@ -299,36 +299,39 @@
         if (!box)
             return;
         var boxEl = box;
-        boxEl.innerHTML = '<p class="text-muted">' + esc(t("auditapi.loading")) + '</p>';
+        boxEl.innerHTML = '<p class="ct-modal-body ct-muted">' + esc(t("auditapi.loading")) + '</p>';
         AuditAPI.list().then(function (items) {
-            var h = '<div class="ct-row" style="align-items:center;margin-bottom:var(--ct-s3)">';
-            h += '<h2 class="ct-m-0">' + esc(t("auditapi.title")) + '</h2><span style="flex:1"></span>';
-            h += '<input type="file" id="audit-import-file" accept=".json" style="display:none">';
-            h += '<button class="ct-btn" data-write data-click="_auditPickerImport">' + _icon("upload", 14) + ' ' + esc(t("auditapi.import")) + '</button> ';
-            h += '<button class="ct-btn" data-write data-variant="primary" data-click="_auditPickerNew">' + _icon("plus", 14) + ' ' + esc(t("auditapi.new")) + '</button> ';
-            h += '<button class="appsec-modal-close" data-click="_closeAuditPicker" style="background:none;border:none;font-size:1.4em;cursor:pointer;color:var(--ct-ink-2)">&#10005;</button>';
+            var h = '<div class="ct-modal-head">';
+            h += '<h2 class="ct-modal-title ct-m-0">' + esc(t("auditapi.title")) + '</h2>';
+            h += '<button class="ct-btn" data-variant="ghost" data-icon data-click="_closeAuditPicker" title="' + esc(t("btn_close")) + '">' + _icon("x", 16) + '</button>';
+            h += '</div><div class="ct-modal-body">';
+            h += '<div class="ct-row ct-row-wrap ct-justify-end ct-mb-3">';
+            h += '<input type="file" id="audit-import-file" accept=".json" class="ct-hidden">';
+            h += '<button class="ct-btn" data-write data-click="_auditPickerImport">' + _icon("upload", 14) + ' ' + esc(t("auditapi.import")) + '</button>';
+            h += '<button class="ct-btn" data-write data-variant="primary" data-click="_auditPickerNew">' + _icon("plus", 14) + ' ' + esc(t("auditapi.new")) + '</button>';
             h += '</div>';
             if (!items.length) {
-                h += '<p class="text-muted">' + esc(t("auditapi.empty")) + '</p>';
+                h += '<p class="ct-muted ct-m-0">' + esc(t("auditapi.empty")) + '</p>';
             }
             else {
-                h += '<div style="overflow:auto"><table class="ct-table"><thead><tr>';
+                h += '<div class="ct-scroll"><table class="ct-table"><thead><tr>';
                 h += '<th>' + esc(t("auditapi.col_name")) + '</th><th>' + esc(t("auditapi.col_date")) + '</th><th>' + esc(t("auditapi.col_updated")) + '</th><th></th>';
                 h += '</tr></thead><tbody>';
                 items.forEach(function (p) {
                     var active = String(p.id) === String(_activeId);
-                    h += '<tr' + (active ? ' style="background:var(--ct-accent-tint)"' : '') + '>';
-                    h += '<td>' + esc(p.name || "(sans nom)") + (active ? ' <span class="ct-badge" data-tone="info">' + esc(t("auditapi.active")) + '</span>' : '') + '</td>';
+                    h += '<tr' + (active ? ' aria-current="true"' : '') + '>';
+                    h += '<td>' + esc(p.name || t("auditapi.unnamed")) + (active ? ' <span class="ct-badge" data-tone="info">' + esc(t("auditapi.active")) + '</span>' : '') + '</td>';
                     h += '<td>' + esc(p.audit_date || "") + '</td>';
-                    h += '<td class="fs-sm text-muted">' + esc((p.updated_at || "").substring(0, 10)) + '</td>';
-                    h += '<td class="ct-ta-r ct-nowrap">';
-                    h += '<button class="ct-btn" data-size="xs" data-click="_auditPickerOpen" data-args=\'' + _da(p.id) + '\'>' + esc(t("auditapi.open")) + '</button> ';
-                    h += '<button class="ct-btn" data-size="xs" data-write data-click="_auditPickerDup" data-args=\'' + _da(p.id) + '\' data-icon title="' + esc(t("auditapi.duplicate")) + '">' + _icon("copy", 14) + '</button> ';
+                    h += '<td class="ct-text-meta ct-muted">' + esc((p.updated_at || "").substring(0, 10)) + '</td>';
+                    h += '<td><div class="ct-row ct-justify-end">';
+                    h += '<button class="ct-btn" data-size="xs" data-click="_auditPickerOpen" data-args=\'' + _da(p.id) + '\'>' + esc(t("auditapi.open")) + '</button>';
+                    h += '<button class="ct-btn" data-size="xs" data-write data-click="_auditPickerDup" data-args=\'' + _da(p.id) + '\' data-icon title="' + esc(t("auditapi.duplicate")) + '">' + _icon("copy", 14) + '</button>';
                     h += '<button class="ct-btn ct-admin-only" data-size="xs" data-variant="danger" data-click="_auditPickerDel" data-args=\'' + _da(p.id) + '\' data-icon title="' + esc(t("auditapi.delete")) + '">' + _icon("trash", 14) + '</button>';
-                    h += '</td></tr>';
+                    h += '</div></td></tr>';
                 });
                 h += '</tbody></table></div>';
             }
+            h += '</div>';
             boxEl.innerHTML = h;
             var input = document.getElementById("audit-import-file");
             if (input)
@@ -404,9 +407,9 @@
     window._auditControlMeasuresHTML = function (controlId) {
         var linked = _measures.filter(function (m) { return m.control_id === controlId; });
         var h = '<div class="ctrl-field audit-measures-inline">';
-        h += '<label>' + esc(t("auditapi.m.linked")) + '</label><div>';
+        h += '<label>' + esc(t("auditapi.m.linked")) + '</label><div class="ct-row ct-row-wrap">';
         linked.forEach(function (m) {
-            h += '<button class="ct-btn" data-size="xs" data-click="_editAuditMeasure" data-args=\'' + _da(m.id) + '\' style="margin:0 4px 4px 0">'
+            h += '<button class="ct-btn" data-size="xs" data-click="_editAuditMeasure" data-args=\'' + _da(m.id) + '\'>'
                 + esc(m.id) + ' · ' + esc(m.title.substring(0, 40)) + (m.responsable ? ' — ' + esc(m.responsable) : '')
                 + ' <span class="ct-badge" data-size="sm">' + esc(_measureStatusLabel(m.statut)) + '</span></button>';
         });
@@ -496,17 +499,17 @@
         if (!c)
             return;
         var el = c;
-        el.innerHTML = '<p class="text-muted">' + esc(t("auditapi.loading")) + '</p>';
+        el.innerHTML = '<p class="ct-muted">' + esc(t("auditapi.loading")) + '</p>';
         _reloadMeasures().then(function () {
-            var h = '<div class="ct-row" style="align-items:center;margin-bottom:var(--ct-s3)">';
-            h += '<span style="flex:1"></span>';
+            var h = '<div class="ct-row ct-mb-3">';
+            h += '<span class="ct-flex-1"></span>';
             h += '<button class="ct-btn" data-write data-variant="primary" data-click="_auditNewMeasure" data-args=\'' + _da("") + '\'>' + _icon("plus", 14) + ' ' + esc(t("auditapi.m.new_title")) + '</button>';
             h += '</div>';
             if (!_measures.length) {
-                h += '<p class="text-muted">' + esc(t("auditapi.m.empty")) + '</p>';
+                h += '<p class="ct-muted">' + esc(t("auditapi.m.empty")) + '</p>';
             }
             else {
-                h += '<div style="overflow:auto"><table class="ct-table"><thead><tr>';
+                h += '<div class="ct-scroll"><table class="ct-table"><thead><tr>';
                 h += '<th>ID</th><th>' + esc(t("auditapi.m.col_title")) + '</th><th>' + esc(t("auditapi.m.col_control")) + '</th>';
                 h += '<th>' + esc(t("auditapi.m.col_status")) + '</th><th>' + esc(t("auditapi.m.col_owner")) + '</th><th>' + esc(t("auditapi.m.col_due")) + '</th>';
                 h += '</tr></thead><tbody>';
@@ -585,6 +588,7 @@
         "auditapi.delete": "Supprimer",
         "auditapi.delete_confirm": "Supprimer définitivement cet audit ?",
         "auditapi.active": "actif",
+        "auditapi.unnamed": "(sans nom)",
         "auditapi.col_name": "Audit",
         "auditapi.col_date": "Date d'audit",
         "auditapi.col_updated": "Modifié",
@@ -619,6 +623,7 @@
         "auditapi.delete": "Delete",
         "auditapi.delete_confirm": "Permanently delete this audit?",
         "auditapi.active": "active",
+        "auditapi.unnamed": "(untitled)",
         "auditapi.col_name": "Audit",
         "auditapi.col_date": "Audit date",
         "auditapi.col_updated": "Updated",

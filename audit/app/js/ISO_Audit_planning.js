@@ -23,20 +23,16 @@ function _timeToMin(timeStr) {
     return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
 }
 // ── RENDER HELPERS ──
-var _JOURS_FR = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
-var _MOIS_FR = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
 function _formatDayHeader(dateStr, dayNum) {
-    // dateStr = "2026-03-15"  →  "Jour 1 — lundi 15 mars 2026"
-    try {
-        var parts = dateStr.split("-");
-        var d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
-        var dow = _JOURS_FR[d.getDay()];
-        var label = dow + " " + d.getDate() + " " + _MOIS_FR[d.getMonth()] + " " + d.getFullYear();
-        return t("audit.planning.day") + " " + dayNum + " — " + label;
-    }
-    catch (e) {
-        return t("audit.planning.day") + " " + dayNum + " — " + dateStr;
-    }
+    // dateStr = "2026-03-15" → "Day 1 — Monday, March 15, 2026", in the UI's
+    // language. Without a start date the slots carry no real date: the header
+    // is the day number alone, never "undefined NaN".
+    var head = t("audit.planning.day") + " " + dayNum;
+    var parts = String(dateStr || "").split("-");
+    var d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    if (parts.length !== 3 || isNaN(d.getTime()))
+        return head;
+    return head + " — " + d.toLocaleDateString(_locale, { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 }
 function _domainGroup(domainId) {
     for (var i = 0; i < PLANNING_DOMAINS.length; i++) {
@@ -59,40 +55,24 @@ function renderPlanning() {
         return;
     var p = D.planning.params;
     var h = '';
-    // ── Parameters section ──
-    h += '<div class="planning-params" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px;padding:16px;background:var(--ct-canvas);border-radius:8px;border:1px solid var(--ct-line)">';
-    h += '<div class="planning-param" style="display:flex;flex-direction:column;gap:4px">';
-    h += '<label style="font-size:0.75em;font-weight:600;color:var(--ct-ink-2);text-transform:uppercase">' + t("audit.planning.start_date") + '</label>';
-    h += '<input type="date" style="padding:6px 8px;border:1px solid var(--ct-line);border-radius:4px;font-size:0.85em" value="' + esc(p.start_date || "") + '" data-change="onPlanningParam" data-args=\'' + _da("start_date") + '\' data-pass-value>';
-    h += '</div>';
-    h += '<div class="planning-param" style="display:flex;flex-direction:column;gap:4px">';
-    h += '<label style="font-size:0.75em;font-weight:600;color:var(--ct-ink-2);text-transform:uppercase">' + t("audit.planning.days") + '</label>';
-    h += '<input type="number" min="1" max="10" style="padding:6px 8px;border:1px solid var(--ct-line);border-radius:4px;font-size:0.85em" value="' + esc(String(p.days || 3)) + '" data-change="onPlanningParam" data-args=\'' + _da("days") + '\' data-pass-value>';
-    h += '</div>';
-    h += '<div class="planning-param" style="display:flex;flex-direction:column;gap:4px">';
-    h += '<label style="font-size:0.75em;font-weight:600;color:var(--ct-ink-2);text-transform:uppercase">' + t("audit.planning.start_time") + '</label>';
-    h += '<input type="time" style="padding:6px 8px;border:1px solid var(--ct-line);border-radius:4px;font-size:0.85em" value="' + esc(p.start_time || "09:00") + '" data-change="onPlanningParam" data-args=\'' + _da("start_time") + '\' data-pass-value>';
-    h += '</div>';
-    h += '<div class="planning-param" style="display:flex;flex-direction:column;gap:4px">';
-    h += '<label style="font-size:0.75em;font-weight:600;color:var(--ct-ink-2);text-transform:uppercase">' + t("audit.planning.slot_duration") + '</label>';
-    h += '<div style="display:flex;align-items:center;gap:6px">';
-    h += '<input type="number" min="15" max="240" step="15" style="padding:6px 8px;border:1px solid var(--ct-line);border-radius:4px;font-size:0.85em;flex:1" value="' + esc(String(p.slot_duration || 60)) + '" data-change="onPlanningParam" data-args=\'' + _da("slot_duration") + '\' data-pass-value>';
-    h += '<span style="font-size:0.78em;color:var(--ct-ink-2)">min</span>';
+    // ── Parameters section ── a socle form: two columns, one on a phone.
+    var champ = function (key, input) {
+        return '<div class="ct-form-row"><label>' + t("audit.planning." + key) + '</label>' + input + '</div>';
+    };
+    var saisie = function (type, key, value, extra) {
+        return '<input type="' + type + '"' + (extra || "") + ' value="' + esc(value) + '" data-change="onPlanningParam" data-args=\'' + _da(key) + '\' data-pass-value>';
+    };
+    h += '<div class="ct-tprm-form ct-mb-5"><div class="ct-form-grid">';
+    h += champ("start_date", saisie("date", "start_date", p.start_date || ""));
+    h += champ("days", saisie("number", "days", String(p.days || 3), ' min="1" max="10"'));
+    h += champ("start_time", saisie("time", "start_time", p.start_time || "09:00"));
+    h += champ("slot_duration", saisie("number", "slot_duration", String(p.slot_duration || 60), ' min="15" max="240" step="15"'));
+    h += champ("lunch_start", saisie("time", "lunch_start", p.lunch_start || "12:30"));
+    h += champ("lunch_duration", saisie("number", "lunch_duration", String(p.lunch_duration || 60), ' min="0" max="120" step="15"'));
     h += '</div></div>';
-    h += '<div class="planning-param" style="display:flex;flex-direction:column;gap:4px">';
-    h += '<label style="font-size:0.75em;font-weight:600;color:var(--ct-ink-2);text-transform:uppercase">' + t("audit.planning.lunch_start") + '</label>';
-    h += '<input type="time" style="padding:6px 8px;border:1px solid var(--ct-line);border-radius:4px;font-size:0.85em" value="' + esc(p.lunch_start || "12:30") + '" data-change="onPlanningParam" data-args=\'' + _da("lunch_start") + '\' data-pass-value>';
-    h += '</div>';
-    h += '<div class="planning-param" style="display:flex;flex-direction:column;gap:4px">';
-    h += '<label style="font-size:0.75em;font-weight:600;color:var(--ct-ink-2);text-transform:uppercase">' + t("audit.planning.lunch_duration") + '</label>';
-    h += '<div style="display:flex;align-items:center;gap:6px">';
-    h += '<input type="number" min="0" max="120" step="15" style="padding:6px 8px;border:1px solid var(--ct-line);border-radius:4px;font-size:0.85em;flex:1" value="' + esc(String(p.lunch_duration || 60)) + '" data-change="onPlanningParam" data-args=\'' + _da("lunch_duration") + '\' data-pass-value>';
-    h += '<span style="font-size:0.78em;color:var(--ct-ink-2)">min</span>';
-    h += '</div></div>';
-    h += '</div>';
     // ── Generate button ──
-    h += '<div style="text-align:center;margin-bottom:20px">';
-    h += '<button class="ct-btn-add" style="padding:10px 28px;font-size:0.95em;font-weight:600;border-radius:8px" data-click="generatePlanning">' + t("audit.planning.generate") + '</button>';
+    h += '<div class="ct-ta-c ct-mb-5">';
+    h += '<button class="ct-btn" data-variant="primary" data-click="generatePlanning">' + t("audit.planning.generate") + '</button>';
     h += '</div>';
     // ── Planning timeline ──
     if (D.planning.slots && D.planning.slots.length > 0) {
@@ -105,43 +85,38 @@ function renderPlanning() {
                     h += '</div>'; // close previous day container
                 currentDay = slot.date;
                 dayNum++;
-                h += '<div class="planning-day" style="margin-bottom:20px">';
-                h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid var(--ct-accent)">';
-                h += '<span style="font-size:0.95em;font-weight:700;color:var(--ct-ink)">' + esc(_formatDayHeader(slot.date, dayNum)) + '</span>';
-                h += '</div>';
+                h += '<div class="planning-day">';
+                h += '<div class="planning-day-head">' + esc(_formatDayHeader(slot.date, dayNum)) + '</div>';
             }
             if (slot.type === "lunch") {
                 // ── Lunch separator ──
-                h += '<div style="display:flex;align-items:center;gap:10px;margin:8px 0;padding:8px 12px;background:var(--ct-surface-2);border-radius:6px;border:1px dashed var(--ct-line)">';
-                h += '<span class="slot-time" style="font-weight:600;font-family:monospace;font-size:0.82em;color:var(--ct-ink-2)">' + esc(slot.start) + ' - ' + esc(slot.end) + '</span>';
-                h += '<span style="font-size:0.82em;color:var(--ct-ink-2);font-style:italic">' + t("audit.planning.lunch") + '</span>';
+                h += '<div class="planning-lunch">';
+                h += '<span class="slot-time">' + esc(slot.start) + ' - ' + esc(slot.end) + '</span>';
+                h += '<span class="ct-italic">' + t("audit.planning.lunch") + '</span>';
                 h += '</div>';
             }
             else {
-                // ── Audit slot card ──
+                // ── Audit slot card ── ISO clauses vs Annex A, on theme tokens
                 var grp = _domainGroup(slot.domain);
-                var isClause = grp === "Clauses ISO 27001";
-                var cardColor = isClause ? "#3498db" : "#1abc9c";
-                var cardBg = isClause ? "#eaf4fc" : "#e8f8f5";
-                h += '<div class="planning-slot" style="display:flex;align-items:center;gap:10px;padding:10px 14px;margin-bottom:6px;border-radius:8px;border-left:4px solid ' + cardColor + ';background:' + cardBg + '">';
-                // Time range
-                h += '<span class="slot-time" style="font-weight:700;font-family:monospace;font-size:0.85em;color:var(--ct-ink);min-width:110px">' + esc(slot.start) + ' - ' + esc(slot.end) + '</span>';
+                var kind = grp === "Clauses ISO 27001" ? "clause" : "annex";
+                h += '<div class="planning-slot" data-kind="' + kind + '">';
+                h += '<span class="slot-time">' + esc(slot.start) + ' - ' + esc(slot.end) + '</span>';
                 // Domain select
-                h += '<select class="slot-domain" style="flex:1;padding:5px 8px;border:1px solid var(--ct-line);border-radius:4px;font-size:0.82em;background:var(--ct-surface)" data-change="onSlotDomain" data-args=\'' + _da(idx) + '\' data-pass-value>';
+                h += '<select class="slot-domain ct-select" data-size="sm" data-change="onSlotDomain" data-args=\'' + _da(idx) + '\' data-pass-value>';
                 h += '<option value="">' + t("audit.planning.select_domain") + '</option>';
                 PLANNING_DOMAINS.forEach(function (dom) {
                     h += '<option value="' + esc(dom.id) + '"' + (slot.domain === dom.id ? ' selected' : '') + '>' + esc(_rt(dom, "label")) + '</option>';
                 });
                 h += '</select>';
                 // Delete button
-                h += '<button style="background:none;border:none;color:#e74c3c;font-size:1.2em;cursor:pointer;padding:2px 6px;border-radius:4px;transition:background 0.15s" data-click="deleteSlot" data-args=\'' + _da(idx) + '\' title="Supprimer">&times;</button>';
+                h += '<button class="ct-btn" data-variant="danger" data-size="sm" data-icon data-click="deleteSlot" data-args=\'' + _da(idx) + '\' title="' + esc(t("btn_delete")) + '" aria-label="' + esc(t("btn_delete")) + '">&times;</button>';
                 h += '</div>';
             }
         });
         if (currentDay !== "")
             h += '</div>'; // close last day container
         // ── Export buttons ──
-        h += '<div style="display:flex;gap:10px;justify-content:center;margin-top:20px;padding-top:16px;border-top:1px solid var(--ct-line)">';
+        h += '<div class="planning-exports">';
         h += '<button class="btn-report" data-click="exportPlanningCSV">' + t("audit.planning.export_csv") + '</button>';
         h += '<button class="btn-report" data-click="exportPlanningWord">' + t("audit.planning.export_word") + '</button>';
         h += '</div>';
