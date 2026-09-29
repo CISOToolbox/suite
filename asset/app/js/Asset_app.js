@@ -948,7 +948,9 @@ function _renderAssetTypesModal() {
     h += '<div><label class="ct-text-label">Id <span class="ct-text-critical">*</span></label>';
     h += '<input type="text" id="nt-id" placeholder="equipement_reseau" class="ct-input" pattern="[a-z0-9_]+"></div>';
     h += '<div><label class="ct-text-label">' + (t("asset.types_color") || "Couleur") + '</label>';
-    h += '<input type="color" id="nt-color" value="var(--ct-ink-2)" style="width:100%;height:32px;padding:var(--ct-s1)"></div>';
+    // A colour input only takes #rrggbb: a CSS variable is invalid there and
+    // the browser falls back to black. The default is a data colour.
+    h += '<input type="color" id="nt-color" class="ct-input" value="' + CT_COLORS.gray.vivid + '"></div>';
     h += '<div><label class="ct-text-label">Label FR <span class="ct-text-critical">*</span></label>';
     h += '<input type="text" id="nt-label" placeholder="Équipement réseau" class="ct-input"></div>';
     h += '<div><label class="ct-text-label">Label EN</label>';
@@ -965,7 +967,7 @@ function _renderAssetTypesModal() {
                     var id = (document.getElementById("nt-id").value || "").trim().toLowerCase().replace(/[^a-z0-9_]/g, "_");
                     var label = (document.getElementById("nt-label").value || "").trim();
                     var labelEn = (document.getElementById("nt-label-en").value || "").trim();
-                    var color = document.getElementById("nt-color").value || "var(--ct-ink-2)";
+                    var color = document.getElementById("nt-color").value || CT_COLORS.gray.vivid;
                     if (!id || !label) {
                         showStatus(t("asset.types_err_missing") || "Id et Label FR requis", true);
                         return false;
