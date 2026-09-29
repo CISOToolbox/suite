@@ -944,7 +944,7 @@ function _renderAssetTypesModal() {
     }
     // Add form
     h += '<h4 style="margin:var(--ct-s3) 0 var(--ct-s1) 0;font-size:var(--ct-text-ui)">' + (t("asset.types_add") || "Ajouter un type") + '</h4>';
-    h += '<div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:var(--ct-s2);margin-bottom:var(--ct-s2)">';
+    h += '<div class="ct-form-grid ct-mb-2">';
     h += '<div><label class="ct-text-label">Id <span class="ct-text-critical">*</span></label>';
     h += '<input type="text" id="nt-id" placeholder="equipement_reseau" class="ct-input" pattern="[a-z0-9_]+"></div>';
     h += '<div><label class="ct-text-label">' + (t("asset.types_color") || "Couleur") + '</label>';
