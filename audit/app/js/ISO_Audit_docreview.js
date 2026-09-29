@@ -64,7 +64,7 @@ function renderDocReview() {
         }
     });
     // KPI row
-    var h = '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">';
+    var h = '<div class="ct-row ct-row-wrap ct-gap-2 ct-mb-4">';
     function dkpi(val, label, tone) {
         return '<div class="ct-kpi"' + (tone ? ' data-tone="' + tone + '" data-emphasis="value"' : '')
             + '><div class="ct-kpi-tone"></div><div class="ct-kpi-body"><div class="ct-kpi-label">' + label
@@ -80,15 +80,15 @@ function renderDocReview() {
     cats.forEach(function (cat) {
         var docs = DOC_REVIEW.filter(function (d) { return d.cat === cat; });
         var catDone = docs.filter(function (d) { return D.doc_review[d.ref] && D.doc_review[d.ref].status; }).length;
-        h += '<div style="margin-bottom:20px">';
-        h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;padding-bottom:6px;border-bottom:2px solid var(--ct-accent)">';
-        h += '<h3 style="font-size:0.95em;color:var(--ct-ink);margin:0">' + esc(docs.length ? _rt(docs[0], "cat") : cat) + '</h3>';
-        h += '<span style="font-size:0.75em;color:var(--ct-ink-2)">' + catDone + '/' + docs.length + '</span>';
+        h += '<div class="ct-mb-5">';
+        h += '<div class="doc-cat-head">';
+        h += '<h3>' + esc(docs.length ? _rt(docs[0], "cat") : cat) + '</h3>';
+        h += '<span class="ct-text-label ct-muted">' + catDone + '/' + docs.length + '</span>';
         h += '</div>';
         h += '<table class="ct-table"><thead><tr>';
-        h += '<th style="width:60px">' + t("audit.doc.col_ref") + '</th>';
+        h += '<th class="ct-w-60">' + t("audit.doc.col_ref") + '</th>';
         h += '<th>' + t("audit.doc.col_doc") + '</th>';
-        h += '<th style="width:70px">' + t("audit.doc.col_status") + '</th>';
+        h += '<th class="ct-w-70">' + t("audit.doc.col_status") + '</th>';
         h += '<th>' + t("audit.doc.observations") + '</th>';
         h += '</tr></thead><tbody>';
         docs.forEach(function (d) {
@@ -102,30 +102,30 @@ function renderDocReview() {
             // Ref + badges
             h += '<td><strong>' + esc(d.ref) + '</strong>';
             if (d.critical)
-                h += ' <span style="color:var(--ct-critical);font-size:0.7em;font-weight:700">★</span>';
+                h += ' <span class="ct-text-critical ct-text-label ct-bold">★</span>';
             if (d.hds)
                 h += ' <span class="ctrl-hds">HDS</span>';
             h += '</td>';
             // Document name + description
-            h += '<td><div style="font-weight:600;font-size:0.85em">' + esc(_rt(d, "label")) + '</div>';
-            h += '<div style="font-size:0.78em;color:var(--ct-ink-2)">' + esc(_rt(d, "desc")) + '</div>';
+            h += '<td><div class="ct-strong ct-text-data">' + esc(_rt(d, "label")) + '</div>';
+            h += '<div class="ct-text-meta ct-muted">' + esc(_rt(d, "desc")) + '</div>';
             if (d.linkedControls && d.linkedControls.length)
-                h += '<div style="font-size:0.72em;color:var(--ct-accent);margin-top:2px">§ ' + d.linkedControls.join(', ') + '</div>';
+                h += '<div class="ct-text-label ct-text-accent ct-mt-1">§ ' + esc(d.linkedControls.join(', ')) + '</div>';
             if (showAlert)
-                h += '<div style="font-size:0.75em;color:var(--ct-critical);margin-top:2px">⚠ ' + esc(_rt(d, "ecartAuto")) + '</div>';
+                h += '<div class="ct-text-meta ct-text-critical ct-mt-1">⚠ ' + esc(_rt(d, "ecartAuto")) + '</div>';
             h += '</td>';
             // Status (clickable badge cycling through states)
-            h += '<td style="text-align:center">';
-            h += '<div class="doc-status-cycle" data-click="cycleDocStatus" data-args=\'' + _da(d.ref) + '\' style="cursor:pointer;user-select:none">';
+            h += '<td class="ct-ta-c">';
+            h += '<div class="doc-status-cycle" data-click="cycleDocStatus" data-args=\'' + _da(d.ref) + '\'>';
             if (st) {
                 h += '<span class="ct-badge" data-tone="' + stTone + '">' + esc(stLabel) + '</span>';
             }
             else {
-                h += '<span style="display:inline-block;padding:3px 8px;border-radius:4px;font-size:0.75em;border:1px dashed var(--ct-line);color:var(--ct-ink-2);cursor:pointer">—</span>';
+                h += '<span class="doc-status-empty">—</span>';
             }
             h += '</div></td>';
             // Observations
-            h += '<td><textarea rows="1" style="width:100%;font-size:0.8em;min-height:28px;resize:vertical" data-change="setDocObs" data-args=\'' + _da(d.ref) + '\' data-pass-value placeholder="' + esc(t("audit.doc.observations")) + '">' + esc(obs) + '</textarea></td>';
+            h += '<td><textarea rows="1" class="doc-obs" data-change="setDocObs" data-args=\'' + _da(d.ref) + '\' data-pass-value placeholder="' + esc(t("audit.doc.observations")) + '">' + esc(obs) + '</textarea></td>';
             h += '</tr>';
         });
         h += '</tbody></table></div>';
