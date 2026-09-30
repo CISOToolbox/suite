@@ -55,7 +55,7 @@ alembic==1.18.4
 
 # ── Auth — all 9 modules ─────────────────────────────────────────────────────
 authlib==1.6.12
-PyJWT==2.13.0                   # DEP-03 — GHSA-xgmm-8j9v-c9wx (HIGH); pins carry [crypto]
+PyJWT==2.14.0                   # DEP-03 — GHSA-xgmm-8j9v-c9wx, GHSA-ffc3-869f-jxw9 and five more (HIGH); pins carry [crypto]
 
 # ── Transitive pins forced for security — all 9 modules ──────────────────────
 # Kept explicit so the resolver cannot drift back to a vulnerable release.
