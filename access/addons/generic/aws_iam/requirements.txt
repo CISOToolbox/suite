@@ -1,5 +1,10 @@
-boto3==1.43.57
+boto3==1.43.96
 # --- transitive pins (security, wave 2) ---
 # urllib3: transitive of boto3/botocore — 6 HIGH fixed in 2.7.0, GHSA-8988-9cw3-xx77
 # and GHSA-vxq7-64xx-v4gw fixed in 2.8.0
 urllib3==2.8.0
+# boto3 transitives, pinned with it: unpinned, the image takes the newest release
+botocore==1.43.96
+s3transfer==0.19.2
+jmespath==1.1.0
+python-dateutil==2.9.0.post0

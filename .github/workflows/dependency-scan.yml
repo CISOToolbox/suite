@@ -38,13 +38,6 @@ env:
   # see reports/fix-deps-2.md §4. Keep this list SHORT; it is the only thing
   # standing between a real HIGH and a red build.
   #
-  #   PYSEC-2026-3481 / -3482 / -3483  (mcp 1.23.3, via semgrep)
-  #     semgrep 1.171.0 hard-pins `mcp==1.23.3` (later releases move the pin),
-  #     so the version cannot be raised without upgrading semgrep. Not
-  #     reachable: appsec only shells out to `semgrep scan`, never imports mcp,
-  #     and exposes no MCP server — all three advisories are server-side.
-  #     Re-check at the next semgrep upgrade.
-  #
   #   RUSTSEC-2026-0194 / -0195  (quick-xml, smb_scan_rs)
   #     Only fixed in quick-xml 0.41, which removes BytesText::unescape() and
   #     therefore needs a one-line source change in smb_scan_rs/rust/src/main.rs.
@@ -61,8 +54,6 @@ env:
   # Cleared ONLY where semgrep's own environment is scanned: the same advisory
   # in an application requirements file still blocks.
   ALLOWLIST_SEMGREP: >-
-    PYSEC-2026-3481 PYSEC-2026-3482 PYSEC-2026-3483
-    GHSA-hvrp-rf83-w775 GHSA-jpw9-pfvf-9f58 GHSA-vj7q-gjh5-988w
     GHSA-ffc3-869f-jxw9 GHSA-9j54-fg26-wv3r GHSA-9v7f-9g4p-ffgj
     GHSA-p4g4-x82p-q773 GHSA-r6x4-923q-g947 GHSA-w2cx-738m-mc7w
 

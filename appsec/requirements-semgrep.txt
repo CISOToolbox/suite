@@ -4,7 +4,7 @@
 #
 # Full lock of that environment, resolved with constraints.txt (pyjwt aside) and
 # no release younger than 14 days at resolution time:
-#   uv pip compile <(echo semgrep==1.171.0) -c constraints.txt (without pyjwt) \
+#   uv pip compile <(echo semgrep==1.177.0) -c constraints.txt (without pyjwt) \
 #     --exclude-newer 2026-09-16 --python-version 3.13 --python-platform linux
 # (resolved on 2026-09-30; --exclude-newer = resolution date - 14 days)
 annotated-types==0.8.0
@@ -32,7 +32,7 @@ importlib-metadata==8.7.1
 jsonschema==4.25.1
 jsonschema-specifications==2025.9.1
 markdown-it-py==4.2.0
-mcp==1.23.3
+mcp==1.29.0
 mdurl==0.1.2
 opentelemetry-api==1.37.0
 opentelemetry-exporter-otlp-proto-common==1.37.0
@@ -62,7 +62,7 @@ rpds-py==2026.6.3
 ruamel-yaml==0.19.1
 ruamel-yaml-clib==0.2.15
 semantic-version==2.10.0
-semgrep==1.171.0
+semgrep==1.177.0
 sse-starlette==3.4.11
 starlette==1.6.0
 tomli==2.4.1
