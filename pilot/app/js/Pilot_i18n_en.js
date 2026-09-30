@@ -41,7 +41,6 @@ _registerTranslations("en", {
     "pilot.ai.suggested_measures": "Suggested actions",
     "pilot.ai.toggle_all": "Check / uncheck all",
     "pilot.ai.unknown_error": "Unknown error",
-    "pilot.auth.sign_out": "Sign out",
     "pilot.backups.col_active": "Active",
     "pilot.backups.col_date": "Date",
     "pilot.backups.col_frequency": "Frequency",

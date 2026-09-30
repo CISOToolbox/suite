@@ -60,6 +60,9 @@ _registerTranslations("en", {
     "audit.desc.journal": "Audit journal: chronological history of actions.",
     // Meta fields
     "audit.meta.name": "Client name",
+    "audit.meta.name_ph": "Audited organisation",
+    "audit.meta.auditor_ph": "Auditor name",
+    "audit.meta.scope_ph": "Audit scope",
     "audit.meta.ref": "Audit reference",
     "audit.meta.date": "Date",
     "audit.meta.auditor": "Auditor",
@@ -204,6 +207,7 @@ _registerTranslations("en", {
     "audit.report.copied": "Report copied",
     "audit.report.copy": "Copy report",
     "audit.report.error": "Error generating the report",
+    "audit.report.too_large": "The audit holds too much text for a report",
     "audit.report.loading": "Generating report...",
     "audit.report.no_ai": "AI is not configured. Go to Settings to configure your API key.",
     "audit.report.title": "AI audit report",

@@ -74,7 +74,7 @@ jobs:
         run: |
           cd ${{ matrix.module }}
           if [ ! -d tests/unit ]; then
-            echo "no tests/unit — module without unit-tested backend (audit)"
+            echo "no tests/unit — module without unit-tested backend"
             exit 0
           fi
           pytest tests/unit/ -q

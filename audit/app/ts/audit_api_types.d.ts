@@ -46,7 +46,6 @@ interface AuditAPIType {
     del(id: string): Promise<null>;
     duplicate(id: string): Promise<AuditStoredProject>;
     importFile(file: File): Promise<AuditStoredProject>;
-    aiComplete(systemPrompt: string, userPrompt: string, provider?: string, model?: string): Promise<{ text: string }>;
     aiConfig(): Promise<any>;
     aiGetKeys(): Promise<any>;
     aiSetKeys(data: any): Promise<any>;
