@@ -39,20 +39,32 @@ env:
   # standing between a real HIGH and a red build.
   #
   #   PYSEC-2026-3481 / -3482 / -3483  (mcp 1.23.3, via semgrep)
-  #     semgrep hard-pins `mcp==1.23.3` in every release to date, so the version
-  #     cannot be raised without dropping semgrep. Not reachable: appsec only
-  #     shells out to `semgrep scan`, never imports mcp, and exposes no MCP
-  #     server — all three advisories are server-side. Re-check whenever
-  #     semgrep relaxes the pin.
+  #     semgrep 1.171.0 hard-pins `mcp==1.23.3` (later releases move the pin),
+  #     so the version cannot be raised without upgrading semgrep. Not
+  #     reachable: appsec only shells out to `semgrep scan`, never imports mcp,
+  #     and exposes no MCP server — all three advisories are server-side.
+  #     Re-check at the next semgrep upgrade.
   #
   #   RUSTSEC-2026-0194 / -0195  (quick-xml, smb_scan_rs)
   #     Only fixed in quick-xml 0.41, which removes BytesText::unescape() and
   #     therefore needs a one-line source change in smb_scan_rs/rust/src/main.rs.
   #     Tracked as a follow-up.
+  #
+  #   GHSA-ffc3-869f-jxw9 and five more  (pyjwt 2.13.0, via semgrep)
+  #     semgrep pins `pyjwt~=2.13.0` in every release to date. It runs in its
+  #     own virtual environment (appsec/requirements-semgrep.txt), so the
+  #     application's authentication is on the fixed 2.14.0; appsec only
+  #     shells out to `semgrep scan` and never shares that environment.
+  #     Re-check whenever semgrep relaxes the pin.
   ALLOWLIST: >-
+    RUSTSEC-2026-0194 RUSTSEC-2026-0195
+  # Cleared ONLY where semgrep's own environment is scanned: the same advisory
+  # in an application requirements file still blocks.
+  ALLOWLIST_SEMGREP: >-
     PYSEC-2026-3481 PYSEC-2026-3482 PYSEC-2026-3483
     GHSA-hvrp-rf83-w775 GHSA-jpw9-pfvf-9f58 GHSA-vj7q-gjh5-988w
-    RUSTSEC-2026-0194 RUSTSEC-2026-0195
+    GHSA-ffc3-869f-jxw9 GHSA-9j54-fg26-wv3r GHSA-9v7f-9g4p-ffgj
+    GHSA-p4g4-x82p-q773 GHSA-r6x4-923q-g947 GHSA-w2cx-738m-mc7w
 
 jobs:
   # ── Dependency drift: the 9 modules must stay on one set of versions ───────
@@ -107,6 +119,7 @@ jobs:
 
           threshold = float(os.environ["SEVERITY_THRESHOLD"])
           allowed = set(os.environ["ALLOWLIST"].split())
+          allowed_semgrep = set(os.environ["ALLOWLIST_SEMGREP"].split())
 
           results = pathlib.Path("osv-results.json")
           if not results.exists():
@@ -127,7 +140,8 @@ jobs:
                       label = ",".join(ids)
                       raw = group.get("max_severity", "")
                       # An allowlisted id or alias clears the whole group.
-                      if allowed.intersection(set(ids) | set(aliases)):
+                      scope = allowed | (allowed_semgrep if source.endswith("/appsec/requirements-semgrep.txt") else set())
+                      if scope.intersection(set(ids) | set(aliases)):
                           ignored.append(f"{source}: {name} {label}")
                           continue
                       try:
