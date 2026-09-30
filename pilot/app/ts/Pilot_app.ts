@@ -90,11 +90,8 @@ function _initAuth() {
             window._currentUser = user;
             var right = document.getElementById("toolbar-right");
             if (right) {
-                var h = "";
-                h += '<span style="color:var(--ct-ink-1);font-size:var(--ct-text-label);margin:0 var(--ct-s1)">' + esc(user.name || user.email) + '</span>';
-                h += '<button class="ct-text-label ct-muted ct-bg-none ct-no-border ct-clickable ct-py-1 ct-px-2" data-click="_openNotifPrefs" title="' + t("notif.title") + '">' + _icon("bell", 15) + '</button>';
-                h += '<button class="ct-text-label ct-muted ct-bg-none ct-no-border ct-clickable ct-py-1 ct-px-2" data-click="_logout" title="' + t("pilot.auth.sign_out") + '">&#x23FB;</button>';
-                right.innerHTML = h;
+                right.innerHTML = _userPillHTML(user,
+                    '<button class="ct-text-label ct-muted ct-bg-none ct-no-border ct-clickable ct-py-1 ct-px-2" data-click="_openNotifPrefs" title="' + esc(t("notif.title")) + '">' + _icon("bell", 15) + '</button>');
             }
             _boot();
         });

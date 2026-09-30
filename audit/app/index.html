@@ -112,7 +112,7 @@
 <div class="meta-grid ct-form-grid" data-cols="3" id="audit-meta">
     <div class="meta-field">
         <label data-i18n="audit.meta.name">Nom du client</label>
-        <input type="text" id="meta-name" data-change="onMetaChange" data-args='["name"]' data-pass-value placeholder="Nom de l'organisme audité">
+        <input type="text" id="meta-name" data-change="onMetaChange" data-args='["name"]' data-pass-value placeholder="Audited organisation" data-i18n-placeholder="audit.meta.name_ph">
     </div>
     <div class="meta-field">
         <label data-i18n="audit.meta.ref">Référence audit</label>
@@ -124,11 +124,11 @@
     </div>
     <div class="meta-field">
         <label data-i18n="audit.meta.auditor">Auditeur</label>
-        <input type="text" id="meta-auditor" data-change="onMetaChange" data-args='["auditor"]' data-pass-value placeholder="Nom de l'auditeur">
+        <input type="text" id="meta-auditor" data-change="onMetaChange" data-args='["auditor"]' data-pass-value placeholder="Auditor name" data-i18n-placeholder="audit.meta.auditor_ph">
     </div>
     <div class="meta-field">
         <label data-i18n="audit.meta.scope">Périmètre</label>
-        <input type="text" id="meta-scope" data-change="onMetaChange" data-args='["scope"]' data-pass-value placeholder="Périmètre de l'audit">
+        <input type="text" id="meta-scope" data-change="onMetaChange" data-args='["scope"]' data-pass-value placeholder="Audit scope" data-i18n-placeholder="audit.meta.scope_ph">
     </div>
     <div class="meta-field">
         <label data-i18n="audit.meta.hds">HDS</label>
@@ -267,7 +267,7 @@
 <div class="search-overlay" id="search-overlay">
     <div class="search-panel">
         <div class="search-header">
-            <input type="text" class="search-input" id="search-input" placeholder="Rechercher..." data-input="onSearchInput" data-pass-value>
+            <input type="text" class="search-input" id="search-input" placeholder="Search across all controls..." data-i18n-placeholder="audit.search.placeholder" data-input="onSearchInput" data-pass-value>
             <select class="search-scope" id="search-scope" data-change="onSearchScope" data-pass-value>
                 <option value="all" data-i18n="audit.search.scope.all">Tous les champs</option>
                 <option value="findings" data-i18n="audit.search.scope.findings">Constats uniquement</option>

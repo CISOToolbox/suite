@@ -68,12 +68,6 @@
         createMeasure: function (pid, body) { return _fetch("/projects/" + pid + "/measures", { method: "POST", body: body }); },
         patchMeasure: function (pid, id, body) { return _fetch("/projects/" + pid + "/measures/" + id, { method: "PATCH", body: body }); },
         deleteMeasure: function (pid, id) { return _fetch("/projects/" + pid + "/measures/" + id, { method: "DELETE" }); },
-        aiComplete: function (systemPrompt, userPrompt, provider, model) {
-            return _fetch("/ai/complete", {
-                method: "POST",
-                body: { system: systemPrompt, user: userPrompt, provider: provider || (window._aiRuntime && window._aiRuntime.provider) || "anthropic", model: model || (window._aiRuntime && window._aiRuntime.model) || "claude-sonnet-4-6" }
-            });
-        },
         aiConfig: function () { return _fetch("/ai/config"); },
         aiGetKeys: function () { return _fetch("/ai/keys"); },
         aiSetKeys: function (data) { return _fetch("/ai/keys", { method: "PUT", body: data }); },
@@ -549,11 +543,9 @@
                 var right2 = document.getElementById("toolbar-right");
                 if (!right2)
                     return;
-                var h = '<span style="color:var(--ct-ink-1);font-size:var(--ct-text-label);margin:0 var(--ct-s1)">' + esc(user.name || user.email) + '</span>';
-                h += '<button class="ct-text-label ct-muted ct-bg-none ct-no-border ct-clickable ct-py-1 ct-px-2" data-click="_logout" title="Sign out">&#x23FB;</button>';
+                var h = _userPillHTML(user);
                 var container = document.createElement("span");
-                container.className = "ct-toolbar-right";
-                container.style.cssText = "display:flex;align-items:center;gap:4px;margin-left:auto";
+                container.className = "ct-toolbar-user";
                 container.innerHTML = h;
                 right2.parentNode.insertBefore(container, right2);
                 fetch("auth/role", { credentials: "same-origin" }).then(function (rr) {

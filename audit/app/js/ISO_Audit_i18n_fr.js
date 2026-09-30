@@ -60,6 +60,9 @@ _registerTranslations("fr", {
     "audit.desc.journal": "Journal d'audit : historique chronologique des actions.",
     // Meta fields
     "audit.meta.name": "Nom du client",
+    "audit.meta.name_ph": "Organisme audité",
+    "audit.meta.auditor_ph": "Nom de l'auditeur",
+    "audit.meta.scope_ph": "Périmètre de l'audit",
     "audit.meta.ref": "Référence audit",
     "audit.meta.date": "Date",
     "audit.meta.auditor": "Auditeur",
@@ -207,6 +210,7 @@ _registerTranslations("fr", {
     "audit.report.copied": "Rapport copié",
     "audit.report.no_ai": "L'IA n'est pas configurée. Allez dans Paramètres pour configurer votre clé API.",
     "audit.report.error": "Erreur lors de la génération du rapport",
+    "audit.report.too_large": "L'audit contient trop de texte pour un rapport",
     "audit.menu.report": "Générer rapport IA",
     "audit.export.csv_ok": "CSV exporte",
     "audit.export.word_ok": "Word exporte",

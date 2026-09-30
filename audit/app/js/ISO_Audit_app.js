@@ -175,7 +175,7 @@ function cardHTML(c, f) {
     // Images container (rendered async by ISO_Audit_images.js)
     var imgCount = (f.images && f.images.length) || 0;
     h += '<div class="img-section">';
-    h += '<div class="img-section-header">📷 ' + t("audit.images.title") + (imgCount > 0 ? ' (' + imgCount + ')' : '') + '</div>';
+    h += '<div class="img-section-header">' + _icon("image", 14) + ' ' + t("audit.images.title") + (imgCount > 0 ? ' (' + imgCount + ')' : '') + '</div>';
     h += '<div id="images-' + c.id.replace(/\./g, "-") + '"></div>';
     h += '</div>';
     h += '</div>';
@@ -848,63 +848,53 @@ document.addEventListener("keydown", function (e) {
 // AI REPORT GENERATION (Feature 4)
 // ═══════════════════════════════════════════════════════════════════════
 function generateReport() {
-    if (typeof _aiCallAPI !== "function" || typeof _aiEnsurePanel !== "function") {
+    // The report prompt is composed server-side (POST api/ai/audit/report):
+    // only figures leave the browser, never the client's or auditor's name.
+    if (!(typeof _aiIsEnabled === "function" && _aiIsEnabled()) || typeof _aiEnsurePanel !== "function") {
         showStatus(t("audit.report.no_ai"));
         return;
     }
-    // Check API key
-    if (typeof _aiGetApiKey === "function" && !_aiGetApiKey()) {
-        _aiShowError(t("audit.report.title"), t("audit.report.no_ai"));
-        _aiOpenPanel(t("audit.report.title"));
-        return;
-    }
     var S = computeStats();
-    // Build domain scores summary
-    var domainLines = "";
-    DOMAINS.forEach(function (dom) {
-        var ds = S.domains[dom.id];
-        domainLines += "- " + domLabel(dom) + " : " + ds.score + "% (" + ds.audited + "/" + ds.total + " audités)\n";
-    });
-    // Build NC details
-    var ncLines = "";
+    var text = function (v, max) { return String(v || "").substring(0, max); };
+    var nonconformities = [];
     CONTROLS.forEach(function (c) {
         var f = getFinding(c.id);
         if (f.status === "ncmaj" || f.status === "ncmin") {
-            ncLines += "- [" + f.status.toUpperCase() + "] " + c.id + " " + ctrlT(c) + "\n";
-            if (f.ecart_constat)
-                ncLines += "  Constat: " + f.ecart_constat + "\n";
-            if (f.ecart_cause)
-                ncLines += "  Cause: " + f.ecart_cause + "\n";
-            if (f.ecart_action)
-                ncLines += "  Action: " + f.ecart_action + "\n";
+            nonconformities.push({
+                status: f.status, control_id: text(c.id, 20), control_title: text(ctrlT(c), 300),
+                finding: text(f.ecart_constat, 2000), cause: text(f.ecart_cause, 2000), action: text(f.ecart_action, 2000)
+            });
         }
     });
-    var systemPrompt = "You are an ISO 27001 lead auditor writing a formal audit report in French. " +
-        "Write a structured report with: executive summary, scope, methodology, key findings, non-conformities analysis, " +
-        "recommendations, and conclusion. Use formal language. Replace actual client/auditor names with [CLIENT] and [AUDITOR].";
-    var userPrompt = "Génère un rapport d'audit ISO 27001 basé sur ces données :\n\n" +
-        "INFORMATIONS GÉNÉRALES:\n" +
-        "- Client: [CLIENT]\n" +
-        "- Référence: " + (D.meta.ref || "N/A") + "\n" +
-        "- Date: " + (D.meta.date || "N/A") + "\n" +
-        "- Auditeur: [AUDITOR]\n" +
-        "- Périmètre: " + (D.meta.scope || "N/A") + "\n" +
-        "- HDS: " + (D.meta.hds || "non") + "\n\n" +
-        "STATISTIQUES GLOBALES:\n" +
-        "- Total contrôles: " + S.total + "\n" +
-        "- Audités: " + S.audited + "/" + S.total + "\n" +
-        "- Conformes: " + S.c + "\n" +
-        "- NC majeures: " + S.ncmaj + "\n" +
-        "- NC mineures: " + S.ncmin + "\n" +
-        "- Points sensibles: " + S.ps + "\n" +
-        "- Pistes de progrès: " + S.pp + "\n" +
-        "- N/A: " + S.na + "\n" +
-        "- Score: " + S.score + "% (Grade " + S.grade + ")\n\n" +
-        "SCORES PAR DOMAINE:\n" + domainLines + "\n" +
-        "NON-CONFORMITÉS:\n" + (ncLines || "Aucune non-conformité identifiée.\n");
+    var payload = {
+        lang: _locale === "en" ? "en" : "fr",
+        ref: text(D.meta.ref, 120), date: text(D.meta.date, 40),
+        scope: text(D.meta.scope, 2000), hds: text(D.meta.hds, 20),
+        stats: { total: S.total, audited: S.audited, c: S.c, ncmaj: S.ncmaj, ncmin: S.ncmin,
+            ps: S.ps, pp: S.pp, na: S.na, score: S.score, grade: S.grade },
+        domains: DOMAINS.map(function (dom) {
+            var ds = S.domains[dom.id];
+            return { label: text(domLabel(dom), 120), score: ds.score, audited: ds.audited, total: ds.total };
+        }),
+        nonconformities: nonconformities.slice(0, 300)
+    };
     _aiShowLoading(t("audit.report.title"));
     _aiOpenPanel(t("audit.report.title"));
-    _aiCallAPI(systemPrompt, userPrompt).then(function (response) {
+    fetch("api/ai/audit/report", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+    }).then(function (r) {
+        // 422: the audit data is refused (too large); the body echoes the
+        // whole request, so the user gets a translated message instead.
+        if (r.status === 422)
+            throw new Error(t("audit.report.too_large"));
+        if (!r.ok)
+            return r.text().then(function (tx) { throw new Error("API " + r.status + ": " + tx.substring(0, 200)); });
+        return r.json();
+    }).then(function (res) {
+        var response = (res && res.text) || "";
         if (!response) {
             _aiShowError(t("audit.report.title"), t("audit.report.error"));
             return;

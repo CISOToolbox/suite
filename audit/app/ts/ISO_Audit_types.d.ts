@@ -185,8 +185,6 @@ interface AuditWordImgRel {
  *    has always passed it). ─────────────────────────────────────── */
 
 declare function _aiIsEnabled(): boolean;
-declare function _aiGetApiKey(): string;
-declare function _aiCallAPI(systemPrompt: string, userPrompt: string): Promise<string>;
 declare function _aiEnsurePanel(): { title: HTMLElement; body: HTMLElement; footer: HTMLElement };
 declare function _aiOpenPanel(title?: string): void;
 declare function _aiShowLoading(title: string): void;

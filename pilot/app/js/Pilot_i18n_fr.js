@@ -43,7 +43,6 @@ _registerTranslations("fr", {
     "pilot.ai.suggested_measures": "Actions suggérées",
     "pilot.ai.toggle_all": "Tout cocher / décocher",
     "pilot.ai.unknown_error": "Erreur inconnue",
-    "pilot.auth.sign_out": "Se déconnecter",
     "pilot.backups.col_active": "Active",
     "pilot.backups.col_date": "Date",
     "pilot.backups.col_frequency": "Fréquence",

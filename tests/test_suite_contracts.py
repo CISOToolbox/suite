@@ -583,7 +583,7 @@ def test_ai_requests_carry_no_precomposed_prompt() -> list[str]:
     # Modules whose prompts are ALL composed server-side. Every new FEAT-41
     # migration is added HERE: that is what enforces cutting the generic proxy
     # and forbids any pre-composed-prompt model.
-    migrated = {"risk", "compliance", "vendor"}
+    migrated = {"risk", "compliance", "vendor", "audit"}
     # AICompleteRequest IS a pre-composed prompt — that is the contract of the
     # generic /api/ai/complete proxy. The class exists in EVERY module
     # (ai_proxy_common imports it at load time), but in a migrated module the
