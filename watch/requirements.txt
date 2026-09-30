@@ -7,7 +7,7 @@ pydantic==2.12.5
 httpx==0.28.1
 python-multipart==0.0.31
 authlib==1.6.12
-PyJWT[crypto]==2.14.0
+PyJWT[crypto]==2.15.0
 cryptography==50.0.0
 setuptools==83.0.0
 # Phase 3: feed ingestion (NVD, OSV, CISA KEV, CERT-FR) + version-range matching.
