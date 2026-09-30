@@ -53,7 +53,7 @@ env:
   #   GHSA-ffc3-869f-jxw9 and five more  (pyjwt 2.13.0, via semgrep)
   #     semgrep pins `pyjwt~=2.13.0` in every release to date. It runs in its
   #     own virtual environment (appsec/requirements-semgrep.txt), so the
-  #     application's authentication is on the fixed 2.14.0; appsec only
+  #     application's authentication is on the fixed 2.15.0; appsec only
   #     shells out to `semgrep scan` and never shares that environment.
   #     Re-check whenever semgrep relaxes the pin.
   ALLOWLIST: >-
