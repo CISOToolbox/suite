@@ -6,12 +6,16 @@
 FROM python:3.13-slim@sha256:6771159cd4fa5d9bba1258caf0b82e6b73458c694d178ad97c5e925c2d0e1a91 AS builder
 
 WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+# requirements-lock.txt holds every package the image installs, transitives
+# included, each at one version with its hashes: the build installs exactly
+# what was resolved, never a newer release (requirements.txt lists what the
+# module asks for; the lock is regenerated from it).
+COPY requirements-lock.txt .
+RUN pip install --no-cache-dir --prefix=/install --require-hashes -r requirements-lock.txt
 
-# Dependencies of the generic connectors (ldap3, boto3, …). Each add-on ships
-# its own requirements.txt; they are installed here so the connectors bundled
-# below actually import.
+# The dependencies of the generic connectors (ldap3, boto3, …) are part of
+# requirements-lock.txt: each add-on's requirements.txt is resolved into it, so
+# the connectors bundled below import without a second, unpinned install.
 #
 # Why bundle them at all: unlike Surface, Access has no addons/core tier — all
 # 23 connectors live under addons/generic. A "plain core build" therefore
@@ -22,15 +26,6 @@ RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 #
 # addons/custom/<client>/ stays out, and is layered by Dockerfile.addons via
 # build-client-image.sh.
-COPY addons/generic/ /tmp/addons/
-# `find -exec … \;` returns 0 even when pip fails: a connector with broken
-# deps produced a green image with an unusable add-on. The loop fails
-# outright on the first failed install.
-RUN for r in $(find /tmp/addons -name requirements.txt | sort); do \
-      echo "── add-on deps: $r ──"; \
-      pip install --no-cache-dir --prefix=/install -r "$r" || exit 1; \
-    done \
-    && rm -rf /tmp/addons
 
 FROM python:3.13-slim@sha256:6771159cd4fa5d9bba1258caf0b82e6b73458c694d178ad97c5e925c2d0e1a91
 

@@ -502,14 +502,36 @@ def test_every_bundled_addon_tier_is_copied() -> list[str]:
     return problems
 
 
+def test_every_image_installs_its_lock() -> list[str]:
+    """Every image that installs Python packages installs its
+    requirements-lock.txt, with --require-hashes: going back to
+    `-r requirements.txt` would let every unpinned transitive float again."""
+    problems = []
+    for dockerfile in sorted(REPO_ROOT.glob("*/Dockerfile")):
+        src = "\n".join(l for l in dockerfile.read_text(encoding="utf-8").splitlines()
+                        if not l.lstrip().startswith("#"))
+        if "pip install" not in src:
+            continue
+        module = dockerfile.parent.name
+        if not re.search(r"pip install[^\n]*--require-hashes[^\n]*-r requirements-lock\.txt", src):
+            problems.append(f"{module}: the Dockerfile does not install requirements-lock.txt with --require-hashes")
+        elif not (dockerfile.parent / "requirements-lock.txt").is_file():
+            problems.append(f"{module}: the Dockerfile installs requirements-lock.txt, which is missing")
+    return problems
+
+
 def test_bundled_addons_get_their_dependencies() -> list[str]:
     """A bundled add-on whose deps are missing is skipped with a mere warning:
-    twenty connectors work, three do not, and nothing says so."""
+    twenty connectors work, three do not, and nothing says so. The image
+    installs requirements-lock.txt (--require-hashes): each bundled add-on's
+    requirements must be in that lock, and the Dockerfile must install it."""
     problems = []
+    pin = re.compile(r"^([A-Za-z0-9][A-Za-z0-9._-]*)\s*(?:\[[^\]]*\])?\s*==\s*([^\s;#\\]+)")
+    canon = lambda n: re.sub(r"[-_.]+", "-", n).lower()
     for module, tier, _n in _addon_tiers():
         if (module, tier) in OPTIONAL_ADDON_TIERS:
             continue
-        reqs = list((REPO_ROOT / module / "addons" / tier).glob("*/requirements.txt"))
+        reqs = sorted((REPO_ROOT / module / "addons" / tier).glob("*/requirements.txt"))
         if not reqs:
             continue
         dockerfile = REPO_ROOT / module / "Dockerfile"
@@ -519,16 +541,21 @@ def test_bundled_addons_get_their_dependencies() -> list[str]:
         # without performing it used to satisfy the search.
         src = "\n".join(l for l in dockerfile.read_text(encoding="utf-8").splitlines()
                         if not l.lstrip().startswith("#"))
-        installs = (re.search(r'addons?[^\n]*requirements\.txt|requirements\.txt[^\n]*addons', src)
-                    or re.search(r'find\s+\S*addons\S*\s+-name\s+requirements\.txt', src)) \
-            and re.search(r'pip install[^\n]*-r\b', src)
-        if not installs:
-            names = ", ".join(sorted(r.parent.name for r in reqs))
-            problems.append(
-                f"{module}: {len(reqs)} bundled add-on(s) ship their own requirements.txt "
-                f"({names}) but the Dockerfile never installs them — they would load "
-                f"broken while the others work."
-            )
+        if not re.search(r"pip install[^\n]*--require-hashes[^\n]*-r requirements-lock\.txt", src):
+            problems.append(f"{module}: the Dockerfile does not install requirements-lock.txt "
+                            f"with --require-hashes — its bundled add-ons' deps are not installed")
+            continue
+        lock = REPO_ROOT / module / "requirements-lock.txt"
+        locked = {canon(m.group(1)): m.group(2) for l in (lock.read_text(encoding="utf-8").splitlines()
+                  if lock.is_file() else []) if (m := pin.match(l.strip()))}
+        for req in reqs:
+            for line in req.read_text(encoding="utf-8").splitlines():
+                m = pin.match(line.split("#", 1)[0].strip())
+                if m and locked.get(canon(m.group(1))) != m.group(2):
+                    problems.append(
+                        f"{module}: add-on {req.parent.name} asks for {m.group(1)}=={m.group(2)} "
+                        f"but requirements-lock.txt holds {locked.get(canon(m.group(1)), 'nothing')} — "
+                        f"it would load broken while the others work.")
     return problems
 
 
@@ -655,6 +682,7 @@ CHECKS = (
     ("custom-LLM branch guarded", test_every_custom_llm_branch_has_ssrf_guard),
     ("proxy validator delegates", test_every_proxy_validator_delegates_to_the_guard),
     ("bundled add-on tiers copied", test_every_bundled_addon_tier_is_copied),
+    ("every image installs its lock", test_every_image_installs_its_lock),
     ("bundled add-ons get their deps", test_bundled_addons_get_their_dependencies),
 )
 
