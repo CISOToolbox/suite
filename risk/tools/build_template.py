@@ -569,7 +569,7 @@ def build(LANG):
 
     out = os.path.join(TPL_DIR, "ebios-report-%s.docx" % LANG)
     doc.save(out)
-    print("template écrit:", os.path.basename(out), round(os.path.getsize(out) / 1024, 1), "Ko")
+    print("template written:", os.path.basename(out), round(os.path.getsize(out) / 1024, 1), "KB")
 
 
 for _lang in ("fr", "en"):
