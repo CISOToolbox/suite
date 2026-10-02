@@ -9,8 +9,5 @@
 pytest==9.1.1
 pytest-asyncio==1.4.0
 aiosqlite==0.22.1
-httpx==0.28.1
-# anyio: transitive of httpx — GHSA-82r6-8w77-94w6 (TLS host name encoding)
-anyio[trio]==4.14.2
 # pygments: transitive of pytest — 4 MODERATE fixed in 2.20.0
 pygments==2.20.0

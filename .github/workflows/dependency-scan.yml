@@ -185,7 +185,7 @@ jobs:
             ### Action Required
             1. Review the [Security tab](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/security/code-scanning) and the failed run's job summary
             2. Raise the affected pins in \`constraints.txt\` **and** in every \`requirements.txt\` that carries them (a transitive that only a lock carries: add it to \`constraints.txt\`)
-            3. Regenerate each affected \`requirements-lock.txt\`: \`bash tests/lock-deps.sh <module>\`
+            3. Regenerate each affected module's locks (image, build, unit tests): \`bash tests/lock-deps.sh <module>\`
             4. Verify alignment: \`bash tests/check-deps-drift.sh\`
             5. Re-scan: \`osv-scanner --recursive .\`
             6. Rebuild the affected images
