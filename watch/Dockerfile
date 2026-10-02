@@ -18,8 +18,14 @@ WORKDIR /app
 # included, each at one version with its hashes: the build installs exactly
 # what was resolved, never a newer release (requirements.txt lists what the
 # module asks for; the lock is regenerated from it).
-COPY requirements-lock.txt .
-RUN pip install --no-cache-dir --prefix=/install --require-hashes -r requirements-lock.txt
+# sgmllib3k (via feedparser) is published only as source: pip would build it
+# in an isolated environment fetched unpinned. Its build tools come from their
+# own hashed lock, into this stage only, and the build uses them.
+# --ignore-installed: setuptools is also in the lock, and must still reach
+# /install although this stage now holds it.
+COPY requirements-build-lock.txt requirements-lock.txt ./
+RUN pip install --no-cache-dir --require-hashes -r requirements-build-lock.txt \
+    && pip install --no-cache-dir --prefix=/install --ignore-installed --no-build-isolation --require-hashes -r requirements-lock.txt
 
 # ── Stage 2: hardened runtime ────────────────────────────────────
 FROM python:3.13-slim@sha256:6771159cd4fa5d9bba1258caf0b82e6b73458c694d178ad97c5e925c2d0e1a91
