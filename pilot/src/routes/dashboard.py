@@ -43,9 +43,10 @@ if SERVICE_TOKEN:
 
 # ═══════════════════════════════════════════════════════════════════════
 # Dashboard v2 — consolidated CISO posture cockpit.
-# See shared/docs/pilot-dashboard-contract.md for the wire format.
-# Each backend module exposes GET /api/internal/stats (mandatory) and
-# optionally /api/internal/activity (max 10 recent events). Pilot does:
+# Modules return a PilotStatsEnvelope, this route a PilotDashboard (both
+# in app/ts/Pilot_types.d.ts). Each backend module exposes
+# GET /api/internal/stats (mandatory) and optionally /api/internal/activity
+# (max 10 recent events). Pilot does:
 #   1. Fan out health + stats + activity calls in parallel (per module).
 #   2. Compute consolidated KPIs (global posture, totals, criticals).
 #   3. Merge all activity feeds + derive `upcoming` from MeasureCache.
@@ -432,8 +433,7 @@ async def get_dashboard(user: User = Depends(get_current_user), db: AsyncSession
         "measures_overdue": measures_overdue,
         "measures_done_last_30d": measures_done_30d,
         "proofs_expired_10d": proofs_expired_10d,
-        # FEAT-08 — transverse evidence summary from the consolidated cache
-        # (see pilot-dashboard-contract.md §kpis.evidences).
+        # FEAT-08 — transverse evidence summary from the consolidated cache.
         "evidences": evidences_summary,
         "critical_count": sum(critical_breakdown.values()),
         "critical_breakdown": critical_breakdown,

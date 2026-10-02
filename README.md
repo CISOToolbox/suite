@@ -217,8 +217,8 @@ tools/build-client-image.sh suite --module surface
 tools/build-client-image.sh acme --module surface \
     --addons generic/smb_scan_rs --exclude-core shodan,cloud_buckets
 
-# Restrict embedded languages (default ships FR + EN)
-tools/build-client-image.sh acme --module surface --langs fr
+# Restrict embedded languages (default ships FR + EN; the base, EN, is always kept)
+tools/build-client-image.sh acme --module surface --langs en
 ```
 
 The script builds the lean core image, stages the selected add-on subtrees,

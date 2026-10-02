@@ -58,15 +58,17 @@ App dictionaries are **authored in TypeScript** (`app/ts/…`) and compiled to
 1. **Language name in the switcher**: `de`, `es`, `it`, `pt`, `nl` are
    already known to the engine (`_LANG_NAMES` in the shared `i18n.ts`). For
    another language, add its native name there (one line).
-2. **Packaging**: add the language to `shared/i18n.conf`:
+2. **Packaging**: add the language to the default list of `tools/i18n.conf`
+   (what `tools/i18n-apply.sh` keeps when no `--langs` is given):
    ```bash
    BASE=en
    LANGS="en fr xx"
    ```
-   The packaging step (`i18n-apply.sh`, run by the image builds) injects
-   `window._CT_LANGS` into each `index.html` and keeps only the retained
-   languages' files — a deployment that doesn't want `xx` simply builds with
-   `--langs "en fr"`.
+   The packaging step (`tools/i18n-apply.sh`, run by
+   `tools/build-client-image.sh --langs`) injects `window._CT_LANGS` into each
+   `index.html` and keeps only the retained languages' files (the base
+   language is always kept) — a client image that wants `xx` builds with
+   `--langs "en fr xx"`.
 3. **Dev tree preview** (no packaging): add the two static tags to the
    app's `index.html` next to the existing ones:
    ```html
@@ -77,7 +79,7 @@ App dictionaries are **authored in TypeScript** (`app/ts/…`) and compiled to
 ## Checking your work
 
 - **Key parity**: every key of the English file must exist in yours and
-  vice-versa. The repo gate (`check-i18n.py`) currently enforces parity for
+  vice-versa. The i18n check run before every release enforces parity for
   the FR/EN pair; for another language, diff the key sets:
   ```bash
   python3 - <<'EOF'

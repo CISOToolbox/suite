@@ -87,8 +87,7 @@ def _check_service_token(request: Request) -> None:
 @router.get("/internal/stats")
 async def internal_stats(request: Request, db: AsyncSession = Depends(get_db)):
     _check_service_token(request)
-    # Phase 6: real Pilot envelope. Per the contract in
-    # shared/docs/pilot-dashboard-contract.md, Watch posts a donut breakdown
+    # Stats v2 envelope read by Pilot: Watch posts a donut breakdown
     # of alerts per severity, a posture score derived from open KEV ratio,
     # and the top critical/high alerts of the last 7 days.
     now = datetime.now(timezone.utc)

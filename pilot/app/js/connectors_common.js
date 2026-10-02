@@ -167,7 +167,7 @@
     // ── Help / setup guide ───────────────────────────────────────────
     // The per-connector "how to configure the account/token/API key" text
     // lives at schema.prereqs.setup_guide ({fr,en}) — synthesised from each
-    // plugin's setup_guide / setup_guide_en, or set in shared/connectors/*.json.
+    // plugin's setup_guide / setup_guide_en, or set in src/connector_schemas/*.json.
     function _connSetupGuide(schema, lang) {
         if (!schema)
             return "";

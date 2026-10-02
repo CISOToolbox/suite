@@ -23,7 +23,7 @@ for m in $MODULES; do
 done
 
 echo ""
-# Same rule as smoke-test.sh: having verified nothing is not a success.
+# Having verified nothing is not a success.
 if [ "$CHECKED" -eq 0 ]; then
     echo "POSTURE FAILED: no module has tests/e2e — nothing was verified"; exit 1
 fi

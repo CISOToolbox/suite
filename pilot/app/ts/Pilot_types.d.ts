@@ -1,12 +1,12 @@
 /**
  * Pilot_types.d.ts — data model of the Pilot front end (backend).
  *
- * The stats v2 envelope (PilotStatsEnvelope) follows the authoritative
- * contract shared/docs/pilot-dashboard-contract.md: every backend module
+ * The stats v2 envelope (PilotStatsEnvelope) is the contract between Pilot
+ * and the modules: every backend module
  * exposes GET /api/internal/stats with { entity_count, entity_label,
  * measures{}, posture{score, score_label, trend_30d}, breakdown{type, data},
  * top_items[], alerts[] }. Fields are optional on the front end because
- * Pilot applies the fallbacks documented in the contract.
+ * Pilot falls back to a default for any field a module leaves out.
  *
  * Pure type file — no emit.
  */
