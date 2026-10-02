@@ -32,7 +32,7 @@
 
 /* ═══════════════════════════════════════════════════════════════
    Dashboard v2 — CISO posture cockpit
-   See shared/docs/pilot-dashboard-contract.md for data contract.
+   Data shapes: PilotStatsEnvelope in ts/Pilot_types.d.ts.
    ═══════════════════════════════════════════════════════════════ */
 
 .dash-section-title { margin: 28px 0 14px; font-size: 1.05em; font-weight: 700; color: var(--ct-ink); }

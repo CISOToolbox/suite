@@ -268,7 +268,7 @@ async def sync_user(request: Request, db: AsyncSession = Depends(get_db)):
     return {"ok": True, "updated": False, "reason": "user not found in module"}
 
 
-# ── Measures export / write-back (pilot-dashboard-contract) ─────
+# ── Measures export / write-back (read by Pilot) ─────
 
 
 @router.post("/internal/delete-user")

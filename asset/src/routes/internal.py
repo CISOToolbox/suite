@@ -96,7 +96,7 @@ def _check_service_token(request: Request) -> None:
 
 @router.get("/internal/stats")
 async def internal_stats(request: Request, db: AsyncSession = Depends(get_db)):
-    """Stats v2 envelope — see shared/docs/pilot-dashboard-contract.md"""
+    """Stats v2 envelope — the shape Pilot's dashboard reads from every module."""
     _check_service_token(request)
 
     total_assets = await db.scalar(select(func.count()).select_from(Asset)) or 0
@@ -232,7 +232,7 @@ async def internal_activity(request: Request, db: AsyncSession = Depends(get_db)
 
 @router.get("/internal/measures")
 async def internal_measures(request: Request, db: AsyncSession = Depends(get_db)):
-    """Export Asset measures to Pilot (pilot-dashboard-contract schema)."""
+    """Export Asset measures to Pilot (the measures export every module shares)."""
     _check_service_token(request)
     result = await db.execute(select(Measure).order_by(Measure.project_id, Measure.sort_order))
     out = []

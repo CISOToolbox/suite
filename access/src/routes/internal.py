@@ -167,7 +167,7 @@ def _normalize_status(s: str) -> str:
 
 @router.get("/internal/stats")
 async def internal_stats(request: Request, db: AsyncSession = Depends(get_db)):
-    """Stats v2 envelope — see shared/docs/pilot-dashboard-contract.md"""
+    """Stats v2 envelope — the shape Pilot's dashboard reads from every module."""
     _check_service_token(request)
     from datetime import date as _date
 

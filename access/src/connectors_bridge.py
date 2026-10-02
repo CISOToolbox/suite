@@ -51,7 +51,7 @@ logger = logging.getLogger("access.connectors_bridge")
 
 def schema_from_plugin(plugin_type: str, plugin_cls: type[AccessPlugin]) -> dict:
     """Translate an AccessPlugin's class metadata to the framework JSON
-    schema shape used by ``shared/connectors/<id>.json`` files."""
+    schema shape of the connectors' ``<id>.json`` schema files."""
     inst = plugin_cls()
     fields = []
     for f in inst.config_schema:

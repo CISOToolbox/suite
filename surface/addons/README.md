@@ -152,7 +152,7 @@ contain **zero** add-on doc text; the client image with the add-on serves it.
   > gitignored and cross-compiled per arch **before** the build
   > (`generic/smb_scan_rs/rust/build.sh amd64 arm64`) — it cannot be a builder
   > stage, rustc segfaults under qemu. The Dockerfile aborts if
-  > `bin/ciso-smb-scan-<arch>` is missing, and `publish-images.sh` produces it
+  > `bin/ciso-smb-scan-<arch>` is missing, and the image release step produces it
   > automatically. Both guards were added after the step was forgotten and the
   > published images shipped the add-on with an empty `bin/`.
 - `Dockerfile.addons` overlays **client** add-ons on top of that image:

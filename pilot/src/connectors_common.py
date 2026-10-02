@@ -24,7 +24,7 @@ credentials (Microsoft Graph, GitHub, Okta, AWS, …). The router exposes:
 
 The module supplies a mapping `{connector_id: ConnectorBinding}` listing
 the connectors it consumes. Each binding carries the schema (loaded from
-the matching JSON file shipped under `shared/connectors/`) and two
+the module's JSON schema file, e.g. Pilot's `src/connector_schemas/`) and two
 coroutines: `test(db)` and `run(db)`.
 
 ## Credentials storage
@@ -84,7 +84,7 @@ class ConnectorBinding:
     """Wires a connector id to its schema + test/run coroutines.
 
     Provide EITHER ``schema_path`` (a Path to a JSON file copied from
-    ``shared/connectors/<id>.json``) OR ``schema_dict`` (an inline dict,
+    a module's ``<id>.json`` schema file) OR ``schema_dict`` (an inline dict,
     handy for modules that synthesize the schema at runtime — e.g. the
     Access bridge that maps each AccessPlugin's config_schema onto the
     framework shape).
@@ -119,7 +119,7 @@ class ConnectorBinding:
 
     def cardinality(self) -> str:
         """`"one"` or `"many"`. Default `"one"` for backward compat with
-        schemas that don't declare it (e.g. older shared/connectors/*.json)."""
+        schemas that don't declare it (e.g. older schema JSON files)."""
         return self.schema().get("cardinality", "one")
 
 

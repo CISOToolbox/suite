@@ -67,13 +67,7 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-# Layout-agnostic: works from a shared tools directory next to the module
-# trees AND from the suite repo's tools/ directory (modules at the repo root).
-if [ -d "$ROOT/../public/suite-modules" ]; then
-    MOD_DIR="$ROOT/../public/suite-modules/$module"
-else
-    MOD_DIR="$ROOT/$module"
-fi
+MOD_DIR="$ROOT/$module"
 [ -d "$MOD_DIR" ] || { echo "!! unknown module: $module ($MOD_DIR missing)"; exit 1; }
 [ -f "$MOD_DIR/Dockerfile.addons" ] || { echo "!! $module has no Dockerfile.addons overlay"; exit 1; }
 
@@ -187,8 +181,8 @@ if $push; then
     else
         docker push "$img"
     fi
-    # Move `latest` too when the tag is a version, the way publish-images.sh
-    # does for the suite images. Without this a client image kept a `latest`
+    # Move `latest` too when the tag is a version, as the suite image
+    # release does. Without this a client image kept a `latest`
     # frozen at whenever it was last built with that tag explicitly — six
     # weeks stale at a client site, and it once sent a debugging session chasing an
     # old image that a `docker pull` had silently produced.
