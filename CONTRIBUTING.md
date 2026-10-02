@@ -35,7 +35,6 @@ applied at the source and reaches every module in the next release.
 bash setup.sh                 # generate .env + local TLS cert
 docker compose up -d --build
 docker compose logs -f
-bash shared/smoke-test.sh     # health-check every module (if present)
 ```
 
 The suite answers on <https://localhost>. Local builds are driven by

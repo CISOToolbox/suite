@@ -2,7 +2,7 @@
 
 Pilot had no crypto module at all: the SMTP password, the AI provider keys and
 the AWS / Graph / Proofpoint connector credentials sat in cleartext in
-AppSettings.value, so a pg_dump — which shared/db-snapshot.sh makes routine —
+AppSettings.value, so a pg_dump — a routine operation —
 handed them over as-is.
 
 The riskiest part is not the cipher, it is the lazy migration: rows written
