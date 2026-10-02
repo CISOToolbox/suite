@@ -1,0 +1,11 @@
+# Locked dependencies of the image's build tools: every package it installs, transitives
+# included, with hashes. Generated — do not edit by hand. Installed with:
+#   pip install --require-hashes -r requirements-build-lock.txt
+# Resolved for Python 3.13, any platform, with the repository's
+# constraints.txt and no release after 2026-09-17 (14-day cooldown), except:
+# pyjwt=2026-09-24. Regenerate with tests/lock-deps.sh after changing an
+# input below.
+# input: requirements-build.txt sha256:0241c5b353ba48be1703c9f02cc182dee1e11e4505d0c06d416b24e382946d07
+setuptools==83.0.0 \
+    --hash=sha256:025bccbbf0fa05b6192bc64ae1e7b16e001fd6d6d4d5de03c97b1c1ade523bef \
+    --hash=sha256:29b23c360f22f414dc7336bb39178cc7bcbf6021ed2733cde173f09dba19abb3

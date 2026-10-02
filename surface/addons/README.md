@@ -158,9 +158,18 @@ contain **zero** add-on doc text; the client image with the add-on serves it.
 - `Dockerfile.addons` overlays **client** add-ons on top of that image:
   `FROM <core>`, `USER root`, `COPY .client-addons/ /app/addons/`, then in one
   layer: drop any `ARG EXCLUDE_CORE` dirs, install each add-on's
-  `apt-packages.txt` (system libs), `requirements.txt` (pip), run each add-on's
+  `apt-packages.txt` (system libs), its Python deps, run each add-on's
   **`install.sh`**, `chmod` bundled `bin/*`, `chown`, `USER surface`,
-  `ENV SURFACE_ADDON_PATHS=/app/addons`.
+  `ENV SURFACE_ADDON_PATHS=/app/addons`. Python deps come from the add-on's
+  `requirements-lock.txt`, installed with `--require-hashes`; lock it against
+  the image it extends:
+  `BASE_LOCK=surface/requirements-lock.txt bash tests/lock-deps.sh <add-on dir>`.
+  An add-on without a lock builds only if the image already holds every
+  package of its `requirements.txt` (`pip install --no-index`), and a URL, a
+  direct reference (`pkg @ …`) or a pip option there requires a lock. The
+  add-on's lock follows the base image: relock it whenever that image's lock
+  changes, or when building on another `--base` (lock it against that
+  image's `requirements-lock.txt`) — otherwise its pins override the image's.
 - `tools/build-client-image.sh <client> --module surface` is needed **only** to
   layer a client's own `custom/` add-ons, or to slim an image with
   `--exclude-core` → `ciso-surface-<client>:<tag>`. Passing

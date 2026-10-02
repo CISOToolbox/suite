@@ -1,0 +1,4 @@
+# Build tools for the packages of requirements-lock.txt published only as
+# source (sgmllib3k, needed by feedparser): installed before the lock, so pip
+# builds them with --no-build-isolation. Locked in requirements-build-lock.txt.
+setuptools==83.0.0

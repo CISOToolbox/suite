@@ -23,7 +23,7 @@ RUN pip install --no-cache-dir --prefix=/install --require-hashes -r requirement
 # semgrep is a CLI with its own pins (pyjwt ~=2.13): it lives in a separate
 # virtual environment so it never constrains the application's dependencies.
 RUN python -m venv /opt/semgrep \
-    && /opt/semgrep/bin/pip install --no-cache-dir -r requirements-semgrep.txt
+    && /opt/semgrep/bin/pip install --no-cache-dir --require-hashes -r requirements-semgrep.txt
 
 # ── Stage 2: security scanning tools ─────────────────────────────
 FROM python:3.13-slim@sha256:6771159cd4fa5d9bba1258caf0b82e6b73458c694d178ad97c5e925c2d0e1a91 AS tools
