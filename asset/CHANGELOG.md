@@ -1,0 +1,24 @@
+# Changelog
+
+Every release has its section here, written at release time from the
+changes since the previous one and published as the GitHub release notes.
+
+## 1.2.0 — 2026-10-03
+
+### Fixed
+
+- Custom asset type colours are validated before storage and rendering, and default to a real colour.
+- Renewal deadlines carry their project, and the review is archived.
+- A record's tabs scroll on a narrow screen and the active tab stays in view.
+- Forms lay out on the shared form grid and collapse to one column below 768 px; checkboxes sit on the line of their label.
+- Muted text keeps AA contrast on every background; one shared signed-in user block in the toolbar.
+- Picking a person closes the result list.
+- Security updates: PyJWT 2.15.0 (GHSA-42vr-xj54-vc7v), urllib3 2.8.0, anyio 4.14.2 (GHSA-82r6-8w77-94w6).
+
+### Changed
+
+- The image installs a complete dependency lock with hashes (`requirements-lock.txt`), transitive dependencies included; the unit tests run on that same lock.
+
+### Documentation
+
+- Comments and documentation point only at files shipped in this repository.
