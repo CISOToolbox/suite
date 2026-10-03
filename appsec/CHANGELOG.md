@@ -3,6 +3,13 @@
 Every release has its section here, written at release time from the
 changes since the previous one and published as the GitHub release notes.
 
+## 1.2.1 — 2026-10-03
+
+### Fixed
+
+- semgrep 1.179.0: its environment now runs PyJWT 2.15.0, like the module, instead of 2.13.0 (CVE-2026-102268 and related HIGH findings).
+- trivy 0.75.0 in the image (0.70.0 carried 50 HIGH findings in its own dependencies), checked against the official sha256.
+
 ## 1.2.0 — 2026-10-03
 
 ### Added
