@@ -3,6 +3,32 @@
 Every release has its section here, written at release time from the
 changes since the previous one and published as the GitHub release notes.
 
+## 0.12.1 — 2026-10-03
+
+### Modules
+
+- pilot: 1.2.0 → **1.2.1**
+- risk: 1.1.0 → **1.1.1**
+- compliance: 1.1.0 → **1.1.1**
+- audit: 1.1.0 → **1.1.1**
+- vendor: 1.3.0 → **1.3.1**
+- asset: 1.2.0 → **1.2.1**
+- access: 1.3.0 → **1.3.1**
+- surface: 1.5.0 → **1.5.1**
+- appsec: 1.2.0 → **1.2.1**
+- watch: 1.1.0 → **1.1.1**
+- ciso-postgres: 16.1 → **16.2**, ciso-backup-agent: 16.2 → **16.3**
+
+### Fixed
+
+- AppSec: semgrep 1.179.0 on PyJWT 2.15.0, and trivy 0.75.0, in the image.
+- Surface: nuclei 3.11.1, its release zip and templates archive checked against their official sha256.
+- `ciso-postgres` and `ciso-backup-agent` rebased on the current `postgres:16-alpine` (Alpine 3.24.2: openssl, expat, util-linux, python3); the backup agent drops `gosu` and `su-exec`, which it never calls.
+
+### Changed
+
+- `.trivyignore.yaml`, read by the image scan: findings in upstream binaries with no fixed release yet (gosu, gitleaks, nuclei, nginx:alpine's expat and pcre2) are accepted per path or per package version, until 2026-11-03. The scan also runs when the exemptions or the workflow change.
+
 ## 0.12.0 — 2026-10-03
 
 ### Modules
