@@ -18,7 +18,7 @@ on:
     - cron: '0 7 * * 1'
   push:
     branches: [main]
-    paths: ['docker-compose.yml']
+    paths: ['docker-compose.yml', '.trivyignore.yaml', '.github/workflows/image-scan.yml']
   workflow_dispatch:
 
 permissions:
@@ -67,6 +67,11 @@ jobs:
             echo "ok=false" >> "$GITHUB_OUTPUT"
           fi
 
+      # .trivyignore.yaml: findings accepted for a bounded time, each scoped to
+      # one upstream binary with no fixed release yet (expired_at forces review).
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        if: steps.probe.outputs.ok == 'true'
+
       - name: Trivy scan (HIGH/CRITICAL, fixable)
         if: steps.probe.outputs.ok == 'true'
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
@@ -77,3 +82,4 @@ jobs:
           ignore-unfixed: true
           exit-code: '1'          # fail the leg on a fixable HIGH+
           format: table
+          trivyignores: .trivyignore.yaml

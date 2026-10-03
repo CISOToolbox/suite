@@ -5,7 +5,7 @@
 # indexes). Adds pgBackRest for continuous WAL archiving (archive_command)
 # to the shared backups repository volume. Archive/cipher settings arrive
 # via PGBACKREST_* environment variables — no conf file, no secret baked in.
-FROM postgres:16-alpine@sha256:e013e867e712fec275706a6c51c966f0bb0c93cfa8f51000f85a15f9865a28cb
+FROM postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
 
 RUN apk add --no-cache pgbackrest && \
     mkdir -p /var/log/pgbackrest && chown postgres:postgres /var/log/pgbackrest

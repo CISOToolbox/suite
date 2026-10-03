@@ -6,9 +6,12 @@
 # socket, no TLS server pair, no extra daemon in the DB containers.
 # Same pinned base as ciso-postgres so uid 70 (postgres) matches the
 # repository files written by the DB containers.
-FROM postgres:16-alpine@sha256:e013e867e712fec275706a6c51c966f0bb0c93cfa8f51000f85a15f9865a28cb
+FROM postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
 
+# gosu (and its su-exec alias) ship with the postgres base for its root
+# entrypoint; this agent runs as USER postgres and never calls them, so they go.
 RUN apk add --no-cache pgbackrest bash python3 && \
+    rm -f /usr/local/bin/gosu /usr/local/bin/su-exec && \
     mkdir -p /var/log/pgbackrest && chown postgres:postgres /var/log/pgbackrest
 
 COPY agent.sh /usr/local/bin/agent.sh

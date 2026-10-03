@@ -1,0 +1,296 @@
+# Trivy findings accepted for a bounded time, read by .github/workflows/image-scan.yml.
+# Each entry is scoped to one upstream binary (by path) or one Alpine package
+# version (by purl) that has no fixed release in its image yet, and
+# expires: when it does, the scan fails again and the entry is reviewed — bump
+# the binary, or renew the entry with its reason.
+
+vulnerabilities:
+  # usr/local/bin/gosu: gosu 1.19 as shipped in the official postgres:16-alpine base, built with Go 1.24.6. No later gosu release; it only drops privileges in the entrypoint (no network, no TLS). Re-check when the postgres image rebuilds it.
+  - id: CVE-2025-61726
+    paths:
+      - "usr/local/bin/gosu"
+    expired_at: 2026-11-03
+  - id: CVE-2025-61729
+    paths:
+      - "usr/local/bin/gosu"
+    expired_at: 2026-11-03
+  - id: CVE-2025-68121
+    paths:
+      - "usr/local/bin/gosu"
+    expired_at: 2026-11-03
+  - id: CVE-2026-25679
+    paths:
+      - "usr/local/bin/gosu"
+    expired_at: 2026-11-03
+  - id: CVE-2026-27145
+    paths:
+      - "usr/local/bin/gosu"
+    expired_at: 2026-11-03
+  - id: CVE-2026-32280
+    paths:
+      - "usr/local/bin/gosu"
+    expired_at: 2026-11-03
+  - id: CVE-2026-32281
+    paths:
+      - "usr/local/bin/gosu"
+    expired_at: 2026-11-03
+  - id: CVE-2026-32283
+    paths:
+      - "usr/local/bin/gosu"
+    expired_at: 2026-11-03
+  - id: CVE-2026-33811
+    paths:
+      - "usr/local/bin/gosu"
+    expired_at: 2026-11-03
+  - id: CVE-2026-33814
+    paths:
+      - "usr/local/bin/gosu"
+    expired_at: 2026-11-03
+  - id: CVE-2026-33818
+    paths:
+      - "usr/local/bin/gosu"
+    expired_at: 2026-11-03
+  - id: CVE-2026-39820
+    paths:
+      - "usr/local/bin/gosu"
+    expired_at: 2026-11-03
+  - id: CVE-2026-39821
+    paths:
+      - "usr/local/bin/gosu"
+    expired_at: 2026-11-03
+  - id: CVE-2026-39822
+    paths:
+      - "usr/local/bin/gosu"
+    expired_at: 2026-11-03
+  - id: CVE-2026-39836
+    paths:
+      - "usr/local/bin/gosu"
+    expired_at: 2026-11-03
+  - id: CVE-2026-42499
+    paths:
+      - "usr/local/bin/gosu"
+    expired_at: 2026-11-03
+  - id: CVE-2026-42504
+    paths:
+      - "usr/local/bin/gosu"
+    expired_at: 2026-11-03
+  - id: CVE-2026-56853
+    paths:
+      - "usr/local/bin/gosu"
+    expired_at: 2026-11-03
+  - id: CVE-2026-56858
+    paths:
+      - "usr/local/bin/gosu"
+    expired_at: 2026-11-03
+  - id: CVE-2026-56859
+    paths:
+      - "usr/local/bin/gosu"
+    expired_at: 2026-11-03
+  - id: CVE-2026-56860
+    paths:
+      - "usr/local/bin/gosu"
+    expired_at: 2026-11-03
+  - id: CVE-2026-56862
+    paths:
+      - "usr/local/bin/gosu"
+    expired_at: 2026-11-03
+  # usr/local/bin/gitleaks: gitleaks 8.30.1, the latest release, built with Go 1.24.11 and old golang.org/x modules. Runs offline on a cloned repository. Re-check at the next gitleaks release.
+  - id: CVE-2025-47913
+    paths:
+      - "usr/local/bin/gitleaks"
+    expired_at: 2026-11-03
+  - id: CVE-2025-61726
+    paths:
+      - "usr/local/bin/gitleaks"
+    expired_at: 2026-11-03
+  - id: CVE-2025-68121
+    paths:
+      - "usr/local/bin/gitleaks"
+    expired_at: 2026-11-03
+  - id: CVE-2026-25679
+    paths:
+      - "usr/local/bin/gitleaks"
+    expired_at: 2026-11-03
+  - id: CVE-2026-27145
+    paths:
+      - "usr/local/bin/gitleaks"
+    expired_at: 2026-11-03
+  - id: CVE-2026-32280
+    paths:
+      - "usr/local/bin/gitleaks"
+    expired_at: 2026-11-03
+  - id: CVE-2026-32281
+    paths:
+      - "usr/local/bin/gitleaks"
+    expired_at: 2026-11-03
+  - id: CVE-2026-32283
+    paths:
+      - "usr/local/bin/gitleaks"
+    expired_at: 2026-11-03
+  - id: CVE-2026-33811
+    paths:
+      - "usr/local/bin/gitleaks"
+    expired_at: 2026-11-03
+  - id: CVE-2026-33814
+    paths:
+      - "usr/local/bin/gitleaks"
+    expired_at: 2026-11-03
+  - id: CVE-2026-33818
+    paths:
+      - "usr/local/bin/gitleaks"
+    expired_at: 2026-11-03
+  - id: CVE-2026-39820
+    paths:
+      - "usr/local/bin/gitleaks"
+    expired_at: 2026-11-03
+  - id: CVE-2026-39821
+    paths:
+      - "usr/local/bin/gitleaks"
+    expired_at: 2026-11-03
+  - id: CVE-2026-39822
+    paths:
+      - "usr/local/bin/gitleaks"
+    expired_at: 2026-11-03
+  - id: CVE-2026-39828
+    paths:
+      - "usr/local/bin/gitleaks"
+    expired_at: 2026-11-03
+  - id: CVE-2026-39829
+    paths:
+      - "usr/local/bin/gitleaks"
+    expired_at: 2026-11-03
+  - id: CVE-2026-39830
+    paths:
+      - "usr/local/bin/gitleaks"
+    expired_at: 2026-11-03
+  - id: CVE-2026-39831
+    paths:
+      - "usr/local/bin/gitleaks"
+    expired_at: 2026-11-03
+  - id: CVE-2026-39832
+    paths:
+      - "usr/local/bin/gitleaks"
+    expired_at: 2026-11-03
+  - id: CVE-2026-39835
+    paths:
+      - "usr/local/bin/gitleaks"
+    expired_at: 2026-11-03
+  - id: CVE-2026-39836
+    paths:
+      - "usr/local/bin/gitleaks"
+    expired_at: 2026-11-03
+  - id: CVE-2026-42499
+    paths:
+      - "usr/local/bin/gitleaks"
+    expired_at: 2026-11-03
+  - id: CVE-2026-42504
+    paths:
+      - "usr/local/bin/gitleaks"
+    expired_at: 2026-11-03
+  - id: CVE-2026-42508
+    paths:
+      - "usr/local/bin/gitleaks"
+    expired_at: 2026-11-03
+  - id: CVE-2026-46595
+    paths:
+      - "usr/local/bin/gitleaks"
+    expired_at: 2026-11-03
+  - id: CVE-2026-46597
+    paths:
+      - "usr/local/bin/gitleaks"
+    expired_at: 2026-11-03
+  - id: CVE-2026-56852
+    paths:
+      - "usr/local/bin/gitleaks"
+    expired_at: 2026-11-03
+  - id: CVE-2026-56853
+    paths:
+      - "usr/local/bin/gitleaks"
+    expired_at: 2026-11-03
+  - id: CVE-2026-56854
+    paths:
+      - "usr/local/bin/gitleaks"
+    expired_at: 2026-11-03
+  - id: CVE-2026-56858
+    paths:
+      - "usr/local/bin/gitleaks"
+    expired_at: 2026-11-03
+  - id: CVE-2026-56859
+    paths:
+      - "usr/local/bin/gitleaks"
+    expired_at: 2026-11-03
+  - id: CVE-2026-56860
+    paths:
+      - "usr/local/bin/gitleaks"
+    expired_at: 2026-11-03
+  - id: CVE-2026-56862
+    paths:
+      - "usr/local/bin/gitleaks"
+    expired_at: 2026-11-03
+  # usr/local/bin/nuclei: nuclei 3.11.1, the latest release, built with Go 1.26.5. Re-check at the next nuclei release.
+  - id: CVE-2026-33818
+    paths:
+      - "usr/local/bin/nuclei"
+    expired_at: 2026-11-03
+  - id: CVE-2026-39821
+    paths:
+      - "usr/local/bin/nuclei"
+    expired_at: 2026-11-03
+  - id: CVE-2026-46600
+    paths:
+      - "usr/local/bin/nuclei"
+    expired_at: 2026-11-03
+  - id: CVE-2026-56853
+    paths:
+      - "usr/local/bin/nuclei"
+    expired_at: 2026-11-03
+  - id: CVE-2026-56854
+    paths:
+      - "usr/local/bin/nuclei"
+    expired_at: 2026-11-03
+  - id: CVE-2026-56858
+    paths:
+      - "usr/local/bin/nuclei"
+    expired_at: 2026-11-03
+  - id: CVE-2026-56859
+    paths:
+      - "usr/local/bin/nuclei"
+    expired_at: 2026-11-03
+  - id: CVE-2026-56860
+    paths:
+      - "usr/local/bin/nuclei"
+    expired_at: 2026-11-03
+  - id: CVE-2026-56862
+    paths:
+      - "usr/local/bin/nuclei"
+    expired_at: 2026-11-03
+  - id: CVE-2026-56864
+    paths:
+      - "usr/local/bin/nuclei"
+    expired_at: 2026-11-03
+  - id: CVE-2026-56865
+    paths:
+      - "usr/local/bin/nuclei"
+    expired_at: 2026-11-03
+  - id: CVE-2026-71556
+    paths:
+      - "usr/local/bin/nuclei"
+    expired_at: 2026-11-03
+  - id: CVE-2026-84304
+    paths:
+      - "usr/local/bin/nuclei"
+    expired_at: 2026-11-03
+  - id: CVE-2026-84445
+    paths:
+      - "usr/local/bin/nuclei"
+    expired_at: 2026-11-03
+  # nginx:alpine (the proxy): libexpat 2.8.5 and pcre2 10.49 are in the Alpine 3.24
+  # repository but not yet in the official image (last rebuilt 2026-09-26).
+  - id: CVE-2026-103111
+    purls:
+      - "pkg:apk/alpine/pcre2@10.48-r0"
+    expired_at: 2026-11-03
+  - id: CVE-2026-93990
+    purls:
+      - "pkg:apk/alpine/libexpat@2.8.4-r0"
+    expired_at: 2026-11-03
