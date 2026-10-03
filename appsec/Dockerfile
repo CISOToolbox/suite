@@ -20,7 +20,7 @@ WORKDIR /app
 # module asks for; the lock is regenerated from it).
 COPY requirements-lock.txt requirements-semgrep.txt ./
 RUN pip install --no-cache-dir --prefix=/install --require-hashes -r requirements-lock.txt
-# semgrep is a CLI with its own pins (pyjwt ~=2.13): it lives in a separate
+# semgrep is a CLI with its own pins: it lives in a separate
 # virtual environment so it never constrains the application's dependencies.
 RUN python -m venv /opt/semgrep \
     && /opt/semgrep/bin/pip install --no-cache-dir --require-hashes -r requirements-semgrep.txt
@@ -28,16 +28,16 @@ RUN python -m venv /opt/semgrep \
 # ── Stage 2: security scanning tools ─────────────────────────────
 FROM python:3.13-slim@sha256:6771159cd4fa5d9bba1258caf0b82e6b73458c694d178ad97c5e925c2d0e1a91 AS tools
 
-ARG TRIVY_VERSION=0.70.0
+ARG TRIVY_VERSION=0.75.0
 ARG GITLEAKS_VERSION=8.30.1
 ARG TARGETARCH
 
 # Official release sha256 sums (CNT-05) — taken from the checksum files
 # published alongside the GitHub releases:
-#   trivy_0.70.0_checksums.txt / gitleaks_8.30.1_checksums.txt
+#   trivy_0.75.0_checksums.txt / gitleaks_8.30.1_checksums.txt
 # MUST be updated together with the version ARGs above.
-ARG TRIVY_SHA256_AMD64=a9f6ce99fa942759ee914d821b9ad38b6d6887e7d1b4d4415c1c9c7387c7bc94
-ARG TRIVY_SHA256_ARM64=d3e3379b9753bbb911a3af924c1465138518cbca34eb6c0c7550c7e15bc7ebb8
+ARG TRIVY_SHA256_AMD64=b6d7b944b6cbf4e7de5b4bc6c3635900c50fed53b64b77b99a5fbc3136cd1d5d
+ARG TRIVY_SHA256_ARM64=23018f1f7136b8391bb300e2579bcf4759e3c64012856f51c0fb6fffe1ee3841
 ARG GITLEAKS_SHA256_AMD64=551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
 ARG GITLEAKS_SHA256_ARM64=e4a487ee7ccd7d3a7f7ec08657610aa3606637dab924210b3aee62570fb4b080
 
