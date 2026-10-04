@@ -1049,11 +1049,11 @@ services:
       - ALL
     tmpfs:
       # CNT-04 — deliberate deviation from the other modules' `noexec,nosuid`:
-      # appsec clones the scanned repos under /tmp and runs trivy / semgrep /
-      # gitleaks against that workspace, and the toolchain is assumed to need
-      # an exec-capable workspace (not re-verified). 2g fits large repos +
-      # trivy artifacts. If a full scan run passes with `noexec`, align this
-      # line with the other modules.
+      # appsec clones the scanned repos under /tmp and runs trivy / opengrep /
+      # gitleaks against that workspace. Opengrep needs it exec-capable when it
+      # falls back to unpacking its runtime there (verified: `noexec` makes it
+      # fail with "couldn't launch child (exec)"). 2g fits large repos + trivy
+      # artifacts.
       - /tmp:nosuid,size=2g
     volumes:
       - appsec-cache:/home/appsec
@@ -1323,4 +1323,4 @@ volumes:
   surface-pgdata:
   appsec-pgdata:
   watch-pgdata:
-  appsec-cache:   # Trivy DB + Semgrep cache — persisted across restarts
+  appsec-cache:   # Trivy DB cache — persisted across restarts

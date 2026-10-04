@@ -38,7 +38,7 @@ the same module repo** and hosted on cisotoolbox.org:
 | **Access** | Access reviews, user lifecycle, identity connectors (AD, Entra, Okta…) | [CISOToolbox/access](https://github.com/CISOToolbox/access) | — |
 | **Asset** | Asset inventory with infrastructure connectors (AD, Intune, AWS…) and cross-connector dedup | [CISOToolbox/asset](https://github.com/CISOToolbox/asset) | — |
 | **Surface** | External attack surface monitoring: DNS, TLS, exposed services, add-on scanners | [CISOToolbox/surface](https://github.com/CISOToolbox/surface) | — |
-| **AppSec** | Application security: SCA/image scans (Trivy), secrets (Gitleaks), SAST (Semgrep), SBOM | [CISOToolbox/appsec](https://github.com/CISOToolbox/appsec) | — |
+| **AppSec** | Application security: SCA/image scans (Trivy), secrets (Gitleaks), SAST (Opengrep), SBOM | [CISOToolbox/appsec](https://github.com/CISOToolbox/appsec) | — |
 | **Watch** | Vulnerability & threat watch: CVE/KEV feeds, scopes, alert triage, email digests | [CISOToolbox/watch](https://github.com/CISOToolbox/watch) | — |
 | **Phish** | Authorised phishing simulations: campaigns, templates, landing pages, awareness reporting | [CISOToolbox/phish](https://github.com/CISOToolbox/phish) | — |
 
@@ -77,7 +77,7 @@ restore UI covers every module.
 | **Access** | `/access/` | Access reviews, user lifecycle, AD/Cloud Temple connectors |
 | **Asset** | `/asset/` | Asset inventory, connectors (AD, Intune, AWS, Cloud Temple), cross-connector dedup |
 | **Surface** | `/surface/` | Attack surface monitoring (DNS, nuclei, nmap, screenshots) |
-| **AppSec** | `/appsec/` | Application security (Trivy SCA/images, Gitleaks secrets, Semgrep SAST, SBOM, ignore rules) |
+| **AppSec** | `/appsec/` | Application security (Trivy SCA/images, Gitleaks secrets, Opengrep SAST, SBOM, ignore rules) |
 | **Watch** | `/watch/` | Vulnerability & threat watch (CVE feeds, scopes, alerts, digests) |
 
 ## Versioning & releases

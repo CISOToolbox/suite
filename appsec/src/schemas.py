@@ -10,7 +10,10 @@ from pydantic import BaseModel, Field, field_validator
 
 from src.ssrf_guard import resolve_safe_target
 
-_VALID_SCANNERS = {"trivy_fs", "trivy_image", "gitleaks", "semgrep"}
+_VALID_SCANNERS = {"trivy_fs", "trivy_image", "gitleaks", "sast"}
+# The SAST scanner was called "semgrep" until the engine became Opengrep:
+# still accepted for one release, so existing API clients keep working.
+_SCANNER_ALIASES = {"semgrep": "sast"}
 _BRANCH_RE = re.compile(r"^[a-zA-Z0-9._/\-]{1,200}$")
 _REPO_SCHEMES = ("https://", "http://", "git@", "ssh://")
 # An image reference must start with an alphanumeric (never '-', which would
@@ -145,7 +148,7 @@ class ApplicationCreate(BaseModel):
     docker_images: list[str] = []
     image_token: str = ""  # PAT for private container registries
     scan_frequency_hours: int = 24
-    enabled_scanners: list[str] = ["trivy_fs", "gitleaks", "semgrep", "trivy_image"]
+    enabled_scanners: list[str] = ["trivy_fs", "gitleaks", "sast", "trivy_image"]
     criticality: str = "medium"
     notification_emails: list[str] = []
     notification_lang: str = "en"
@@ -192,6 +195,7 @@ class ApplicationCreate(BaseModel):
     @field_validator("enabled_scanners")
     @classmethod
     def valid_scanners(cls, v: list[str]) -> list[str]:
+        v = [_SCANNER_ALIASES.get(s, s) for s in v]
         invalid = set(v) - _VALID_SCANNERS
         if invalid:
             raise ValueError(f"Unknown scanners: {invalid}")
@@ -268,6 +272,7 @@ class ApplicationUpdate(BaseModel):
     def valid_scanners(cls, v: list[str] | None) -> list[str] | None:
         if v is None:
             return v
+        v = [_SCANNER_ALIASES.get(s, s) for s in v]
         invalid = set(v) - _VALID_SCANNERS
         if invalid:
             raise ValueError(f"Unknown scanners: {invalid}")
@@ -336,6 +341,9 @@ class FindingResponse(BaseModel):
     triage_notes: str
     # FEAT-45 — set while the finding is under an approved derogation.
     derogation_id: uuid.UUID | None = None
+    # FEAT-52 — closed by the move from Semgrep to Opengrep, and its status then.
+    migration_closed_at: datetime | None = None
+    migration_prev_status: str | None = None
     last_seen_at: datetime
     created_at: datetime
     updated_at: datetime

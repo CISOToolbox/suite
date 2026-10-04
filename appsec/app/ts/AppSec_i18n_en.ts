@@ -122,8 +122,8 @@ _registerTranslations("en", {
     "finding.trivy_image.desc":  "Vulnerability {cve} affecting {package} {installed_version} (image {image}).\n\n{original}",
     "finding.gitleaks.title":    "Secret detected: {rule} in {file}",
     "finding.gitleaks.desc":     "A match for rule '{rule}' was found in {file}:{line}.\n\n{original}",
-    "finding.semgrep.title":     "SAST: {rule_id}",
-    "finding.semgrep.desc":      "The SAST rule {rule_id} was triggered in {file}:{line}.\n\n{original}",
+    "finding.sast.title":        "SAST: {rule_id}",
+    "finding.sast.desc":          "The SAST rule {rule_id} was triggered in {file}:{line}.\n\n{original}",
     "findings.all_apps": "All applications",
     "findings.search_app": "Search an application…",
     "findings.all_severities": "All severities",
@@ -167,6 +167,9 @@ _registerTranslations("en", {
     "findings.patch_available": "Patch available",
     "findings.patch_unavailable": "No patch",
     "findings.patch_none": "No patch",
+    "findings.engine_change": "SAST engine change",
+    "findings.engine_change_closed": "Closed: superseded by the new engine's finding",
+    "findings.engine_change_was": "Closed: superseded by the new engine's finding (status before: {status})",
     "findings.patch_status": "Vendor patch",
     "findings.installed_version": "Installed version",
     "dashboard.cve_patchable": "Patchable CVEs",
@@ -216,7 +219,7 @@ _registerTranslations("en", {
     "scanner.trivy_fs": "Dependencies",
     "scanner.trivy_image": "Docker Images",
     "scanner.gitleaks": "Secrets",
-    "scanner.semgrep": "SAST",
+    "scanner.sast": "SAST",
 
     "nav.ignore_rules": "Ignore Rules",
     "ignore.title": "Ignore Rules",
@@ -290,7 +293,7 @@ _registerTranslations("en", {
         + "<tr><td>SCA (dependencies)</td><td>Trivy FS</td><td>Known CVEs in declared dependencies (<code>requirements.txt</code>, <code>package.json</code>, <code>go.sum</code>, <code>Gemfile.lock</code>…)</td></tr>"
         + "<tr><td>Container images</td><td>Trivy Image</td><td>CVEs in system packages (apt, apk) and dependencies embedded in image layers</td></tr>"
         + "<tr><td>Secrets</td><td>Gitleaks</td><td>Committed API keys, tokens, passwords and certificates, including in Git history</td></tr>"
-        + "<tr><td>SAST (source code)</td><td>Semgrep</td><td>Code vulnerabilities: SQL injection, XSS, insecure deserialization, SSRF…</td></tr></table>"
+        + "<tr><td>SAST (source code)</td><td>Opengrep</td><td>Code vulnerabilities: SQL injection, XSS, insecure deserialization, SSRF…</td></tr></table>"
 
         + "<h3>SCA — software composition analysis</h3>"
         + "<p>Each CVE reports the affected package, the installed version and, when it exists, the <em>fixed version</em> published by the vendor. This underpins the <strong>quick-wins</strong> doctrine: a CVE with a patch is fixed by a simple version bump.</p>"
@@ -309,7 +312,7 @@ _registerTranslations("en", {
         + "<li>Block commits containing secrets with a pre-commit hook</li></ul>"
 
         + "<h3>SAST — static code analysis</h3>"
-        + "<p>Semgrep applies declarative rules from the <strong>OWASP Top 10</strong>, default and language-specific rulesets (Python, JavaScript, TypeScript). SAST structurally produces more false positives than SCA: fast, justified triage is essential to maintain trust in the tool.</p>"
+        + "<p>Opengrep applies the security rules embedded in the image — the opengrep-rules collection (LGPL 2.1 with the Commons Clause), plus rules written for CISO Toolbox — to every language they cover (Python, JavaScript, TypeScript, Go, Java, PHP…); no rule is downloaded at scan time. SAST structurally produces more false positives than SCA: fast, justified triage is essential to maintain trust in the tool.</p>"
 
         + "<h2>3. Severity model</h2>"
         + "<p>Findings are classified on the suite-wide harmonised scale, derived from the CVSS score:</p>"

@@ -119,8 +119,8 @@ _registerTranslations("fr", {
     "finding.trivy_image.desc": "Vulnérabilité {cve} affectant {package} {installed_version} (image {image}).\n\n{original}",
     "finding.gitleaks.title": "Secret détecté : {rule} dans {file}",
     "finding.gitleaks.desc": "Une correspondance de la règle « {rule} » a été trouvée dans {file}:{line}.\n\n{original}",
-    "finding.semgrep.title": "SAST : {rule_id}",
-    "finding.semgrep.desc": "La règle SAST {rule_id} a été déclenchée dans {file}:{line}.\n\n{original}",
+    "finding.sast.title": "SAST : {rule_id}",
+    "finding.sast.desc": "La règle SAST {rule_id} a été déclenchée dans {file}:{line}.\n\n{original}",
     "findings.all_apps": "Toutes les applications",
     "findings.search_app": "Rechercher une application…",
     "findings.all_severities": "Toutes les sévérités",
@@ -164,6 +164,9 @@ _registerTranslations("fr", {
     "findings.patch_available": "Patch disponible",
     "findings.patch_unavailable": "Sans patch",
     "findings.patch_none": "Aucun patch",
+    "findings.engine_change": "Changement de moteur SAST",
+    "findings.engine_change_closed": "Fermé : remplacé par le constat du nouveau moteur",
+    "findings.engine_change_was": "Fermé : remplacé par le constat du nouveau moteur (statut d'avant : {status})",
     "findings.patch_status": "Patch editeur",
     "findings.installed_version": "Version installee",
     "dashboard.cve_patchable": "CVE patchables",
@@ -209,7 +212,7 @@ _registerTranslations("fr", {
     "scanner.trivy_fs": "Dépendances",
     "scanner.trivy_image": "Images Docker",
     "scanner.gitleaks": "Secrets",
-    "scanner.semgrep": "SAST",
+    "scanner.sast": "SAST",
     "nav.ignore_rules": "Regles d'exclusion",
     "ignore.title": "Regles d'exclusion",
     "ignore.add": "Ajouter une regle",
@@ -276,7 +279,7 @@ _registerTranslations("fr", {
         + "<tr><td>SCA (dépendances)</td><td>Trivy FS</td><td>CVE connues dans les dépendances déclarées (<code>requirements.txt</code>, <code>package.json</code>, <code>go.sum</code>, <code>Gemfile.lock</code>…)</td></tr>"
         + "<tr><td>Images de conteneurs</td><td>Trivy Image</td><td>CVE des paquets système (apt, apk) et des dépendances embarquées dans les couches d'image</td></tr>"
         + "<tr><td>Secrets</td><td>Gitleaks</td><td>Clés API, tokens, mots de passe et certificats commités, y compris dans l'historique Git</td></tr>"
-        + "<tr><td>SAST (code source)</td><td>Semgrep</td><td>Vulnérabilités dans le code : injections SQL, XSS, désérialisation non sécurisée, SSRF…</td></tr></table>"
+        + "<tr><td>SAST (code source)</td><td>Opengrep</td><td>Vulnérabilités dans le code : injections SQL, XSS, désérialisation non sécurisée, SSRF…</td></tr></table>"
         + "<h3>SCA — analyse de composition logicielle</h3>"
         + "<p>Chaque CVE remonte le package concerné, la version installée et, quand elle existe, la <em>version corrigée</em> publiée par l'éditeur. Cette information fonde la doctrine des <strong>quick wins</strong> : une CVE avec patch se corrige par une simple montée de version.</p>"
         + "<ul><li>Maintenir les dépendances à jour (Renovate, Dependabot)</li>"
@@ -291,7 +294,7 @@ _registerTranslations("fr", {
         + "<ul><li>Externaliser les secrets (fichiers <code>.env</code> gitignorés, gestionnaire de secrets type Vault)</li>"
         + "<li>Bloquer les commits contenant des secrets via un hook pre-commit</li></ul>"
         + "<h3>SAST — analyse statique du code</h3>"
-        + "<p>Semgrep applique des règles déclaratives issues des rulesets <strong>OWASP Top 10</strong>, default et spécifiques aux langages (Python, JavaScript, TypeScript). Le SAST produit structurellement plus de faux positifs que la SCA : un triage rapide et justifié est indispensable pour maintenir la confiance dans l'outil.</p>"
+        + "<p>Opengrep applique les règles de sécurité embarquées dans l'image — la collection opengrep-rules (LGPL 2.1 avec la Commons Clause), complétée de règles écrites pour CISO Toolbox — à tous les langages qu'elles couvrent (Python, JavaScript, TypeScript, Go, Java, PHP…) ; aucune règle n'est téléchargée au moment du scan. Le SAST produit structurellement plus de faux positifs que la SCA : un triage rapide et justifié est indispensable pour maintenir la confiance dans l'outil.</p>"
         + "<h2>3. Modèle de sévérité</h2>"
         + "<p>Les findings sont classés sur l'échelle harmonisée de la suite, dérivée du score CVSS :</p>"
         + "<table><tr><th>Niveau</th><th>CVSS indicatif</th><th>Traitement attendu</th></tr>"

@@ -50,7 +50,7 @@ class Application(Base):
     docker_images = Column(JSONB, default=list)
     image_token_encrypted = Column(Text, default="")
     scan_frequency_hours = Column(Integer, default=24)
-    enabled_scanners = Column(JSONB, default=lambda: ["trivy_fs", "gitleaks", "semgrep", "trivy_image"])
+    enabled_scanners = Column(JSONB, default=lambda: ["trivy_fs", "gitleaks", "sast", "trivy_image"])
     enabled = Column(Boolean, default=True, server_default=text("true"))
     criticality = Column(String(20), default="medium")
     owner_id = Column(UUID(as_uuid=True), nullable=True)
@@ -108,6 +108,11 @@ class Finding(Base):
     triage_notes = Column(Text, default="")
     # FEAT-45 — the approved derogation covering the finding while it is "derogated".
     derogation_id = Column(UUID(as_uuid=True), nullable=True)
+    # FEAT-52 — set when the move from Semgrep to Opengrep closes a Semgrep-era
+    # finding it could not carry over: kept (not purged, not reopened) for
+    # SAST_MIGRATION_KEEP_DAYS so its former verdict can still be read.
+    migration_closed_at = Column(DateTime(timezone=True), nullable=True)
+    migration_prev_status = Column(String(30), nullable=True)   # its status before
     last_seen_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))

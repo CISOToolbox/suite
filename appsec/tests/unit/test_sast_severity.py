@@ -5,7 +5,7 @@ not a defect: it rates low whatever its level. Everything else keeps the
 level mapping (ERROR → high, WARNING → medium, INFO → low)."""
 import pytest
 
-from src.scanners import semgrep_finding, semgrep_severity
+from src.scanners import sast_finding, sast_severity
 
 
 def extra(severity, likelihood=None, confidence=None):
@@ -30,22 +30,22 @@ def extra(severity, likelihood=None, confidence=None):
     ("error", "medium", "low", "low"),        # case-insensitive
     ("", "MEDIUM", "MEDIUM", "medium"),       # unknown level defaults to medium
 ])
-def test_semgrep_severity(severity, likelihood, confidence, expected):
-    assert semgrep_severity(extra(severity, likelihood, confidence)) == expected
+def test_sast_severity(severity, likelihood, confidence, expected):
+    assert sast_severity(extra(severity, likelihood, confidence)) == expected
 
 
 @pytest.mark.parametrize("metadata", [None, [], "LOW", 3])
 def test_malformed_metadata_keeps_the_level(metadata):
-    assert semgrep_severity({"severity": "ERROR", "metadata": metadata}) == "high"
+    assert sast_severity({"severity": "ERROR", "metadata": metadata}) == "high"
 
 
 def test_values_with_spaces_are_tolerated():
-    assert semgrep_severity({"severity": "WARNING", "metadata": {"likelihood": " MEDIUM ", "confidence": "low "}}) == "low"
+    assert sast_severity({"severity": "WARNING", "metadata": {"likelihood": " MEDIUM ", "confidence": "low "}}) == "low"
 
 
-def test_semgrep_finding_uses_the_tempered_severity():
+def test_sast_finding_uses_the_tempered_severity():
     match = {"check_id": "python.lang.security.eval", "path": "app/x.py",
              "start": {"line": 3}, "extra": extra("ERROR", "MEDIUM", "LOW")}
-    f = semgrep_finding(match, "app/x.py", "python.lang.security.eval", 3, {})
+    f = sast_finding(match, "app/x.py", "python.lang.security.eval", 3, {})
     assert f["severity"] == "low"
     assert f["evidence"]["metadata"] == {"likelihood": "MEDIUM", "confidence": "LOW"}

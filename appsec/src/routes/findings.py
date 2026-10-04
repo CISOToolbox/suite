@@ -43,7 +43,8 @@ async def list_findings(
     if severity:
         query = query.where(Finding.severity == severity)
     if scanner:
-        query = query.where(Finding.scanner == scanner)
+        from src.schemas import _SCANNER_ALIASES
+        query = query.where(Finding.scanner == _SCANNER_ALIASES.get(scanner, scanner))
     if status:
         query = query.where(Finding.status == status)
     if type:

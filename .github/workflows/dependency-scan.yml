@@ -42,20 +42,8 @@ env:
   #     Only fixed in quick-xml 0.41, which removes BytesText::unescape() and
   #     therefore needs a one-line source change in smb_scan_rs/rust/src/main.rs.
   #     Tracked as a follow-up.
-  #
-  #   GHSA-ffc3-869f-jxw9 and five more  (pyjwt 2.13.0, via semgrep)
-  #     semgrep pins `pyjwt~=2.13.0` in every release to date. It runs in its
-  #     own virtual environment (appsec/requirements-semgrep.txt), so the
-  #     application's authentication is on the fixed 2.15.0; appsec only
-  #     shells out to `semgrep scan` and never shares that environment.
-  #     Re-check whenever semgrep relaxes the pin.
   ALLOWLIST: >-
     RUSTSEC-2026-0194 RUSTSEC-2026-0195
-  # Cleared ONLY where semgrep's own environment is scanned: the same advisory
-  # in an application requirements file still blocks.
-  ALLOWLIST_SEMGREP: >-
-    GHSA-ffc3-869f-jxw9 GHSA-9j54-fg26-wv3r GHSA-9v7f-9g4p-ffgj
-    GHSA-p4g4-x82p-q773 GHSA-r6x4-923q-g947 GHSA-w2cx-738m-mc7w
 
 jobs:
   # ── Dependency drift: the 9 modules must stay on one set of versions ───────
@@ -110,7 +98,6 @@ jobs:
 
           threshold = float(os.environ["SEVERITY_THRESHOLD"])
           allowed = set(os.environ["ALLOWLIST"].split())
-          allowed_semgrep = set(os.environ["ALLOWLIST_SEMGREP"].split())
 
           results = pathlib.Path("osv-results.json")
           if not results.exists():
@@ -131,8 +118,7 @@ jobs:
                       label = ",".join(ids)
                       raw = group.get("max_severity", "")
                       # An allowlisted id or alias clears the whole group.
-                      scope = allowed | (allowed_semgrep if source.endswith("/appsec/requirements-semgrep.txt") else set())
-                      if scope.intersection(set(ids) | set(aliases)):
+                      if allowed.intersection(set(ids) | set(aliases)):
                           ignored.append(f"{source}: {name} {label}")
                           continue
                       try:
