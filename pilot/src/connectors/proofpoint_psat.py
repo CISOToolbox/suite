@@ -38,11 +38,13 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Any, Optional
 
 import httpx
-from sqlalchemy import select
+from sqlalchemy import delete, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.auth import SERVICE_TOKEN
-from src.models import AppSettings, KpiDefinition, KpiFrameworkMapping, MeasureCache, ModuleRegistry
+from src.models import (
+    AppSettings, KpiDefinition, KpiFrameworkMapping, MeasureCache, ModuleRegistry, Personnel, PsatAssignment,
+)
 from src.settings_crypto import decrypt_setting, is_secret_key
 
 logger = logging.getLogger("pilot.connectors.proofpoint_psat")
@@ -239,11 +241,17 @@ def _user_excluded(attrs: dict) -> bool:
 # ---------- Per-user completion model ------------------------------------- #
 #
 # Shape produced by both the real fetch and the demo synth:
-#   { email_lower: { "email": str,
+#   { email_lower: { "email": str, "first_name": str, "last_name": str,
 #                    "campaigns": { campaign_name: {"completed": bool,
-#                                                   "date": "YYYY-MM-DD"} } } }
+#                                                   "date": "YYYY-MM-DD",
+#                                                   "due": …, "sent": …,
+#                                                   "psat_status": str} } } }
 
-def _parse_training(records: list[dict], tracked: list[str]) -> dict[str, dict]:
+def _parse_training(records: list[dict], tracked: list[str],
+                    excluded: Optional[dict[str, dict]] = None) -> dict[str, dict]:
+    """Per-user completion. Excluded users (see ``_user_excluded``) do not
+    count: they are dropped, or collected into ``excluded`` (same shape) when
+    given — the CSV export lists them (FEAT-53)."""
     tracked_norm = {_norm(c) for c in tracked}
     users: dict[str, dict] = {}
     skipped_no_email = 0
@@ -256,8 +264,11 @@ def _parse_training(records: list[dict], tracked: list[str]) -> dict[str, dict]:
             continue
         if tracked_norm and _norm(campaign) not in tracked_norm:
             continue
+        target = users
         if _user_excluded(attrs):
-            continue  # inactive / removed / deleted user — not counted
+            if excluded is None:
+                continue  # inactive / removed / deleted user — not counted
+            target = excluded
         # `userassignmentstatus` is the authoritative per-user completion state
         # ("Completed", "Overdue - Completed", "Not Started"…). `assignmentstatus`
         # is a schedule-level flag that stays "Not Started" and must NOT be used.
@@ -265,8 +276,14 @@ def _parse_training(records: list[dict], tracked: list[str]) -> dict[str, dict]:
         date = _attr(attrs, "forcecompleteddate", "moduleattemptdate", "modulelastaction",
                      "completiondate", "datecompleted", "completedtimestamp")
         udue = _date_only(_attr(attrs, "assignmentduedate", "duedate"))
+        # When the user got the campaign: their own enrolment date if PSAT
+        # gives one, else the campaign start.
+        usent = _date_only(_attr(attrs, "userenrollmentdate", "enrollmentdate", "userassigneddate",
+                                 "assignmentstartdate", "startdate"))
         em = _norm(email)
-        u = users.setdefault(em, {"email": email, "campaigns": {}})
+        u = target.setdefault(em, {"email": email, "first_name": "", "last_name": "", "campaigns": {}})
+        u["first_name"] = u["first_name"] or str(_attr(attrs, "userfirstname", "firstname") or "")
+        u["last_name"] = u["last_name"] or str(_attr(attrs, "userlastname", "lastname") or "")
         # A curriculum spans several module rows per user — keep it completed once
         # any row says so, and don't lose a completion/due date already captured.
         prev = u["campaigns"].get(campaign)
@@ -281,7 +298,14 @@ def _parse_training(records: list[dict], tracked: list[str]) -> dict[str, dict]:
         cdate = max(new_date, prev_date) if (new_date or prev_date) else ""
         prev_due = prev.get("due") if prev else ""
         cdue = max(udue, prev_due) if (udue or prev_due) else ""
-        u["campaigns"][campaign] = {"completed": completed, "date": cdate, "due": cdue}
+        prev_sent = prev.get("sent") if prev else ""
+        csent = min(d for d in (usent, prev_sent) if d) if (usent or prev_sent) else ""
+        # The PSAT status shown is the one of the row that decides completion.
+        psat_status = str(status or "")
+        if prev and prev.get("completed") and not _is_completed(status):
+            psat_status = prev.get("psat_status", "")
+        u["campaigns"][campaign] = {"completed": completed, "date": cdate, "due": cdue,
+                                    "sent": csent, "psat_status": psat_status}
     if skipped_no_email:
         logger.info("PSAT: %d training records skipped (missing email/campaign)", skipped_no_email)
     return users
@@ -399,17 +423,21 @@ async def _demo_users(cfg: dict, campaigns: list[str], db: AsyncSession) -> dict
     """Build deterministic completion data from the Access referential so the
     connector is demoable without a live PSAT tenant. ~70% of users 'complete'
     each tracked campaign (stable per email+campaign)."""
-    emails = [u["email"] for u in await _fetch_access_referential(db) if u.get("email")]
+    people = [u for u in await _fetch_access_referential(db) if u.get("email")]
     today = datetime.now(timezone.utc).date()
+    sent = (today - timedelta(days=120)).isoformat()
     users: dict[str, dict] = {}
-    for email in emails:
+    for person in people:
+        email = person["email"]
         camps: dict[str, dict] = {}
         for campaign in campaigns:
             h = int(hashlib.sha256(f"{_norm(email)}|{_norm(campaign)}".encode()).hexdigest(), 16)
             completed = (h % 10) < 7
             day = today - timedelta(days=(h % 120))
-            camps[campaign] = {"completed": completed, "date": day.isoformat() if completed else ""}
-        users[_norm(email)] = {"email": email, "campaigns": camps}
+            camps[campaign] = {"completed": completed, "date": day.isoformat() if completed else "",
+                               "sent": sent, "psat_status": "Completed" if completed else "In Progress"}
+        users[_norm(email)] = {"email": email, "first_name": person.get("prenom") or "",
+                               "last_name": person.get("nom") or "", "campaigns": camps}
     logger.info("PSAT demo: synthesized completion for %d Access users", len(users))
     return users
 
@@ -646,6 +674,77 @@ async def _sync_measures(reporting: dict, db: AsyncSession) -> int:
     return len(active)
 
 
+# ---------- Per-user snapshot (FEAT-53: CSV export of a campaign) --------- #
+
+def _assignment_status(c: dict, today: str, excluded: bool = False) -> str:
+    """Status of one user on one campaign, by the KPI's own rules: late means
+    after the user's OWN due date."""
+    if excluded:
+        return "excluded"
+    due, done = c.get("due", ""), c.get("date", "")
+    if c.get("completed"):
+        return "completed_late" if (due and done and done > due) else "completed"
+    return "overdue" if (due and due < today) else "pending"
+
+
+def _build_assignments(users: dict[str, dict], excluded: dict[str, dict],
+                       campaigns: list[str], today: str) -> list[dict]:
+    """One row per (user, campaign) of the effective campaigns: the users the
+    KPI counts, then the excluded ones it does not (unless the same user also
+    counts for that campaign through another row)."""
+    wanted = {_norm(c) for c in campaigns}
+    rows: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+    for pool, is_excluded in ((users, False), (excluded, True)):
+        for em, u in pool.items():
+            for name, c in u["campaigns"].items():
+                key = (em, _norm(name))
+                if key[1] not in wanted or key in seen:
+                    continue
+                seen.add(key)
+                rows.append({
+                    "campaign": name, "email": u["email"],
+                    "last_name": u.get("last_name", ""), "first_name": u.get("first_name", ""),
+                    "sent_date": c.get("sent", ""), "due_date": c.get("due", ""),
+                    "completion_date": c.get("date", "") if c.get("completed") else "",
+                    "status": _assignment_status(c, today, is_excluded),
+                    "psat_status": c.get("psat_status", ""),
+                })
+    return rows
+
+
+_DIRECTORY_BATCH = 1000  # e-mails per lookup: asyncpg caps a query at 32 767 parameters
+
+
+async def _store_assignments(rows: list[dict], db: AsyncSession) -> int:
+    """Replace the per-user snapshot. A name PSAT does not give is taken from
+    the Pilot directory (same e-mail)."""
+    missing = sorted({_norm(r["email"]) for r in rows if not (r["last_name"] or r["first_name"])})
+    directory: dict[str, Personnel] = {}
+    for i in range(0, len(missing), _DIRECTORY_BATCH):
+        found = (await db.execute(
+            select(Personnel).where(func.lower(Personnel.email).in_(missing[i:i + _DIRECTORY_BATCH]))
+        )).scalars().all()
+        directory.update({_norm(p.email): p for p in found})
+    now = datetime.now(timezone.utc)
+    # Two syncs at once (a manual run during the scheduled one) would each
+    # delete only what they can see and both insert: serialise the writers.
+    # Readers (the export) are not blocked and see the previous snapshot.
+    await db.execute(text("LOCK TABLE psat_assignment IN EXCLUSIVE MODE"))
+    await db.execute(delete(PsatAssignment))
+    for r in rows:
+        p = directory.get(_norm(r["email"])) if not (r["last_name"] or r["first_name"]) else None
+        last, first = (p.nom or "", p.prenom or "") if p is not None else (r["last_name"], r["first_name"])
+        db.add(PsatAssignment(
+            campaign=r["campaign"][:500], email=r["email"][:255],
+            last_name=last[:255], first_name=first[:255],
+            sent_date=r["sent_date"], due_date=r["due_date"], completion_date=r["completion_date"],
+            status=r["status"], psat_status=r["psat_status"][:100], synced_at=now,
+        ))
+    await db.commit()
+    return len(rows)
+
+
 # ---------- KPIs (one per training campaign) ------------------------------ #
 
 _KPI_PREFIX = "psat.completion."
@@ -796,15 +895,26 @@ async def test_credentials(db: AsyncSession) -> tuple[bool, str]:
         return False, "Échec de connexion à l'API PSAT (voir les logs serveur)."
 
 
+def _live_campaigns(cfg: dict, meta: dict[str, dict], today: str) -> tuple[list[str], str]:
+    """Campaigns a live sync follows, or why it has none. The name filter
+    drives the discovery — empty, every current training — unless only an
+    explicit list is set, which is then followed as is."""
+    if cfg["tracked_campaigns"] and not cfg["campaign_filter"]:
+        return cfg["tracked_campaigns"], ""
+    found = _discover_campaigns(meta, cfg["campaign_filter"], today, cfg["retention_months"])
+    if found:
+        return found, ""
+    if not cfg["campaign_filter"]:
+        return [], "aucune formation en cours dans PSAT"
+    return [], f"aucune formation en cours ne correspond au filtre « {cfg['campaign_filter']} »"
+
+
 async def run_sync(db: AsyncSession) -> dict[str, Any]:
     """Pull training completion and push the Access awareness proof.
     Lot 2 (KPIs/panel) and Lot 3 (measures) hook in here later."""
     cfg = await get_config(db)
-    # No-op until configured — keeps the scheduled call harmless on a fresh
-    # install (and avoids demo-synth noise when nothing is set up).
-    if not cfg["tracked_campaigns"] and not cfg["campaign_filter"]:
-        return {"ok": False, "skipped": "not configured (no campaign filter or list)"}
-
+    # Live, an empty filter and no explicit list follow every training (same
+    # discovery rules); demo mode has nothing to discover from and needs a list.
     demo = not cfg["api_key"]
     today = datetime.now(timezone.utc).date().isoformat()
     meta: dict[str, dict] = {}
@@ -816,6 +926,7 @@ async def run_sync(db: AsyncSession) -> dict[str, Any]:
         if not effective:
             return {"ok": False, "skipped": "demo mode needs an explicit campaign list (no live data to discover from)"}
         users = await _demo_users(cfg, effective, db)
+        excluded: dict[str, dict] = {}
     else:
         try:
             records = await _fetch_all("/training", cfg)
@@ -833,13 +944,11 @@ async def run_sync(db: AsyncSession) -> dict[str, Any]:
             logger.warning("PSAT run live fetch error: %s", e)
             return {"ok": False, "error": "Échec de connexion à l'API PSAT (voir les logs serveur)."}
         meta = _campaign_meta(records)
-        if cfg["campaign_filter"]:
-            effective = _discover_campaigns(meta, cfg["campaign_filter"], today, cfg["retention_months"])
-            if not effective:
-                return {"ok": False, "skipped": f"aucune formation en cours ne correspond au filtre « {cfg['campaign_filter']} »"}
-        else:
-            effective = cfg["tracked_campaigns"]
-        users = _parse_training(records, effective)
+        effective, skipped = _live_campaigns(cfg, meta, today)
+        if skipped:
+            return {"ok": False, "skipped": skipped}
+        excluded = {}
+        users = _parse_training(records, effective, excluded)
 
     # Mandatory campaigns default to the whole effective set (the discovered /
     # tracked trainings) — no separate explicit list in the UI anymore. An
@@ -854,6 +963,15 @@ async def run_sync(db: AsyncSession) -> dict[str, Any]:
     # (2) Reporting — tenant-wide, per campaign + daily trend point.
     reporting = _build_reporting(users, effective, mandatory, today)
     await _store_detail(reporting, db)
+
+    # (2b) Per-user snapshot behind the KPI's CSV export.
+    try:
+        assignments: int | str = await _store_assignments(
+            _build_assignments(users, excluded, effective, today), db)
+    except Exception as e:  # noqa: BLE001 — the export lags, the KPIs must not
+        await db.rollback()
+        logger.warning("PSAT: per-user snapshot not stored: %s", e)
+        assignments = "error"
 
     # (3) KPIs — one completion KPI per tracked campaign (+ daily snapshot).
     kpis_synced = await _sync_kpis(reporting, db)
@@ -872,6 +990,7 @@ async def run_sync(db: AsyncSession) -> dict[str, Any]:
         "overdue_total": reporting["overdue_total"],
         "completed_late": sum(c["completed_late"] for c in reporting["campaigns"]),
         "kpis_synced": kpis_synced,
+        "assignments_stored": assignments,
         "measures_raised": measures_raised,
         "campaign_filter": cfg["campaign_filter"],
         "tracked_campaigns": effective,

@@ -371,6 +371,29 @@ class KpiSnapshot(Base):
 
 
 
+class PsatAssignment(Base):
+    """Per-user progress on a Proofpoint PSAT campaign (FEAT-53), as of the
+    last connector sync — the rows behind the awareness KPI, excluded users
+    included. Replaced as a whole on every successful sync; read by the CSV
+    export of the KPI detail."""
+    __tablename__ = "psat_assignment"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()"))
+    campaign = Column(String(500), nullable=False)
+    email = Column(String(255), nullable=False)
+    last_name = Column(String(255), nullable=False, default="")
+    first_name = Column(String(255), nullable=False, default="")
+    sent_date = Column(String(10), nullable=False, default="")        # ISO dates, "" when unknown
+    due_date = Column(String(10), nullable=False, default="")
+    completion_date = Column(String(10), nullable=False, default="")
+    # completed | completed_late | overdue | pending | excluded
+    status = Column(String(20), nullable=False)
+    psat_status = Column(String(100), nullable=False, default="")     # userassignmentstatus, as PSAT returns it
+    synced_at = Column(DateTime(timezone=True), nullable=False)
+
+    # The export looks a campaign up as the KPI names it, regardless of case.
+    __table_args__ = (Index("ix_psat_assignment_campaign", text("lower(trim(campaign))")),)
+
+
 # ── Append-only server-side write journal (FEAT-30 P1.6) ──────────────
 # Created by Base.metadata.create_all at startup (no migration needed for
 # a new table). Written via src.audit.log_write — see audit_common.
