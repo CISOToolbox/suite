@@ -1,0 +1,43 @@
+# Python packages bundled in the Opengrep 1.30.0 release binary.
+#
+# The release workflow (.github/workflows/build-manylinux-binary.yml at tag
+# v1.30.0) installs the opengrep wheel — the bounds of cli/setup.py — plus
+# chardet and charset-normalizer, and compiles them with Nuitka; cli/Pipfile.lock
+# is NOT what it ships. Reproduced by resolving the same requirements at the
+# release date:
+#   uv pip compile <cli/setup.py install_requires + chardet, charset-normalizer> \
+#     --exclude-newer 2026-09-07T11:00:00Z --python-version 3.13 \
+#     --python-platform aarch64-manylinux_2_28
+# then cross-checked against the __version__ strings compiled into
+# opengrep.bin (click, requests, jsonschema, peewee, ruamel.yaml, certifi,
+# face, click-option-group, urllib3, chardet: all match). protobuf and
+# setuptools are installed by the workflow but not compiled in, so not listed.
+# The x86_64 binary is built in the same run; a version may still differ.
+# Re-derive with every OPENGREP_VERSION bump.
+attrs==26.1.0
+boltons==21.0.0
+bracex==3.0.1
+certifi==2026.7.22
+chardet==7.6.0
+charset-normalizer==3.5.1
+click==8.5.0
+click-option-group==0.5.9
+colorama==0.4.6
+face==26.0.1
+glom==22.1.0
+idna==3.19
+jsonschema==4.26.0
+jsonschema-specifications==2025.9.1
+markdown-it-py==4.2.0
+mdurl==0.1.2
+packaging==26.3
+peewee==3.19.0
+pygments==2.21.0
+referencing==0.37.0
+requests==2.34.2
+rich==13.5.3
+rpds-py==2026.6.3
+ruamel-yaml==0.19.1
+typing-extensions==4.16.0
+urllib3==2.7.0
+wcmatch==8.5.2
