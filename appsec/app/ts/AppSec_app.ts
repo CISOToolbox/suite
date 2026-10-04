@@ -101,7 +101,7 @@ var _APPSEC_TONES: Record<string, string> = {
     // scan statuses
     pending: "info", running: "info", completed: "low", failed: "critical", skipped: "neutral",
     // scanners (identity, not severity)
-    trivy_fs: "info", trivy_image: "accent", gitleaks: "critical", semgrep: "low",
+    trivy_fs: "info", trivy_image: "accent", gitleaks: "critical", sast: "low",
     // application criticality
     low: "low", medium: "medium", high: "high", critical: "critical",
 };
@@ -563,7 +563,7 @@ async function _renderAppDetail(c: HTMLElement): Promise<void> {
         { v: "trivy_fs",    l: _scannerLabel("trivy_fs") },
         { v: "trivy_image", l: _scannerLabel("trivy_image") },
         { v: "gitleaks",    l: _scannerLabel("gitleaks") },
-        { v: "semgrep",     l: _scannerLabel("semgrep") }
+        { v: "sast",        l: _scannerLabel("sast") }
     ].forEach(function(o) {
         var scCls = o.v ? " scanner-pill-specific" : "";
         var on = adf.scanner === o.v ? " active" : "";
@@ -667,13 +667,13 @@ function _showAppModal(app: AppSecApp | null): void {
     var overlay = document.getElementById("app-modal-overlay")!;
     var modal = document.getElementById("app-modal")!;
 
-    var enabled = isEdit ? (app!.enabled_scanners || []) : ["trivy_fs", "gitleaks", "semgrep", "trivy_image"];
+    var enabled = isEdit ? (app!.enabled_scanners || []) : ["trivy_fs", "gitleaks", "sast", "trivy_image"];
     var critOptions = ["critical", "high", "medium", "low"];
 
     var codeScanners = [
         {id: "trivy_fs", label: _scannerLabel("trivy_fs")},
         {id: "gitleaks", label: _scannerLabel("gitleaks")},
-        {id: "semgrep", label: _scannerLabel("semgrep")},
+        {id: "sast", label: _scannerLabel("sast")},
     ];
     var imageEnabled = enabled.indexOf("trivy_image") >= 0;
 
@@ -853,7 +853,7 @@ function _renderFindings(c: HTMLElement): void {
         { v: "trivy_fs",    l: _scannerLabel("trivy_fs") },
         { v: "trivy_image", l: _scannerLabel("trivy_image") },
         { v: "gitleaks",    l: _scannerLabel("gitleaks") },
-        { v: "semgrep",     l: _scannerLabel("semgrep") }
+        { v: "sast",        l: _scannerLabel("sast") }
     ].forEach(function(o) {
         var on = f.scanner === o.v ? " active" : "";
         var scCls = o.v ? " scanner-pill-specific" : "";
@@ -1183,6 +1183,16 @@ async function _renderFindingDetail(c: HTMLElement): Promise<void> {
                 value: inst,
             });
         }
+    }
+
+    // FEAT-52 — closed by the move to Opengrep: say so, with its status then,
+    // so the former verdict can be read when the new finding is qualified.
+    if (f.migration_closed_at) {
+        var prev = f.migration_prev_status ? (t("findings.status_" + f.migration_prev_status) || f.migration_prev_status) : "";
+        extraRows.push({
+            label: t("findings.engine_change"),
+            value: prev ? t("findings.engine_change_was").replace("{status}", prev) : t("findings.engine_change_closed"),
+        });
     }
 
     var fd = Object.assign({}, f, { title: _findingTitle(f), description: _findingDesc(f) });

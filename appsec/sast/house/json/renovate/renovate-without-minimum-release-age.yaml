@@ -1,0 +1,29 @@
+rules:
+  - id: renovate-without-minimum-release-age
+    languages: [json]
+    severity: INFO
+    message: >-
+      This Renovate configuration sets no `minimumReleaseAge`: an update is
+      proposed as soon as it is published. A waiting period (e.g. "14 days")
+      leaves time for a compromised or broken release to be found and pulled
+      before it reaches the project.
+    paths:
+      include:
+        - "renovate.json"
+        - ".renovaterc"
+        - ".renovaterc.json"
+        - ".github/renovate.json"
+    patterns:
+      - pattern: "{...}"
+      - pattern-not: '{..., "minimumReleaseAge": $AGE, ...}'
+      - pattern-not-inside: '{..., $KEY: {...}, ...}'
+      - pattern-not-inside: '[...]'
+    metadata:
+      category: security
+      subcategory: [audit]
+      cwe: ["CWE-1357: Reliance on Insufficiently Trustworthy Component"]
+      confidence: MEDIUM
+      likelihood: LOW
+      impact: MEDIUM
+      references:
+        - https://docs.renovatebot.com/configuration-options/#minimumreleaseage

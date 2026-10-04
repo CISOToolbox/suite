@@ -1,0 +1,29 @@
+rules:
+  - id: first-party-action-not-pinned-to-sha
+    languages: [yaml]
+    severity: WARNING
+    message: >-
+      `$USES` runs a GitHub-owned action or workflow at a movable reference (a
+      tag or a branch). Pin it to the full 40-character commit SHA, the version
+      in a comment beside it: a tag can be moved, and a moved or compromised tag
+      changes what every workflow using it runs.
+    paths:
+      include:
+        - ".github/workflows/*.yml"
+        - ".github/workflows/*.yaml"
+        - "action.yml"
+        - "action.yaml"
+    patterns:
+      - pattern: "uses: $USES"
+      - metavariable-regex:
+          metavariable: $USES
+          regex: '^(actions|github)/[^@\s]+@(?![0-9a-fA-F]{40}$)\S+$'
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-829: Inclusion of Functionality from Untrusted Control Sphere"]
+      confidence: HIGH
+      likelihood: LOW
+      impact: HIGH
+      references:
+        - https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions#using-third-party-actions

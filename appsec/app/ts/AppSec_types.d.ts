@@ -60,6 +60,9 @@ type AppSecFinding = {
     measure_id?: string | null;
     /** FEAT-45 — set while the finding is under an approved derogation. */
     derogation_id?: string | null;
+    /** FEAT-52 — closed by the move from Semgrep to Opengrep, and its status then. */
+    migration_closed_at?: string | null;
+    migration_prev_status?: string | null;
     created_at?: string;
     last_seen_at?: string;
     triaged_at?: string;

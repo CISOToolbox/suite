@@ -612,60 +612,145 @@ def run_gitleaks(repo_dir: str, app_id: str, scan_paths: list[str] | None = None
 
 
 # ═══════════════════════════════════════════════════════════════
-# SEMGREP — SAST
+# SAST — Opengrep on embedded rules
 # ═══════════════════════════════════════════════════════════════
 
-def run_semgrep(repo_dir: str, app_id: str, scan_paths: list[str] | None = None) -> list[dict]:
+# Built into the image (Dockerfile, sast/prepare_rules.py), never fetched at
+# scan time: rules/ = the opengrep-rules snapshot (LGPL 2.1 + Commons Clause,
+# LICENSE beside it), house/ = CISO Toolbox's own rules, index.json = each
+# local rule id → the name it has in the public registry.
+SAST_RULES_DIR = os.environ.get("SAST_RULES_DIR", "/opt/sast-rules")
+_SAST_INDEX: dict[str, str] | None = None
+
+
+def _sast_index() -> dict[str, str]:
+    global _SAST_INDEX
+    if _SAST_INDEX is None:
+        try:
+            with open(os.path.join(SAST_RULES_DIR, "index.json"), encoding="utf-8") as fh:
+                _SAST_INDEX = json.load(fh)
+        except (OSError, ValueError) as e:
+            logger.warning("sast: no rule index (%s), rule ids kept as reported", e)
+            _SAST_INDEX = {}
+    return _SAST_INDEX
+
+
+def sast_rule_id(check_id: str) -> str:
+    """One name per rule whatever the engine. Opengrep names a local rule
+    `<dirs>.<rule id>`; the registry — and every finding recorded until now —
+    `<dirs>.<file>.<rule id>`. The index maps the former to the latter, so a
+    rule keeps its name and a former finding can be recognised."""
+    return _sast_index().get(check_id, check_id)
+
+
+def run_sast(repo_dir: str, app_id: str, scan_paths: list[str] | None = None) -> list[dict]:
     if scan_paths:
         merged: list[dict] = []
         for sp in scan_paths:
             target = _safe_scan_target(repo_dir, sp)
             if not target:
                 continue
-            merged.extend(run_semgrep(target, app_id, scan_paths=None))
+            merged.extend(run_sast(target, app_id, scan_paths=None))
         return merged
-    cmd = ["semgrep", "scan", "--json", "--config", "p/default", "--config", "p/owasp-top-ten",
-           "--config", "p/javascript", "--config", "p/typescript", "--config", "p/python", repo_dir]
+    rule_dirs = [d for d in ("rules", "house") if os.path.isdir(os.path.join(SAST_RULES_DIR, d))]
+    if not rule_dirs:
+        raise RuntimeError(f"no SAST rules in {SAST_RULES_DIR}")
+    cmd = ["opengrep", "scan", "--json", "--disable-version-check"]
+    for d in rule_dirs:
+        cmd += ["-f", d]
+    cmd.append(os.path.abspath(repo_dir))
     try:
+        # cwd = the rules root: rule ids come out relative to it (rules.…, house.…).
+        # Opengrep unpacks its runtime (~250 MB) under $HOME/.cache and runs
+        # it from there: HOME when it is writable (the appsec-cache volume in
+        # the suite compose, kept across restarts), else /tmp — never a noexec
+        # mount. LANG: its bundled Python reads rule files in the locale's
+        # encoding, and the image sets no locale (ASCII chokes on the first
+        # non-ASCII rule).
+        home = os.environ.get("HOME", "")
+        if not (home and os.access(home, os.W_OK)):
+            home = tempfile.gettempdir()
+        env = {**os.environ, "HOME": home, "LANG": "C.UTF-8"}
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=SCAN_TIMEOUT,
-                                env={**os.environ, "SEMGREP_SEND_METRICS": "off"})
-        logger.info("semgrep exit=%d stdout=%d stderr=%d", result.returncode, len(result.stdout or ""), len(result.stderr or ""))
+                                cwd=SAST_RULES_DIR, env=env)
+        logger.info("opengrep exit=%d stdout=%d stderr=%d", result.returncode,
+                    len(result.stdout or ""), len(result.stderr or ""))
         if not result.stdout or not result.stdout.strip():
             msg = (result.stderr or "unknown error")[:500]
-            logger.warning("semgrep produced no stdout. stderr: %s", msg)
-            raise RuntimeError(f"semgrep failed (exit {result.returncode}): {msg}")
+            logger.warning("opengrep produced no stdout. stderr: %s", msg)
+            raise RuntimeError(f"opengrep failed (exit {result.returncode}): {msg}")
         data = json.loads(result.stdout)
     except RuntimeError:
         raise
     except json.JSONDecodeError as e:
-        logger.error("semgrep JSON parse error: %s — stdout[:200]: %s", e, (result.stdout or "")[:200])
-        raise RuntimeError(f"semgrep JSON parse error: {e}")
+        logger.error("opengrep JSON parse error: %s — stdout[:200]: %s", e, (result.stdout or "")[:200])
+        raise RuntimeError(f"opengrep JSON parse error: {e}")
     except Exception as e:
-        logger.error("semgrep error: %s", e)
-        raise RuntimeError(f"semgrep error: {e}")
+        logger.error("opengrep error: %s", e)
+        raise RuntimeError(f"opengrep error: {e}")
 
     findings = []
     _seen: dict[str, int] = {}
+    _files: dict[str, bytes | None] = {}
+    root = os.path.abspath(repo_dir)
     for match in data.get("results", []):
-        rule_id = match.get("check_id", "unknown")
-        filepath = match.get("path", "")
-        if filepath.startswith(repo_dir):
-            filepath = filepath[len(repo_dir):].lstrip("/")
+        rule_id = sast_rule_id(match.get("check_id", "unknown"))
+        source_path = match.get("path", "")
+        filepath = source_path
+        if filepath.startswith(root):
+            filepath = filepath[len(root):].lstrip("/")
         line = match.get("start", {}).get("line", 0)
-        findings.append(semgrep_finding(match, filepath, rule_id, line, _seen))
+        code = _sast_matched_code(source_path, match, _files)
+        findings.append(sast_finding(match, filepath, rule_id, line, _seen, code=code))
     return findings
 
 
-SEMGREP_SEVERITY = {"ERROR": "high", "WARNING": "medium", "INFO": "low"}
+_SAST_MAX_FILE = 5 * 1024 * 1024
 
 
-def semgrep_severity(extra: dict) -> str:
-    """Severity of a semgrep match: the rule's level (ERROR/WARNING/INFO),
+def _sast_matched_code(source_path: str, match: dict,
+                          cache: dict[str, bytes | None]) -> str:
+    """The source lines a SAST match spans (start.line … end.line), read
+    from the scanned file: whole lines, like the engine's own `extra.lines`, so
+    the evidence reads as code and two matches on one token in different
+    statements stay apart. '' when the file cannot be read — logged, since the
+    caller then falls back to telling same-rule matches apart by their order."""
+    if source_path not in cache:
+        try:
+            with open(source_path, "rb") as fh:
+                data = fh.read(_SAST_MAX_FILE + 1)
+            if len(data) > _SAST_MAX_FILE:
+                logger.warning("sast: %s exceeds %d bytes, its findings fall back "
+                               "to positional identity", source_path, _SAST_MAX_FILE)
+                data = None
+            cache[source_path] = data
+        except OSError as e:
+            logger.warning("sast: cannot read %s (%s), its findings fall back "
+                           "to positional identity", source_path, e)
+            cache[source_path] = None
+    data = cache[source_path]
+    if not data:
+        return ""
+    start, end = match.get("start", {}) or {}, match.get("end", {}) or {}
+    s_line, e_line = start.get("line"), end.get("line") or start.get("line")
+    if not (isinstance(s_line, int) and isinstance(e_line, int) and 1 <= s_line <= e_line):
+        return ""
+    lines = data.decode("utf-8", "replace").splitlines()
+    return "\n".join(lines[s_line - 1:e_line])
+
+
+
+
+SAST_SEVERITY = {"ERROR": "high", "WARNING": "medium", "INFO": "low"}
+
+
+def sast_severity(extra: dict) -> str:
+    """Severity of a SAST match: the rule's level (ERROR/WARNING/INFO),
     tempered by the rule metadata. A rule that is itself unsure of its
     match — confidence LOW — with a likelihood no better than MEDIUM is a
     lead to check, not a defect to fix: it rates low whatever its level.
     Likelihood HIGH keeps the level even at low confidence."""
-    base = SEMGREP_SEVERITY.get(str(extra.get("severity", "")).upper(), "medium")
+    base = SAST_SEVERITY.get(str(extra.get("severity", "")).upper(), "medium")
     meta = extra.get("metadata")
     if not isinstance(meta, dict):        # a malformed rule never breaks the scan
         meta = {}
@@ -676,20 +761,23 @@ def semgrep_severity(extra: dict) -> str:
     return base
 
 
-def semgrep_finding(match: dict, filepath: str, rule_id: str, line: int,
-                    seen: dict[str, int]) -> dict:
-    """Normalize one semgrep match. Pure — the identity tests call this."""
+def sast_finding(match: dict, filepath: str, rule_id: str, line: int,
+                 seen: dict[str, int], code: str = "") -> dict:
+    """Normalize one SAST match. Pure — the identity tests call this.
+
+    The identity is a digest of `code`, the whole source lines the match
+    spans, whitespace collapsed so a re-indentation keeps it — never the
+    engine's fingerprint: changing engine or version must not change a key,
+    and engines have shipped placeholders (Semgrep OSS: "requires login") or
+    one fingerprint for several matches."""
     extra = match.get("extra", {}) or {}
-    snippet = extra.get("lines", "") or ""
-    # Semgrep ships its own syntactic fingerprint, built for exactly this
-    # (stable across line moves). Fall back to hashing the matched lines
-    # when the field is absent (older semgrep, or a rule that omits it).
-    sid = extra.get("fingerprint", "") or _code_id(rule_id, snippet)
+    snippet = code or ""
+    sid = _code_id(rule_id, " ".join(snippet.split()))
     occ = _dedup_index(seen, f"{filepath}|{rule_id}|{sid}")
     return {
-        "scanner": "semgrep",
+        "scanner": "sast",
         "type": "sast",
-        "severity": semgrep_severity(extra),
+        "severity": sast_severity(extra),
         "title": f"{rule_id}",
         "description": (extra.get("message", "") or "")[:3000],
         # The line is WHERE to look — kept in target and evidence, refreshed on
@@ -702,7 +790,7 @@ def semgrep_finding(match: dict, filepath: str, rule_id: str, line: int,
             "lines": snippet[:500],
             "metadata": extra.get("metadata", {}),
         },
-        "dedup_key": f"semgrep|sast|{filepath}|{rule_id}|{sid}{occ}".lower(),
+        "dedup_key": f"sast|{filepath}|{rule_id}|{sid}{occ}".lower(),
     }
 
 
@@ -714,5 +802,5 @@ SCANNERS = {
     "trivy_fs": run_trivy_fs,
     "trivy_image": run_trivy_image,
     "gitleaks": run_gitleaks,
-    "semgrep": run_semgrep,
+    "sast": run_sast,
 }

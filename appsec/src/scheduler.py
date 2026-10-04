@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database import async_session
 from src.models import Application, Finding, ScanJob, SBOMEntry
-from src.findings_dedup import upsert_findings
+from src.findings_dedup import LEGACY_SAST_PREFIX, upsert_findings
 from src.scanners import _clone_repo, _cleanup, get_remote_head, SCANNERS, run_trivy_fs, run_trivy_image, SCAN_TIMEOUT
 
 logger = logging.getLogger("appsec-scheduler")
@@ -170,7 +170,7 @@ async def _run_single_scanner(
                     all_findings.extend(img_findings)
                     sbom_data.extend(img_sbom)
                     scanner_ran = True
-            elif scanner_name in ("gitleaks", "semgrep") and repo_dir:
+            elif scanner_name in ("gitleaks", "sast") and repo_dir:
                 func = SCANNERS.get(scanner_name)
                 if func:
                     findings = await asyncio.to_thread(
@@ -272,7 +272,7 @@ async def _do_scan_locked(app_id: uuid.UUID, force: bool, triggered_by: str) -> 
 
         scanners = app.enabled_scanners or []
         repo_dir = None
-        needs_repo = any(s in scanners for s in ("trivy_fs", "gitleaks", "semgrep"))
+        needs_repo = any(s in scanners for s in ("trivy_fs", "gitleaks", "sast"))
         has_image_scan = "trivy_image" in scanners and (app.docker_images or [])
 
         # Check if repo has new commits since last scan
@@ -286,7 +286,7 @@ async def _do_scan_locked(app_id: uuid.UUID, force: bool, triggered_by: str) -> 
                 # had nothing to do. Without these rows, scheduler runs
                 # would be invisible in the UI between real scans.
                 skipped_scanners = [s for s in scanners
-                                    if s in ("trivy_fs", "gitleaks", "semgrep")]
+                                    if s in ("trivy_fs", "gitleaks", "sast")]
                 now = datetime.now(timezone.utc)
                 skip_reason = f"No new commits since last scan (HEAD={remote_head[:8]})"
                 for scanner_name in skipped_scanners:
@@ -315,24 +315,17 @@ async def _do_scan_locked(app_id: uuid.UUID, force: bool, triggered_by: str) -> 
                             .values(last_seen_at=now)
                         )
                         # Reopen "fixed" findings — no commit means no fix
-                        reopened = await touch_db.execute(
-                            sa_update(Finding)
-                            .where(Finding.application_id == app.id,
-                                   Finding.status == "fixed")
-                            .values(status="new", last_seen_at=now,
-                                    triaged_at=None, triaged_by=None,
-                                    triage_notes="")
-                        )
-                        if reopened.rowcount:
+                        reopened = await _reopen_fixed(touch_db, app.id, now)
+                        if reopened:
                             logger.info("Reopened %d fixed finding(s) for %s (no new commits)",
-                                        reopened.rowcount, app.name)
+                                        reopened, app.name)
                         app_ref = await touch_db.get(Application, app.id)
                         if app_ref:
                             app_ref.last_scan_at = now
                         await touch_db.commit()
                     return
                 # Only image scans needed, skip repo scanners
-                scanners = [s for s in scanners if s not in ("trivy_fs", "gitleaks", "semgrep")]
+                scanners = [s for s in scanners if s not in ("trivy_fs", "gitleaks", "sast")]
                 needs_repo = False
 
         try:
@@ -343,7 +336,7 @@ async def _do_scan_locked(app_id: uuid.UUID, force: bool, triggered_by: str) -> 
                     )
                 except RuntimeError as clone_err:
                     logger.error("Clone failed for %s: %s", app.name, clone_err)
-                    for scanner_name in [s for s in scanners if s in ("trivy_fs", "gitleaks", "semgrep")]:
+                    for scanner_name in [s for s in scanners if s in ("trivy_fs", "gitleaks", "sast")]:
                         job = ScanJob(
                             id=uuid.uuid4(), application_id=app.id, scanner=scanner_name,
                             status="failed", started_at=datetime.now(timezone.utc),
@@ -412,7 +405,7 @@ async def _close_unseen_findings(db: AsyncSession, app_id: uuid.UUID,
     worth keeping, ``upsert_findings`` already reopens a ``fixed`` finding
     if it comes back, and the retention pass purges them later.
 
-    Scoped to ONE scanner: a semgrep run must not close SCA findings. Only
+    Scoped to ONE scanner: a SAST run must not close SCA findings. Only
     ever called on the success path, and only when the scanner actually
     inspected something.
 
@@ -421,18 +414,39 @@ async def _close_unseen_findings(db: AsyncSession, app_id: uuid.UUID,
     a finding is about one package AT one version.
     """
     from sqlalchemy import update as sa_update
-    result = await db.execute(
-        sa_update(Finding)
-        .where(Finding.application_id == app_id,
-               Finding.scanner == scanner_name,
-               Finding.status.notin_(["fixed", "derogated"]),    # FEAT-45: a live derogation is not closed by silence
-               Finding.last_seen_at < scan_started)
-        .values(status="fixed", updated_at=datetime.now(timezone.utc))
+    now = datetime.now(timezone.utc)
+    unseen = (Finding.application_id == app_id,
+              Finding.scanner == scanner_name,
+              Finding.status.notin_(["fixed", "derogated"]),    # FEAT-45: a live derogation is not closed by silence
+              Finding.last_seen_at < scan_started)
+    # FEAT-52 — a Semgrep-era SAST finding the first Opengrep scan did not
+    # carry over is closed — even under a derogation: its code now has its own
+    # finding — and marked, its former status kept beside it: readable, not
+    # purged, not reopened, for SAST_MIGRATION_KEEP_DAYS; never a candidate
+    # for the carry-over again.
+    marked = await db.execute(
+        sa_update(Finding).where(
+            Finding.application_id == app_id,
+            Finding.scanner == scanner_name,
+            Finding.dedup_key.startswith(LEGACY_SAST_PREFIX, autoescape=True),
+            Finding.migration_closed_at.is_(None),
+            Finding.status != "fixed",
+            Finding.last_seen_at < scan_started)
+        .values(migration_prev_status=Finding.status, status="fixed",
+                updated_at=now, migration_closed_at=now)
     )
-    if result.rowcount:
+    result = await db.execute(
+        sa_update(Finding).where(*unseen)
+        .values(status="fixed", updated_at=now)
+    )
+    if marked.rowcount:
+        logger.info("Closed %d Semgrep-era finding(s) not carried over for app %s "
+                    "(kept %d days)", marked.rowcount, app_id, SAST_MIGRATION_KEEP_DAYS)
+    closed = (result.rowcount or 0) + (marked.rowcount or 0)
+    if closed:
         logger.info("Closed %d finding(s) no longer reported by %s for app %s",
-                    result.rowcount, scanner_name, app_id)
-    return result.rowcount or 0
+                    closed, scanner_name, app_id)
+    return closed
 
 
 async def _upsert_sbom(db: AsyncSession, app_id: uuid.UUID, entries: list[dict]) -> None:
@@ -498,7 +512,7 @@ async def _tick() -> None:
             now = datetime.now(timezone.utc)
             # Pull all enabled apps whose last scan is older than the tick
             # window, then keep the ones that have something scannable:
-            # either a repo URL (for trivy_fs / gitleaks / semgrep) or at
+            # either a repo URL (for trivy_fs / gitleaks / sast) or at
             # least one docker image (for trivy_image). Filtering on
             # repo_url alone would silently ignore image-only apps.
             result = await db.execute(
@@ -538,7 +552,33 @@ async def _tick() -> None:
 
 
 PURGE_INTERVAL = timedelta(hours=24)
+SAST_MIGRATION_KEEP_DAYS = 30
 _last_purge: datetime | None = None
+
+
+def _purgeable(now: datetime):
+    """Fixed findings the retention pass deletes. FEAT-52: a Semgrep-era
+    finding closed by the engine change is kept SAST_MIGRATION_KEEP_DAYS, so
+    its former verdict can still be read."""
+    return (Finding.status == "fixed") & (
+        Finding.migration_closed_at.is_(None)
+        | (Finding.migration_closed_at < now - timedelta(days=SAST_MIGRATION_KEEP_DAYS)))
+
+
+async def _reopen_fixed(db: AsyncSession, app_id: uuid.UUID, now: datetime) -> int:
+    """No new commit since the last scan: a "fixed" finding cannot have been
+    fixed, so it reopens — except a Semgrep-era finding the engine change
+    closed (FEAT-52), which stays closed."""
+    from sqlalchemy import update as sa_update
+    reopened = await db.execute(
+        sa_update(Finding)
+        .where(Finding.application_id == app_id,
+               Finding.status == "fixed",
+               Finding.migration_closed_at.is_(None))
+        .values(status="new", last_seen_at=now,
+                triaged_at=None, triaged_by=None, triage_notes="")
+    )
+    return reopened.rowcount or 0
 
 
 async def _purge() -> None:
@@ -556,8 +596,9 @@ async def _purge() -> None:
             #    First nullify measure FK so measures are preserved.
             from src.models import Measure
             from sqlalchemy import update as sa_update
+            purgeable = _purgeable(now)
             fixed_ids_q = await db.execute(
-                select(Finding.id).where(Finding.status == "fixed")
+                select(Finding.id).where(purgeable)
             )
             fixed_ids = [row[0] for row in fixed_ids_q]
             if fixed_ids:
@@ -567,7 +608,7 @@ async def _purge() -> None:
                     ).values(finding_id=None)
                 )
             r1 = await db.execute(
-                sa_delete(Finding).where(Finding.status == "fixed")
+                sa_delete(Finding).where(purgeable)
             )
             # 2. Scan jobs older than 30 days (completed or failed only)
             r2 = await db.execute(

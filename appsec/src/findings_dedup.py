@@ -17,6 +17,7 @@ async def upsert_findings(
 ) -> dict[str, int]:
     stats = {"inserted": 0, "refreshed": 0, "reopened": 0, "silenced": 0}
     now = datetime.now(timezone.utc)
+    legacy = await _plan_legacy_semgrep(db, application_id, raw_findings)
 
     for raw in raw_findings:
         dedup_key = raw.get("dedup_key", "")
@@ -30,6 +31,11 @@ async def upsert_findings(
             )
         )
         existing = result.scalar_one_or_none()
+        if existing is None:
+            existing = legacy.get(dedup_key)
+            if existing is not None:
+                existing.dedup_key = dedup_key
+                stats["rekeyed"] = stats.get("rekeyed", 0) + 1
 
         # The line moves even when the finding does not: refresh it whatever
         # the status, or the UI would keep pointing at where the code used to
@@ -100,3 +106,78 @@ async def upsert_findings(
 
     await db.flush()
     return stats
+
+
+LEGACY_SAST_PREFIX = "semgrep|sast|"
+
+
+async def _plan_legacy_semgrep(db: AsyncSession, application_id: uuid.UUID,
+                               raw_findings: list[dict]) -> dict[str, Finding]:
+    """New SAST key → the row that finding had under its Semgrep-era key.
+
+    Semgrep-era findings were keyed `semgrep|sast|<file>|<rule>|<id><n>`, the
+    id being Semgrep's fingerprint — the placeholder "requires login" in its
+    OSS edition, so told apart by their order only. SAST findings (Opengrep) are keyed
+    `sast|<file>|<rule>|<digest of the matched lines>`, the rule under its
+    registry name — the one those former keys carry. To
+    keep each one's status and links (measures, derogations, non-conformities)
+    rather than closing it and opening a twin, the first scan carries each
+    former row over — decided over the whole scan, never match by match:
+
+      1. a match at the same place (file:line) as exactly one former row of
+         its file and rule takes it;
+      2. otherwise, only when the scan has a single match for that file and
+         rule and a single former row is left, that match takes it.
+
+    Anything else gets a new finding and the former row is closed by the
+    scan: a guess could hand one finding's verdict to another, for good.
+
+    Only rows still undecided are candidates: after the first SAST scan every
+    former row is either carried over (its key is no longer a Semgrep-era one)
+    or closed and marked (`migration_closed_at`), so a later scan can never
+    hand a former verdict — a derogation, say — to code written since.
+    """
+    rows = (await db.execute(
+        select(Finding).where(
+            Finding.application_id == application_id,
+            Finding.dedup_key.startswith(LEGACY_SAST_PREFIX, autoescape=True),
+            Finding.migration_closed_at.is_(None),
+            Finding.status != "fixed",
+        )
+    )).scalars().all()
+    if not rows:
+        return {}
+    by_group: dict[str, list[Finding]] = {}
+    for r in rows:
+        by_group.setdefault(r.dedup_key.rsplit("|", 1)[0], []).append(r)
+
+    raws: dict[str, list[dict]] = {}
+    for raw in raw_findings:
+        ev = raw.get("evidence") or {}
+        if raw.get("scanner") != "sast" or not raw.get("dedup_key"):
+            continue
+        if not ev.get("file") or not ev.get("rule_id"):
+            continue
+        group = f"{LEGACY_SAST_PREFIX}{ev['file']}|{ev['rule_id']}".lower()
+        if group in by_group:
+            raws.setdefault(group, []).append(raw)
+    keys = [r["dedup_key"] for group in raws.values() for r in group]
+    known = set((await db.execute(
+        select(Finding.dedup_key).where(Finding.application_id == application_id,
+                                        Finding.dedup_key.in_(keys))
+    )).scalars().all()) if keys else set()
+
+    plan: dict[str, Finding] = {}
+    for group, matches in raws.items():
+        left = list(by_group[group])
+        pending = [m for m in matches if m["dedup_key"] not in known]
+        for m in list(pending):                         # 1. same place
+            target = (m.get("target") or "")[:500]
+            here = [r for r in left if r.target == target]
+            if len(here) == 1:
+                plan[m["dedup_key"]] = here[0]
+                left.remove(here[0])
+                pending.remove(m)
+        if len(matches) == 1 and len(pending) == 1 and len(left) == 1:   # 2. sole one
+            plan[pending[0]["dedup_key"]] = left[0]
+    return plan

@@ -85,7 +85,7 @@ def _finding_analysis_system(lang: str = "fr") -> str:
     lang_name = _LANG_NAMES.get((lang or "fr").lower(), "French")
     return (
         "You are a senior application security engineer performing triage on findings "
-        "from automated security scanners (Trivy, Gitleaks, Semgrep). "
+        "from automated security scanners (Trivy, Gitleaks, Opengrep). "
         f"Today's date is {today}. CVE identifiers with year {year} or earlier are valid and published. "
         "The scanner databases are up-to-date — trust the CVE data provided in the finding evidence. "
         "Do NOT dismiss a CVE as fake or hallucinated based on its year alone. "
