@@ -620,6 +620,7 @@ def run_gitleaks(repo_dir: str, app_id: str, scan_paths: list[str] | None = None
 # LICENSE beside it), house/ = CISO Toolbox's own rules, index.json = each
 # local rule id → the name it has in the public registry.
 SAST_RULES_DIR = os.environ.get("SAST_RULES_DIR", "/opt/sast-rules")
+OPENGREP_CACHE = os.environ.get("OPENGREP_CACHE", "/opt/opengrep/cache")
 _SAST_INDEX: dict[str, str] | None = None
 
 
@@ -661,18 +662,23 @@ def run_sast(repo_dir: str, app_id: str, scan_paths: list[str] | None = None) ->
     cmd.append(os.path.abspath(repo_dir))
     try:
         # cwd = the rules root: rule ids come out relative to it (rules.…, house.…).
-        # Opengrep unpacks its runtime (~250 MB) under $HOME/.cache and runs
-        # it from there: HOME when it is writable (the appsec-cache volume in
-        # the suite compose, kept across restarts), else /tmp — never a noexec
-        # mount. LANG: its bundled Python reads rule files in the locale's
-        # encoding, and the image sets no locale (ASCII chokes on the first
-        # non-ASCII rule).
+        # XDG_CACHE_HOME: Opengrep's runtime, unpacked at build time
+        # (read-only). HOME only takes its log (~/.opengrep): writable HOME,
+        # else /tmp. Not set image-wide — trivy would put its own cache there.
+        # LANG: its bundled Python reads rule files in the locale's encoding,
+        # and the image sets no locale (ASCII chokes on non-ASCII rules).
         home = os.environ.get("HOME", "")
         if not (home and os.access(home, os.W_OK)):
             home = tempfile.gettempdir()
         env = {**os.environ, "HOME": home, "LANG": "C.UTF-8"}
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=SCAN_TIMEOUT,
-                                cwd=SAST_RULES_DIR, env=env)
+        if os.path.isdir(OPENGREP_CACHE):
+            env["XDG_CACHE_HOME"] = OPENGREP_CACHE
+        # TMPDIR: Opengrep writes one temporary file per rule (~1 500 per scan)
+        # and leaves them behind; a directory of this scan's own, removed
+        # afterwards, keeps them from filling the in-memory /tmp.
+        with tempfile.TemporaryDirectory(prefix="opengrep-") as scratch:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=SCAN_TIMEOUT,
+                                    cwd=SAST_RULES_DIR, env={**env, "TMPDIR": scratch})
         logger.info("opengrep exit=%d stdout=%d stderr=%d", result.returncode,
                     len(result.stdout or ""), len(result.stderr or ""))
         if not result.stdout or not result.stdout.strip():

@@ -1050,10 +1050,9 @@ services:
     tmpfs:
       # CNT-04 — deliberate deviation from the other modules' `noexec,nosuid`:
       # appsec clones the scanned repos under /tmp and runs trivy / opengrep /
-      # gitleaks against that workspace. Opengrep needs it exec-capable when it
-      # falls back to unpacking its runtime there (verified: `noexec` makes it
-      # fail with "couldn't launch child (exec)"). 2g fits large repos + trivy
-      # artifacts.
+      # gitleaks against that workspace. Opengrep runs from its runtime unpacked
+      # in the image (verified with a `noexec` /tmp); trivy and gitleaks were not
+      # re-verified with `noexec`. 2g fits large repos + trivy artifacts.
       - /tmp:nosuid,size=2g
     volumes:
       - appsec-cache:/home/appsec

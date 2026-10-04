@@ -36,6 +36,11 @@ def rule_ids(text: str) -> list[str]:
     top-level `rules:` list, wherever it sits in the item (it is not always
     the first key, and the dash may stand alone on its line), never an `id`
     nested deeper."""
+    return [rid for _, rid in rule_id_lines(text)]
+
+
+def rule_id_lines(text: str) -> list[tuple[int, str]]:
+    """(line number, id) of each rule id, as read by rule_ids()."""
     lines = text.splitlines()
     try:
         start = next(i for i, l in enumerate(lines) if l.rstrip() == "rules:") + 1
@@ -43,8 +48,8 @@ def rule_ids(text: str) -> list[str]:
         return []
     item_indent = None      # indentation of the dashes of the rules list
     key_indent = None       # indentation of the keys of the current rule
-    ids: list[str] = []
-    for line in lines[start:]:
+    ids: list[tuple[int, str]] = []
+    for lineno, line in enumerate(lines[start:], start):
         if not line.strip() or line.lstrip().startswith("#"):
             continue
         indent = len(line) - len(line.lstrip())
@@ -71,8 +76,21 @@ def rule_ids(text: str) -> list[str]:
             candidate = line.strip()
         mid = ID_VALUE.match(candidate)
         if mid:
-            ids.append(mid.group(1))
+            ids.append((lineno, mid.group(1)))
     return ids
+
+
+def renamed(text: str, lineno: int, old: str, new: str) -> str:
+    """The rule file with the id on line `lineno` (a rule's own `id`, as found
+    by rule_id_lines) renamed from `old` to `new` — never an `id` elsewhere."""
+    lines = text.split("\n")
+    line = lines[lineno]
+    pat = re.compile(r"^(\s*(?:-\s+)?id:\s*['\"]?)" + re.escape(old) + r"(['\"]?\s*)$")
+    out, n = pat.subn(lambda m: m.group(1) + new + m.group(2), line)
+    if n != 1:
+        raise SystemExit(f"cannot rename rule {old!r} on line {lineno + 1}")
+    lines[lineno] = out
+    return "\n".join(lines)
 
 
 def rule_files(root: Path, security_only: bool):
@@ -96,30 +114,39 @@ def main() -> int:
         return 2
     src, house, dest = Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3])
     index: dict[str, str] = {}
-    clashes: set[str] = set()
-    counts = {}
+    counts, renames = {}, 0
     for group, root, security_only in (("rules", src, True), ("house", house, False)):
         out = dest / group
         out.mkdir(parents=True, exist_ok=True)
-        n = 0
-        for rel, text in rule_files(root, security_only):
-            (out / rel).parent.mkdir(parents=True, exist_ok=True)
-            (out / rel).write_text(text, encoding="utf-8")
-            n += 1
-            dirs = list(rel.parent.parts)
+        files = list(rule_files(root, security_only))
+        # Opengrep names a local rule <dirs>.<id>: two files of one directory
+        # declaring the same id would share one name (and one finding key).
+        # Such an id is renamed <file>-<id> in the copy — its registry name,
+        # <dirs>.<file>.<id>, was distinct all along.
+        seen: dict[tuple, int] = {}
+        for rel, text in files:
             for rid in rule_ids(text):
-                local = ".".join([group, *dirs, rid])
+                seen[(rel.parent, rid)] = seen.get((rel.parent, rid), 0) + 1
+        for rel, text in files:
+            dirs = list(rel.parent.parts)
+            for lineno, rid in rule_id_lines(text):
+                local_id = rid
+                if seen[(rel.parent, rid)] > 1:
+                    local_id = f"{rel.stem}-{rid}"
+                    text = renamed(text, lineno, rid, local_id)
+                    renames += 1
+                local = ".".join([group, *dirs, local_id])
                 registry = ".".join(([] if group == "rules" else ["house"]) + [*dirs, rel.stem, rid])
                 if local in index and index[local] != registry:
-                    clashes.add(local)
-                index.setdefault(local, registry)
-        counts[group] = n
-    for local in clashes:            # two files name a rule alike: no guess
-        index.pop(local, None)
+                    raise SystemExit(f"rule name clash left: {local}")
+                index[local] = registry
+            (out / rel).parent.mkdir(parents=True, exist_ok=True)
+            (out / rel).write_text(text, encoding="utf-8")
+        counts[group] = len(files)
     shutil.copy(src / "LICENSE", dest / "rules" / "LICENSE")
     (dest / "index.json").write_text(json.dumps(index, indent=0, sort_keys=True), encoding="utf-8")
     print(f"sast rules: {counts['rules']} upstream file(s), {counts['house']} house file(s), "
-          f"{len(index)} rule id(s) indexed, {len(clashes)} ambiguous dropped")
+          f"{len(index)} rule id(s) indexed, {renames} renamed apart")
     return 0
 
 

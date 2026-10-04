@@ -49,6 +49,11 @@ ARG OPENGREP_SHA256_ARM64=a5d5a4a58ba5d46ff51e921663da1c2bba38f4b03987f4aeec87f1
 # upstream) at its last commit, embedded in the image — never fetched at scan
 # time. sast/prepare_rules.py keeps the security rules and the LICENSE.
 ARG SAST_RULES_COMMIT=f1d2b562b414783763fd02a6ed2736eaed622efa
+# The Opengrep repository's LICENSE at the release tag (the full LGPL 2.1
+# text, shipped with the binary and the rules). Pinned like the binaries;
+# updated with OPENGREP_VERSION — and so is sast/opengrep-bundled.txt, the
+# Python packages the binary bundles, turned into an SBOM for the image scan.
+ARG OPENGREP_LICENSE_SHA256=20c17d8b8c48a600800dfd14f95d5cb9ff47066a9641ddeab48dc54aec96e331
 ARG SAST_RULES_SHA256=9a5f1cd5c625418cc1c776120123e2d4371df9bb66e099426b17c3488e13619d
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -79,14 +84,25 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
        "https://github.com/opengrep/opengrep-rules/archive/${SAST_RULES_COMMIT}.tar.gz" \
     && echo "${SAST_RULES_SHA256}  /tmp/sast-rules.tar.gz" | sha256sum -c - \
     && mkdir -p /tmp/sast-src && tar xzf /tmp/sast-rules.tar.gz -C /tmp/sast-src --strip-components=1 \
-    && rm /tmp/sast-rules.tar.gz
+    && rm /tmp/sast-rules.tar.gz \
+    && mkdir -p /opt/opengrep/cache \
+    && curl -fsSL -o /opt/opengrep/LICENSE \
+       "https://raw.githubusercontent.com/opengrep/opengrep/v${OPENGREP_VERSION}/LICENSE" \
+    && echo "${OPENGREP_LICENSE_SHA256}  /opt/opengrep/LICENSE" | sha256sum -c -
 
 # Rule tree + local-id → registry-name index, validated now: a malformed rule
-# fails the build, not a scan.
+# fails the build, not a scan. The validation also unpacks Opengrep's runtime
+# into /opt/opengrep/cache (XDG_CACHE_HOME), read-only at run time: no unpacking
+# per container start, no exec-capable /tmp needed, no race between two scans.
+# The SBOM of what that runtime bundles lands beside it.
 COPY sast/ /tmp/sast/
 RUN python3 /tmp/sast/prepare_rules.py /tmp/sast-src /tmp/sast/house /opt/sast-rules \
+    && cp /opt/opengrep/LICENSE /opt/sast-rules/rules/LGPL-2.1.txt \
+    && python3 /tmp/sast/opengrep_sbom.py /tmp/sast/opengrep-bundled.txt "${OPENGREP_VERSION}" /opt/opengrep/opengrep.cdx.json \
     && cd /opt/sast-rules \
-    && HOME=/tmp LANG=C.UTF-8 opengrep scan --validate --disable-version-check -f rules -f house . \
+    && HOME=/tmp XDG_CACHE_HOME=/opt/opengrep/cache LANG=C.UTF-8 \
+       opengrep scan --validate --disable-version-check -f rules -f house . \
+    && chmod -R a+rX,go-w /opt/opengrep \
     && rm -rf /tmp/sast-src /tmp/sast
 
 # ── Stage 3: hardened runtime ────────────────────────────────────
@@ -123,6 +139,7 @@ COPY --from=tools /usr/bin/trivy /usr/bin/trivy
 COPY --from=tools /usr/local/bin/gitleaks /usr/local/bin/gitleaks
 COPY --from=tools /usr/local/bin/opengrep /usr/local/bin/opengrep
 COPY --from=tools /opt/sast-rules /opt/sast-rules
+COPY --from=tools /opt/opengrep /opt/opengrep
 
 # Non-root user.
 RUN useradd -r -m -u 1000 -s /usr/sbin/nologin appsec \
