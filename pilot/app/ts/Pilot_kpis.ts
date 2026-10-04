@@ -467,6 +467,8 @@
                + (c.grace_date ? ' · ' + t("pilot.kpi.grace_end") + ' : <strong>' + esc(c.grace_date) + '</strong>' : '')
                + ' · <span style="color:' + sevCol + '">' + esc(sevTxt) + '</span></div>';
         }
+        h += '<div class="ct-mb-2"><button class="ct-btn" data-click="_kpiAwarenessExport" data-args=\'' + _da(campaignName) + '\'>'
+           + t("pilot.kpi.aw_export_csv") + '</button></div>';
         var late = c.late_users || [];
         var ov = c.overdue_users || [];
         if (!late.length && !ov.length) {
@@ -632,6 +634,21 @@
             // Close any open detail modal so the toggled card refreshes.
             if (window.ct_modal && ct_modal.close) ct_modal.close();
             return _reloadAndRerender();
+        }).catch(function(e) {
+            ct_modal.alert({ title: t("pilot.kpi.error"), message: String(e) });
+        });
+    };
+
+    // FEAT-53 — per-user progress of a PSAT campaign, as the last sync saw it.
+    window._kpiAwarenessExport = function(campaign: string) {
+        var url = "api/awareness/export.csv?campaign=" + encodeURIComponent(campaign)
+            + "&lang=" + (_locale === "fr" ? "fr" : "en");
+        fetch(url, { credentials: "same-origin" }).then(function(resp) {
+            if (resp.status === 404) { showStatus(t("pilot.kpi.aw_export_none"), true); return; }
+            if (!resp.ok) throw new Error("API " + resp.status);
+            var cd = resp.headers.get("Content-Disposition") || "";
+            var m = /filename="([^"]+)"/.exec(cd);
+            return resp.blob().then(function(blob) { _downloadBlob(blob, m ? m[1] : "psat.csv"); });
         }).catch(function(e) {
             ct_modal.alert({ title: t("pilot.kpi.error"), message: String(e) });
         });

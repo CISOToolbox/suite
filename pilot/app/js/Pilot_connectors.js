@@ -423,8 +423,11 @@
                     }
                     if (typeof r.computed !== "undefined")
                         return k + ": " + r.computed + " calc., " + (r.skipped || 0) + " skip., " + (r.errors || 0) + " err.";
+                    if (r.assignments_stored === "error")
+                        hasError = true;
                     if (typeof r.kpis_synced !== "undefined")
-                        return k + ": " + r.kpis_synced + " KPI, " + (r.measures_raised || 0) + " " + t("pilot.connectors.measures_unit") + (r.completed_late ? ", " + r.completed_late + " " + t("pilot.connectors.late") : "") + (r.mode ? " [" + r.mode + "]" : "");
+                        return k + ": " + r.kpis_synced + " KPI, " + (r.measures_raised || 0) + " " + t("pilot.connectors.measures_unit") + (r.completed_late ? ", " + r.completed_late + " " + t("pilot.connectors.late") : "") + (r.mode ? " [" + r.mode + "]" : "")
+                            + (r.assignments_stored === "error" ? " — " + t("pilot.connectors.psat_export_not_updated") : "");
                     return k + ": ok";
                 }).join(" | ");
             }

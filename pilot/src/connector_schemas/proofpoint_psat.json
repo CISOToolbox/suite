@@ -39,8 +39,8 @@
       "id": "campaign_filter",
       "label": { "fr": "Filtre par nom (contient)", "en": "Name filter (contains)" },
       "help": {
-        "fr": "Récupère dynamiquement les formations démarrées et non archivées dont le nom contient ce texte (insensible à la casse). Une échéance dépassée n'exclut pas la formation (l'indicateur passe au rouge) ; les formations échues depuis plus de 12 mois ne sont plus affichées. Un indicateur de complétion est créé par formation trouvée.",
-        "en": "Dynamically pulls started, non-archived trainings whose name contains this text (case-insensitive). A past due date does not exclude a training (its indicator turns red); trainings whose deadline is over 12 months old are dropped. One completion indicator is created per matching training."
+        "fr": "Récupère dynamiquement les formations démarrées et non archivées dont le nom contient ce texte (insensible à la casse). Une échéance dépassée n'exclut pas la formation (l'indicateur passe au rouge) ; les formations échues depuis plus de 12 mois ne sont plus affichées. Un indicateur de complétion est créé par formation trouvée. Laisser vide pour suivre toutes les formations.",
+        "en": "Dynamically pulls started, non-archived trainings whose name contains this text (case-insensitive). A past due date does not exclude a training (its indicator turns red); trainings whose deadline is over 12 months old are dropped. One completion indicator is created per matching training. Leave empty to follow every training."
       },
       "secret": false,
       "required": false,

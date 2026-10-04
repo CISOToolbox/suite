@@ -120,3 +120,91 @@ def test_reporting_is_tenant_wide_per_campaign():
     assert rep["overdue_total"] == 1
     assert rep["overdue"][0]["email"] == "partial@acme.example"
     assert MANDATORY in rep["overdue"][0]["missing"]
+
+
+# ---------- FEAT-53: per-user snapshot behind the CSV export -------------- #
+
+from src.connectors.proofpoint_psat import _assignment_status, _build_assignments  # noqa: E402
+
+
+def test_parse_training_collects_names_sent_date_and_excluded_users():
+    records = [
+        # A curriculum: two module rows for the same user, one completed.
+        {"attributes": {"useremailaddress": "a@acme.example", "userfirstname": "Alice",
+                        "userlastname": "Martin", "assignmentname": MANDATORY,
+                        "userassignmentstatus": "Not Started", "assignmentstartdate": "2026-03-01",
+                        "assignmentduedate": "2026-04-01"}},
+        {"attributes": {"useremailaddress": "a@acme.example", "assignmentname": MANDATORY,
+                        "userassignmentstatus": "Overdue - Completed", "assignmentstartdate": "2026-02-15",
+                        "completiondate": "2026-04-10T09:00:00Z", "assignmentduedate": "2026-04-01"}},
+        {"attributes": {"useremailaddress": "gone@acme.example", "assignmentname": MANDATORY,
+                        "userassignmentstatus": "Not Started", "useractiveflag": "false"}},
+    ]
+    excluded: dict = {}
+    users = _parse_training(records, [MANDATORY], excluded)
+    a = users["a@acme.example"]
+    assert (a["first_name"], a["last_name"]) == ("Alice", "Martin")
+    c = a["campaigns"][MANDATORY]
+    assert (c["completed"], c["sent"], c["date"], c["due"]) == (True, "2026-02-15", "2026-04-10", "2026-04-01")
+    assert c["psat_status"] == "Overdue - Completed"
+    # Excluded users stay out of the counted set, collected aside.
+    assert "gone@acme.example" not in users and "gone@acme.example" in excluded
+    # Without the collector they are simply dropped (KPI behaviour unchanged).
+    assert "gone@acme.example" not in _parse_training(records, [MANDATORY])
+
+
+def test_assignment_status_follows_the_kpi_rules():
+    today = "2026-05-01"
+    assert _assignment_status({"completed": True, "date": "2026-03-01", "due": "2026-04-01"}, today) == "completed"
+    assert _assignment_status({"completed": True, "date": "2026-04-10", "due": "2026-04-01"}, today) == "completed_late"
+    assert _assignment_status({"completed": False, "due": "2026-04-01"}, today) == "overdue"
+    assert _assignment_status({"completed": False, "due": "2026-06-01"}, today) == "pending"
+    assert _assignment_status({"completed": False, "due": ""}, today) == "pending"
+    assert _assignment_status({"completed": True, "date": "2026-03-01"}, today, excluded=True) == "excluded"
+
+
+def test_build_assignments_matches_the_kpi_counts():
+    users = _users()
+    excluded = {"gone@acme.example": {"email": "gone@acme.example", "campaigns": {
+        MANDATORY: {"completed": False}}},
+        # Counted through another row for the same campaign: not listed twice.
+        "ok@acme.example": {"email": "ok@acme.example", "campaigns": {MANDATORY: {"completed": False}}}}
+    rows = _build_assignments(users, excluded, [MANDATORY], "2026-06-01")
+    mine = [r for r in rows if r["campaign"] == MANDATORY]
+    assert len(rows) == len(mine) == 4           # OPTIONAL is not an effective campaign
+    counted = [r for r in mine if r["status"] != "excluded"]
+    done = [r for r in counted if r["status"] in ("completed", "completed_late")]
+    rep = _build_reporting(users, [MANDATORY], [MANDATORY], "2026-06-01")["campaigns"][0]
+    assert (len(counted), len(done)) == (rep["assigned"], rep["completed"])
+    assert [r["email"] for r in mine if r["status"] == "excluded"] == ["gone@acme.example"]
+    assert next(r for r in mine if r["email"] == "partial@acme.example")["completion_date"] == ""
+
+
+# ---------- BUG-80: an empty filter follows every training ----------------- #
+
+def test_empty_filter_discovers_every_current_training():
+    from src.connectors.proofpoint_psat import _discover_campaigns
+    meta = {
+        "Phishing Q3": {"due": "2026-09-30", "start": "2026-07-01", "active": True},
+        "Onboarding": {"due": "", "start": "2026-01-01", "active": True},
+        "Archived": {"due": "2026-09-30", "start": "2026-07-01", "active": False},
+        "Next year": {"due": "2027-03-01", "start": "2027-01-01", "active": True},
+        "Old": {"due": "2024-01-01", "start": "2023-12-01", "active": True},
+    }
+    assert _discover_campaigns(meta, "", "2026-10-04") == ["Onboarding", "Phishing Q3"]
+    assert _discover_campaigns(meta, "phish", "2026-10-04") == ["Phishing Q3"]
+
+
+def test_live_campaigns_follow_list_filter_or_everything():
+    from src.connectors.proofpoint_psat import _live_campaigns
+    meta = {"Phishing Q3": {"due": "2026-09-30", "start": "2026-07-01", "active": True},
+            "Onboarding": {"due": "", "start": "2026-01-01", "active": True}}
+    cfg = {"tracked_campaigns": [], "campaign_filter": "", "retention_months": 12}
+    assert _live_campaigns(cfg, meta, "2026-10-04") == (["Onboarding", "Phishing Q3"], "")
+    assert _live_campaigns({**cfg, "campaign_filter": "phish"}, meta, "2026-10-04") == (["Phishing Q3"], "")
+    assert _live_campaigns({**cfg, "tracked_campaigns": ["X"]}, meta, "2026-10-04") == (["X"], "")
+    # A filter is set: it drives the discovery even when a list exists.
+    assert _live_campaigns({**cfg, "tracked_campaigns": ["X"], "campaign_filter": "phish"},
+                           meta, "2026-10-04") == (["Phishing Q3"], "")
+    assert _live_campaigns(cfg, {}, "2026-10-04") == ([], "aucune formation en cours dans PSAT")
+    assert _live_campaigns({**cfg, "campaign_filter": "zz"}, meta, "2026-10-04")[1].startswith("aucune formation en cours ne correspond")

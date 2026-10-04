@@ -396,7 +396,9 @@ window._connRunNow = function(id: string) {
                 if (r.error) { hasError = true; return k + ": " + r.error; }
                 if (r.ok === false) { hasError = true; return k + ": " + (r.skipped || t("pilot.connectors.not_configured_lc")); }
                 if (typeof r.computed !== "undefined") return k + ": " + r.computed + " calc., " + (r.skipped || 0) + " skip., " + (r.errors || 0) + " err.";
-                if (typeof r.kpis_synced !== "undefined") return k + ": " + r.kpis_synced + " KPI, " + (r.measures_raised || 0) + " " + t("pilot.connectors.measures_unit") + (r.completed_late ? ", " + r.completed_late + " " + t("pilot.connectors.late") : "") + (r.mode ? " [" + r.mode + "]" : "");
+                if (r.assignments_stored === "error") hasError = true;
+                if (typeof r.kpis_synced !== "undefined") return k + ": " + r.kpis_synced + " KPI, " + (r.measures_raised || 0) + " " + t("pilot.connectors.measures_unit") + (r.completed_late ? ", " + r.completed_late + " " + t("pilot.connectors.late") : "") + (r.mode ? " [" + r.mode + "]" : "")
+                    + (r.assignments_stored === "error" ? " — " + t("pilot.connectors.psat_export_not_updated") : "");
                 return k + ": ok";
             }).join(" | ");
         }
