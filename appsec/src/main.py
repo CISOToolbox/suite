@@ -125,6 +125,15 @@ async def version():
     async with async_session() as db:
         return await version_payload("appsec", Base.metadata, db)
 
+@app.on_event("shutdown")
+async def on_shutdown():
+    # BUG-79 — scanners run in sessions of their own (so a timeout can stop a
+    # whole tree): the SIGTERM stopping the service does not reach them, and
+    # the executor would wait for their scans. Stop them here.
+    from src.scanners import stop_running_scanners
+    stop_running_scanners()
+
+
 @app.on_event("startup")
 async def on_startup():
     # Fail closed unless AUTH_MODE=none is explicit (see auth_common.assert_auth_posture).

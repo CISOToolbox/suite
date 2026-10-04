@@ -6,6 +6,8 @@ import json
 import logging
 import os
 import shutil
+import signal
+import threading
 import subprocess
 import tempfile
 import uuid
@@ -45,6 +47,64 @@ def _dedup_index(seen: dict[str, int], key: str) -> str:
 logger = logging.getLogger("appsec-scanners")
 
 SCAN_TIMEOUT = int(os.getenv("SCAN_TIMEOUT_SECONDS", "900"))
+
+
+_RUNNING_SCANNERS: set[int] = set()     # process groups of the scanners running now
+_RUNNING_LOCK = threading.Lock()
+_STOPPING = False                       # set on shutdown: a scanner started from now on is killed at once
+
+
+def _kill_group(pgid: int) -> None:
+    try:
+        os.killpg(pgid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+
+
+def _run_scanner(cmd: list[str], *, timeout: int | None = None, **kwargs) -> subprocess.CompletedProcess:
+    """subprocess.run for a scanner, its whole process tree stopped on timeout.
+
+    A scanner forks workers (Opengrep: opengrep-cli, several opengrep-core):
+    subprocess.run kills only the process it started, and the workers kept
+    scanning for minutes after the timeout. The scanner gets a process group
+    of its own, killed as a whole when the time is up (TimeoutExpired is raised
+    as before) or on any other exception, and by stop_running_scanners() when
+    the service shuts down — in a session of its own, it no longer receives
+    the SIGTERM sent to the service."""
+    if timeout is None:
+        timeout = SCAN_TIMEOUT
+    with subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                          start_new_session=True, **kwargs) as proc:
+        with _RUNNING_LOCK:
+            _RUNNING_SCANNERS.add(proc.pid)
+            stopping = _STOPPING
+        if stopping:
+            # Started during or after the shutdown hook, which could not see it.
+            _kill_group(proc.pid)
+        try:
+            out, err = proc.communicate(timeout=timeout)
+        except BaseException:
+            _kill_group(proc.pid)
+            # Not communicate(): a process that left the group could hold the
+            # pipes open and block it; the pipes are closed on leaving `with`.
+            proc.wait()
+            raise
+        finally:
+            with _RUNNING_LOCK:
+                _RUNNING_SCANNERS.discard(proc.pid)
+    return subprocess.CompletedProcess(cmd, proc.returncode, out, err)
+
+
+def stop_running_scanners() -> int:
+    """Kill every scanner still running (service shutdown), and any started
+    afterwards; returns how many were running."""
+    global _STOPPING
+    with _RUNNING_LOCK:
+        _STOPPING = True
+        groups = list(_RUNNING_SCANNERS)
+    for pgid in groups:
+        _kill_group(pgid)
+    return len(groups)
 
 
 def _safe_scan_target(base_dir: str, sub_path: str) -> str | None:
@@ -392,7 +452,7 @@ def run_trivy_fs(repo_dir: str, app_id: str, scan_paths: list[str] | None = None
         return all_findings, all_sbom
     cmd = ["trivy", "fs", "--format", "json", "--scanners", "vuln", "--list-all-pkgs", "--quiet", repo_dir]
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=SCAN_TIMEOUT)
+        result = _run_scanner(cmd)
         if result.returncode != 0 and not result.stdout:
             msg = (result.stderr or "unknown error")[:500]
             logger.warning("trivy fs failed: %s", msg)
@@ -478,7 +538,7 @@ def run_trivy_image(image: str, app_id: str, token_encrypted: str = "") -> tuple
             env["TRIVY_USERNAME"] = "x-access-token"
             env["TRIVY_PASSWORD"] = token
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=SCAN_TIMEOUT, env=env)
+        result = _run_scanner(cmd, env=env)
         if result.returncode != 0 and not result.stdout:
             msg = _sanitize_git_error((result.stderr or "unknown error"), image)
             logger.warning("trivy image failed for %s: %s", image, msg)
@@ -561,7 +621,7 @@ def run_gitleaks(repo_dir: str, app_id: str, scan_paths: list[str] | None = None
     cmd = ["gitleaks", "detect", "--source", repo_dir, "--report-format", "json",
            "--report-path", report_file, "--no-banner", "--exit-code", "0"]
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=SCAN_TIMEOUT)
+        result = _run_scanner(cmd)
         if not os.path.exists(report_file):
             # gitleaks didn't write a report — check if it crashed
             if result.returncode not in (0, 1):
@@ -677,8 +737,7 @@ def run_sast(repo_dir: str, app_id: str, scan_paths: list[str] | None = None) ->
         # and leaves them behind; a directory of this scan's own, removed
         # afterwards, keeps them from filling the in-memory /tmp.
         with tempfile.TemporaryDirectory(prefix="opengrep-") as scratch:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=SCAN_TIMEOUT,
-                                    cwd=SAST_RULES_DIR, env={**env, "TMPDIR": scratch})
+            result = _run_scanner(cmd, cwd=SAST_RULES_DIR, env={**env, "TMPDIR": scratch})
         logger.info("opengrep exit=%d stdout=%d stderr=%d", result.returncode,
                     len(result.stdout or ""), len(result.stderr or ""))
         if not result.stdout or not result.stdout.strip():
