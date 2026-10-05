@@ -3,6 +3,39 @@
 Every release has its section here, written at release time from the
 changes since the previous one and published as the GitHub release notes.
 
+## 1.3.0 — 2026-10-05
+
+### Added
+
+- Unpack Opengrep at build time, ship its LGPL text and an SBOM of what it bundles
+- Show a finding closed by the SAST engine change, with its former status
+- House SAST rules — GitHub-owned actions pinned by SHA, Renovate release age
+- Carry Semgrep-era SAST findings over, keep the others readable 30 days
+- The SAST scanner is called sast
+- SAST runs Opengrep on rules built into the image
+
+### Fixed
+
+- Kill a scanner started during or after shutdown
+- Stop running scanners on shutdown and never wait on held pipes
+- Stop a timed-out scanner's whole process tree
+- Keep the dot in pypi purls of the Opengrep SBOM
+- Give each Opengrep run its own temporary directory
+- Rename a duplicated rule id on its own line only
+- Describe what the Opengrep binary really bundles, not its dev lock
+- Give rules sharing an id in one directory distinct names
+- Stop reading rule ids at the next top-level key
+- Index every rule id of a file; run Opengrep from a writable, persistent HOME
+- Decide the Semgrep-era carry-over once, keep each former status
+
+### Tests
+
+- Make the scanner shutdown tests deterministic
+- SBOM from the bundled listing, rename scope
+- Rule ids, renamed collisions, Opengrep SBOM
+- A former verdict never reaches later code; real fingerprints carried over
+- SAST identity, rule names, re-keying, purge and reopening
+
 ## 1.2.1 — 2026-10-03
 
 ### Fixed

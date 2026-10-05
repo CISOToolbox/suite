@@ -3,6 +3,34 @@
 Every release has its section here, written at release time from the
 changes since the previous one and published as the GitHub release notes.
 
+## 0.13.0 — 2026-10-05
+
+### Modules
+
+- pilot: 1.2.1 → **1.3.0**
+- risk: 1.1.1 → **1.1.2**
+- compliance: 1.1.1 → **1.1.2**
+- audit: 1.1.1 → **1.1.2**
+- vendor: 1.3.1 → **1.3.2**
+- asset: 1.2.1 → **1.2.2**
+- access: 1.3.1 → **1.3.2**
+- surface: 1.5.1 → **1.5.2**
+- appsec: 1.2.1 → **1.3.0**
+- watch: 1.1.1 → **1.1.2**
+
+### Added
+
+- Unpack Opengrep at build time, ship its LGPL text and an SBOM of what it bundles
+
+### Documentation
+
+- List gophish instead of the retired phish in the suite module table
+
+### Maintenance
+
+- Drop the semgrep lock from the standalone mirror; tmpfs note
+- Drop the semgrep environment from the dependency tooling (deps)
+
 ## 0.12.1 — 2026-10-03
 
 ### Modules

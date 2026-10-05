@@ -3,6 +3,27 @@
 Every release has its section here, written at release time from the
 changes since the previous one and published as the GitHub release notes.
 
+## 1.3.0 — 2026-10-05
+
+### Added
+
+- Export a PSAT campaign's per-user progress as CSV from the KPI detail
+- Keep each user's PSAT campaign progress at sync
+
+### Fixed
+
+- Tell the admin when a PSAT run could not refresh the CSV export
+- Keep the PSAT export consistent across sync races, casing and large tenants
+- Follow every PSAT training when the campaign filter is empty
+
+### Changed
+
+- Index PSAT snapshot rows on the normalised campaign name
+
+### Upgrade note
+
+- A connector set up with an API key but no name filter and no explicit campaign list used to do nothing on sync; it now follows every current training. Each one becomes a completion KPI counted as mandatory, raises an overdue measure while overdue users remain, and feeds the Access awareness proof for the configured e-mail domains (every user when none is set). Set a name filter or an explicit campaign list to narrow the scope.
+
 ## 1.2.1 — 2026-10-03
 
 ### Maintenance
