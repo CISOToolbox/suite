@@ -40,7 +40,7 @@ the same module repo** and hosted on cisotoolbox.org:
 | **Surface** | External attack surface monitoring: DNS, TLS, exposed services, add-on scanners | [CISOToolbox/surface](https://github.com/CISOToolbox/surface) | — |
 | **AppSec** | Application security: SCA/image scans (Trivy), secrets (Gitleaks), SAST (Opengrep), SBOM | [CISOToolbox/appsec](https://github.com/CISOToolbox/appsec) | — |
 | **Watch** | Vulnerability & threat watch: CVE/KEV feeds, scopes, alert triage, email digests | [CISOToolbox/watch](https://github.com/CISOToolbox/watch) | — |
-| **Phish** | Authorised phishing simulations: campaigns, templates, landing pages, awareness reporting | [CISOToolbox/phish](https://github.com/CISOToolbox/phish) | — |
+| **Gophish** | Authorised phishing simulations (standalone, not Pilot-integrated): campaigns, templates, landing pages, awareness reporting | [CISOToolbox/gophish](https://github.com/CISOToolbox/gophish) | — |
 
 The suite (this repo) is for organizations that want several modules working
 **together**: measures raised in any module flow up into Pilot's consolidated
