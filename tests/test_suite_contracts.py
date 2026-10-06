@@ -686,6 +686,16 @@ CHECKS = (
     ("bundled add-ons get their deps", test_bundled_addons_get_their_dependencies),
 )
 
+# The checks above RETURN their findings — they are consumed by `main()` (the
+# CLI) and by the aggregating `test_suite_contracts()` below, which is the real
+# pytest entry point. Their `test_*` names would otherwise make pytest collect
+# each as a standalone test that returns a list: it "passes" without asserting
+# anything (and warns about the returned value), so a broken contract still
+# showed green on those lines — only the aggregator actually fails. Mark them
+# non-collectable so the single assert below is what enforces the contract.
+for _label, _check in CHECKS:
+    _check.__test__ = False
+
 
 def test_suite_contracts() -> None:
     """pytest entry point — one assert carrying every problem found."""
