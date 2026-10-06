@@ -208,3 +208,49 @@ def test_live_campaigns_follow_list_filter_or_everything():
                            meta, "2026-10-04") == (["Phishing Q3"], "")
     assert _live_campaigns(cfg, {}, "2026-10-04") == ([], "aucune formation en cours dans PSAT")
     assert _live_campaigns({**cfg, "campaign_filter": "zz"}, meta, "2026-10-04")[1].startswith("aucune formation en cours ne correspond")
+
+
+async def test_purge_connector_data_clears_the_dashboard_footprint(db):
+    """BUG-83 — clearing the PSAT config deactivates its completion KPIs (so the
+    dashboard cards drop off, since the dashboard lists only active KPIs) and
+    removes the derived measures, awareness assignments and detail panel —
+    without touching other connectors' data."""
+    from datetime import datetime, timezone
+    from sqlalchemy import select
+    from src.connectors.proofpoint_psat import (
+        purge_connector_data, _KPI_PREFIX, _MEASURE_PREFIX, DETAIL_KEY,
+    )
+    from src.models import AppSettings, KpiDefinition, MeasureCache, PsatAssignment
+
+    db.add_all([
+        KpiDefinition(code=_KPI_PREFIX + "camp1", name_fr="A", name_en="A",
+                      category_primary="awareness", unit="%", direction="up",
+                      source_type="external", active=True),
+        KpiDefinition(code="m365.mfa", name_fr="MFA", name_en="MFA",
+                      category_primary="identity", unit="%", direction="up",
+                      source_type="external", active=True),   # another connector — must survive
+        MeasureCache(module="pilot", source_id=_MEASURE_PREFIX + "camp1", data={}),
+        MeasureCache(module="pilot", source_id="other-measure", data={}),   # must survive
+        PsatAssignment(campaign="camp1", email="a@example.org", status="pending",
+                       synced_at=datetime.now(timezone.utc)),
+        AppSettings(key=DETAIL_KEY, value="{}"),
+        AppSettings(key="demo_mode", value="false"),   # unrelated — must survive
+    ])
+    await db.commit()
+
+    await purge_connector_data(db)
+    await db.commit()
+
+    active = {k.code: k.active for k in (await db.execute(select(KpiDefinition))).scalars()}
+    assert active[_KPI_PREFIX + "camp1"] is False     # PSAT KPI deactivated → card gone
+    assert active["m365.mfa"] is True                 # other connector untouched
+
+    measures = [m.source_id for m in (await db.execute(select(MeasureCache))).scalars()]
+    assert _MEASURE_PREFIX + "camp1" not in measures
+    assert "other-measure" in measures
+
+    assert (await db.execute(select(PsatAssignment))).first() is None
+
+    keys = {s.key for s in (await db.execute(select(AppSettings))).scalars()}
+    assert DETAIL_KEY not in keys
+    assert "demo_mode" in keys

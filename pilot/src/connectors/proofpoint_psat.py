@@ -874,7 +874,23 @@ async def _sync_kpis(reporting: dict, db: AsyncSession) -> int:
     return len(active_codes)
 
 
-# ---------- Connector entry points (test / run) --------------------------- #
+# ---------- Connector entry points (test / run / clear) ------------------- #
+
+async def purge_connector_data(db: AsyncSession) -> None:
+    """Tear down the dashboard footprint when the connector's config is cleared
+    (BUG-83). The completion KPIs are DEACTIVATED (kept for history; the
+    dashboard lists only active KPIs, so the cards drop off), and the derived
+    overdue measures, per-user awareness assignments and the stored detail
+    panel are removed. The caller commits."""
+    kpis = (await db.execute(
+        select(KpiDefinition).where(KpiDefinition.code.like(_KPI_PREFIX + "%"))
+    )).scalars().all()
+    for k in kpis:
+        k.active = False
+    await db.execute(delete(MeasureCache).where(MeasureCache.source_id.like(_MEASURE_PREFIX + "%")))
+    await db.execute(delete(PsatAssignment))
+    await db.execute(delete(AppSettings).where(AppSettings.key == DETAIL_KEY))
+
 
 async def test_credentials(db: AsyncSession) -> tuple[bool, str]:
     cfg = await get_config(db)

@@ -82,6 +82,22 @@ def test_is_configured_false_when_any_required_missing(m365_schema):
     assert _is_configured(m365_schema, {}) is False
 
 
+@pytest.fixture
+def psat_schema() -> dict:
+    path = Path(__file__).parent.parent.parent / "src" / "connector_schemas" / "proofpoint_psat.json"
+    return json.loads(path.read_text())
+
+
+def test_psat_configured_without_an_explicit_region(psat_schema):
+    """BUG-83 — region has a safe default (eu) and must not gate the
+    'configured' flag: a PSAT with its domain set but region left empty is
+    configured, so the delete button shows. An all-empty config is not."""
+    assert _is_configured(psat_schema, {
+        "api_key": "tok", "email_domains": "example.org", "region": ""
+    }) is True
+    assert _is_configured(psat_schema, {}) is False
+
+
 # ── _apply_update ──────────────────────────────────────────────────
 
 

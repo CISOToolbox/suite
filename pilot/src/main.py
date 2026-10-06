@@ -123,6 +123,7 @@ _CONNECTORS_MAP = {
         schema_path=_CONNECTOR_SCHEMAS / "proofpoint_psat.json",
         test=psat_connector.test_credentials,
         run=psat_connector.run_sync,
+        on_clear=psat_connector.purge_connector_data,
     ),
 }
 # Stash the binding map on app.state so the aggregator route can read
