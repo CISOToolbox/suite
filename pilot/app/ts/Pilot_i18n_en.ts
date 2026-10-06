@@ -443,6 +443,7 @@ _registerTranslations("en", {
   "pilot.measures.orphan_count": "{n} without project",
   "pilot.measures.project_included": " (project included)",
   "pilot.measures.remediation_project_required": "Remediation project (required)",
+  "pilot.measures.search_project": "Search a project…",
   "pilot.measures.search_measure": "Search an action...",
   "pilot.measures.status_set": "Status: {status}",
   "pilot.measures.title": "Cross-cutting remediation plan",

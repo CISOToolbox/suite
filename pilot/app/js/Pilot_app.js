@@ -661,7 +661,7 @@
             ct_bulkbar.update("pilot-measures");
         }
         else {
-            h += _renderMeasuresKanban(filtered, measureProject, today);
+            h += _renderMeasuresKanban(filtered, groupsShown, measureProject, today);
             c.innerHTML = h;
             _wireKanbanDnD();
         }
@@ -739,7 +739,7 @@
     // Kanban view: 4 columns mapped to the canonical statuses. Each card is
     // draggable; dropping it on another column triggers a PATCH on the
     // measure's status with optimistic update + rollback on error.
-    function _renderMeasuresKanban(filtered, measureProject, today) {
+    function _renderMeasuresKanban(filtered, groupsShown, measureProject, today) {
         // Bucket measures by status; sort each bucket by due_date asc
         // (overdue first, then upcoming, finally no-date).
         var buckets = {};
@@ -769,7 +769,11 @@
                 + '<span class="pilot-kanban-col-count">' + rows.length + '</span>'
                 + '</div>';
             h += '<div class="pilot-kanban-col-body" data-status="' + esc(s) + '">';
-            _groups.forEach(function (g) {
+            // Meta-measures obey the same filters as individual actions (module,
+            // project, search) — use the already-filtered groupsShown, not the raw
+            // _groups, or a meta-measure unrelated to the selected module stays in
+            // the Kanban.
+            groupsShown.forEach(function (g) {
                 if ((g.status || "planned") !== s)
                     return;
                 h += _renderGroupCard(g, today);
@@ -1412,7 +1416,7 @@
             defaultStatus: "planned",
             // Default to the first project: an empty selection used to close the
             // modal, drop the user's input and only flash a 3-second toast.
-            extraFields: [{ key: "project_id", label: t("pilot.measures.remediation_project_required"), type: "select", value: projectOpts[0].value, options: projectOpts }],
+            extraFields: [{ key: "project_id", label: t("pilot.measures.remediation_project_required"), type: "refselect", value: projectOpts[0].value, options: projectOpts, placeholder: t("pilot.measures.search_project") }],
             ownerPicker: { pickerId: "pilot-new-measure-owner", directoryUrl: "api/directory", sourceUrl: null }
         }).then(function (result) {
             if (!result || result.__deleted)
@@ -1538,7 +1542,7 @@
         h += '<div><label class="pilot-label">' + t("pilot.projects.start_date") + '</label><input type="date" id="pj-start" class="ct-input" value="' + esc(p.start_date || '') + '"></div>';
         h += '<div><label class="pilot-label">' + t("pilot.col.due_date") + '</label><input type="date" id="pj-due" class="ct-input" value="' + esc(p.due_date || '') + '"></div>';
         h += '</div>';
-        h += '<div class="ct-mb-4"><label class="pilot-label">' + t("pilot.common.description") + '</label><textarea id="pj-desc" class="ct-textarea ct-w-full" rows="3">' + esc(p.description || '') + '</textarea></div>';
+        h += '<div class="ct-mb-4"><label class="pilot-label">' + t("pilot.common.description") + '</label><textarea id="pj-desc" class="ct-textarea ct-w-full" rows="6">' + esc(p.description || '') + '</textarea></div>';
         h += '<div class="ct-flex ct-gap-2 ct-mb-6">';
         h += '<button class="ct-btn" data-variant="primary" data-click="_saveProject">' + t("pilot.action.save") + '</button>';
         var cascadeLabel = p.id ? '<label class="ct-text-meta ct-flex ct-items-center ct-gap-1"><input type="checkbox" id="pj-cascade"> ' + t("pilot.projects.cascade_status") + '</label>' : '';
@@ -1853,7 +1857,7 @@
         p.body.innerHTML = h;
         p.footer.innerHTML =
             '<button class="ct-btn" data-click="_aiClosePanel">' + t("pilot.action.cancel") + '</button>' +
-                '<button class="ct-btn" data-variant="primary" data-size="xs" data-click="_aiAddSuggestedMeasures">' + t("pilot.action.add_selection") + '</button>';
+                '<button class="ct-btn" data-variant="primary" data-click="_aiAddSuggestedMeasures">' + t("pilot.action.add_selection") + '</button>';
     }
     window._aiToggleAllMeasures = function () {
         var cbs = document.querySelectorAll(".ai-meas-cb");
