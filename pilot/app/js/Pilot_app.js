@@ -2750,16 +2750,30 @@
     // SETTINGS
     // ═══════════════════════════════════════════════════════════════
     var _settings = null;
+    // The provider/model catalogue, fetched from GET /ai/config (which returns the
+    // shared AI_PROVIDERS). The model dropdowns are built from this, never from a
+    // hand-kept list — that duplication is exactly the drift the shared catalogue
+    // exists to prevent.
+    var _aiProviders = null;
+    // Model <option> list for a provider, sourced from the catalogue above. When
+    // the stored model is unset or belongs to another provider, the provider's
+    // defaultModel is pre-selected so the panel never opens on an empty choice.
+    function _aiModelOptions(provider, s) {
+        var conf = _aiProviders ? _aiProviders[provider] : null;
+        var models = (conf && conf.models) || [];
+        var ids = models.map(function (m) { return m.id; });
+        var cur = s.ai_model || "";
+        var selected = ids.indexOf(cur) >= 0 ? cur : ((conf && conf.defaultModel) || "");
+        return models.map(function (m) {
+            return '<option value="' + esc(m.id) + '"' + (m.id === selected ? ' selected' : '') + '>' + esc(m.label || m.id) + '</option>';
+        }).join("");
+    }
     function _renderAiProviderFields(provider, s) {
         var h = '';
         var bullets = "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022";
         if (provider === "anthropic") {
             h += '<div class="ct-form-grid">';
-            h += '<div><label class="pilot-label">' + t("pilot.settings.model") + '</label><select id="set-ai-model" class="ct-select">';
-            ["claude-sonnet-5", "claude-opus-5", "claude-fable-5", "claude-haiku-4-5-20251001", "claude-opus-4-8", "claude-sonnet-4-6"].forEach(function (m) {
-                h += '<option value="' + m + '"' + (s.ai_model === m ? ' selected' : '') + '>' + m + '</option>';
-            });
-            h += '</select></div>';
+            h += '<div><label class="pilot-label">' + t("pilot.settings.model") + '</label><select id="set-ai-model" class="ct-select">' + _aiModelOptions("anthropic", s) + '</select></div>';
             h += '<div><label class="pilot-label">' + t("pilot.settings.api_key_anthropic") + '</label>';
             h += '<input type="password" id="set-key-anthropic" class="ct-input" placeholder="sk-ant-..." value="' + (s.ai_key_anthropic === "configured" ? bullets : "") + '">';
             h += '<div style="font-size:var(--ct-text-label);color:' + (s.ai_key_anthropic === "configured" ? 'var(--ct-low)' : 'var(--ct-ink-2)') + ';margin-top:2px">' + (s.ai_key_anthropic === "configured" ? t("pilot.settings.key_configured") : t("pilot.settings.key_not_configured")) + '</div></div>';
@@ -2767,11 +2781,7 @@
         }
         else if (provider === "openai") {
             h += '<div class="ct-form-grid">';
-            h += '<div><label class="pilot-label">' + t("pilot.settings.model") + '</label><select id="set-ai-model" class="ct-select">';
-            ["gpt-5.6", "gpt-5.6-terra", "gpt-5.5", "gpt-5.4-mini", "gpt-4o"].forEach(function (m) {
-                h += '<option value="' + m + '"' + (s.ai_model === m ? ' selected' : '') + '>' + m + '</option>';
-            });
-            h += '</select></div>';
+            h += '<div><label class="pilot-label">' + t("pilot.settings.model") + '</label><select id="set-ai-model" class="ct-select">' + _aiModelOptions("openai", s) + '</select></div>';
             h += '<div><label class="pilot-label">' + t("pilot.settings.api_key_openai") + '</label>';
             h += '<input type="password" id="set-key-openai" class="ct-input" placeholder="sk-..." value="' + (s.ai_key_openai === "configured" ? bullets : "") + '">';
             h += '<div style="font-size:var(--ct-text-label);color:' + (s.ai_key_openai === "configured" ? 'var(--ct-low)' : 'var(--ct-ink-2)') + ';margin-top:2px">' + (s.ai_key_openai === "configured" ? t("pilot.settings.key_configured") : t("pilot.settings.key_not_configured")) + '</div></div>';
@@ -2779,11 +2789,7 @@
         }
         else if (provider === "gemini") {
             h += '<div class="ct-form-grid">';
-            h += '<div><label class="pilot-label">' + t("pilot.settings.model") + '</label><select id="set-ai-model" class="ct-select">';
-            ["gemini-3.6-flash", "gemini-3.5-flash-lite"].forEach(function (m) {
-                h += '<option value="' + m + '"' + (s.ai_model === m ? ' selected' : '') + '>' + m + '</option>';
-            });
-            h += '</select></div>';
+            h += '<div><label class="pilot-label">' + t("pilot.settings.model") + '</label><select id="set-ai-model" class="ct-select">' + _aiModelOptions("gemini", s) + '</select></div>';
             h += '<div><label class="pilot-label">' + t("pilot.settings.api_key_gemini") + '</label>';
             h += '<input type="password" id="set-key-gemini" class="ct-input" placeholder="AIza..." value="' + (s.ai_key_gemini === "configured" ? bullets : "") + '">';
             h += '<div style="font-size:var(--ct-text-label);color:' + (s.ai_key_gemini === "configured" ? 'var(--ct-low)' : 'var(--ct-ink-2)') + ';margin-top:2px">' + (s.ai_key_gemini === "configured" ? t("pilot.settings.key_configured") : t("pilot.settings.key_not_configured")) + '</div></div>';
@@ -2837,6 +2843,16 @@
         if (!_settings) {
             c.innerHTML = '<h2>' + t("pilot.settings.title") + '</h2><div class="ct-ta-c ct-p-8 ct-muted">' + t("pilot.common.loading") + '</div>';
             _fetch("/settings").then(function (s) { _settings = s; _renderSettings(c); });
+            return;
+        }
+        if (!_aiProviders) {
+            // The model dropdowns need the shared catalogue (GET /ai/config). Fetch
+            // it as a SEPARATE, non-fatal step: if it fails, degrade to an empty
+            // catalogue so the rest of the panel (proxy, SMTP, demo) still renders
+            // rather than hanging on "loading" — the model <select> is the only
+            // part that depends on it.
+            c.innerHTML = '<h2>' + t("pilot.settings.title") + '</h2><div class="ct-ta-c ct-p-8 ct-muted">' + t("pilot.common.loading") + '</div>';
+            _fetch("/ai/config").then(function (cfg) { _aiProviders = (cfg && cfg.providers) || {}; _renderSettings(c); }, function () { _aiProviders = {}; _renderSettings(c); });
             return;
         }
         var s = _settings;
