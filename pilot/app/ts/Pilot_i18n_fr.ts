@@ -445,6 +445,7 @@ _registerTranslations("fr", {
   "pilot.measures.orphan_count": "{n} sans projet",
   "pilot.measures.project_included": " (projet inclus)",
   "pilot.measures.remediation_project_required": "Projet de remédiation (requis)",
+  "pilot.measures.search_project": "Rechercher un projet…",
   "pilot.measures.search_measure": "Rechercher une action...",
   "pilot.measures.status_set": "Statut : {status}",
   "pilot.measures.title": "Plan de traitement transverse",
