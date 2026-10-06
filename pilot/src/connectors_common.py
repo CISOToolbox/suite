@@ -102,6 +102,10 @@ class ConnectorBinding:
     test: Callable[[AsyncSession], Awaitable[tuple[bool, str]]] | None = None
     run: Callable[[AsyncSession], Awaitable[dict[str, Any]]] | None = None
     backend: "MultiInstanceBackend | None" = None
+    # Optional teardown run when the connector's config is cleared: remove the
+    # data the connector produced (KPIs, measures…) so deleting it also clears
+    # its dashboard footprint. The caller commits.
+    on_clear: Callable[[AsyncSession], Awaitable[None]] | None = None
 
     _schema_cache: dict | None = None
 
@@ -354,6 +358,10 @@ async def clear_connector(
     )
     for s in r.scalars().all():
         await db.delete(s)
+    # Let the connector remove what it produced (KPIs, measures…) so the
+    # dashboard footprint goes with the config.
+    if binding.on_clear is not None:
+        await binding.on_clear(db)
 
 
 def make_router(connectors: dict[str, ConnectorBinding]) -> APIRouter:
