@@ -45,12 +45,19 @@ for module, app_rev in sorted(sm.MODULE_REVS.items()):
         out = sm.migrate_blob(module, data)
         check(f"{module}/{fixture.name}: migre vers rev {app_rev}",
               out["meta"]["schema_rev"] == app_rev)
-        # preservation: every business key of the fixture survives
+        # preservation: every business key survives. A key a migration is
+        # allowed to reshape (RESHAPED_KEYS) must stay present but may change
+        # (e.g. FEAT-54 coerces classification 0 -> null in `vendors`); every
+        # other key must be byte-identical.
+        reshaped = getattr(sm, "RESHAPED_KEYS", {}).get(module, set())
         for k, v in before.items():
             if k == "meta":
                 continue
-            check(f"{module}/{fixture.name}: préserve {k}", out.get(k) == v,
-                  f"{out.get(k)!r} != {v!r}")
+            if k in reshaped:
+                check(f"{module}/{fixture.name}: {k} survit (reshapé)", out.get(k) is not None)
+            else:
+                check(f"{module}/{fixture.name}: préserve {k}", out.get(k) == v,
+                      f"{out.get(k)!r} != {v!r}")
         # normalization: the baseline collections exist
         for k in sm._BASELINE_KEYS[module]:
             check(f"{module}/{fixture.name}: baseline {k}", isinstance(out.get(k), list))
@@ -67,6 +74,19 @@ sm.migrate_blob("vendor", d1)
 d2 = copy.deepcopy(d1)
 sm.migrate_blob("vendor", d2)
 check("idempotence (vendor)", d1 == d2)
+
+# 5. FEAT-54: a rev<=2 export's classification 0s coerce to null (not a real 0),
+# so a server-side import/restore never silently promotes an unset vendor.
+_v54 = json.loads((FIXTURES / "vendor" / "rev2.json").read_text())
+sm.migrate_blob("vendor", _v54)
+_v54_cls = (_v54.get("vendors") or [{}])[0].get("classification", {})
+_v54_exp = (_v54.get("vendors") or [{}])[0].get("exposure", {})
+check("vendor FEAT-54: classification 0 -> null",
+      _v54_cls.get("replace_difficulty") is None and _v54_cls.get("ops_impact") == 3,
+      f"cls={_v54_cls!r}")
+check("vendor FEAT-54: exposure recomputed (incomplete axis -> null)",
+      _v54_exp.get("penetration") is None,
+      f"exp={_v54_exp!r}")
 
 print("=" * 60)
 if FAILS:
