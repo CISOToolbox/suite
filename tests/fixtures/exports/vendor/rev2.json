@@ -1,0 +1,25 @@
+{
+  "meta": { "schema_rev": 2 },
+  "vendors": [
+    {
+      "id": "V-0001",
+      "name": "MedSecure Cloud Hosting",
+      "status": "active",
+      "classification": {
+        "ops_impact": 3,
+        "processes": 2,
+        "replace_difficulty": 0,
+        "data_sensitivity": 0,
+        "integration": 0,
+        "regulatory_impact": 0,
+        "gdpr_subprocessor": true
+      },
+      "exposure": { "dependance": 1.7, "penetration": 0, "maturite": 2, "confiance": 2 }
+    }
+  ],
+  "risks": [],
+  "measures": [],
+  "documents": [],
+  "assessments": [],
+  "questionnaire_templates": []
+}
