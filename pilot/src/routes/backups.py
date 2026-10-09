@@ -350,6 +350,9 @@ async def _pilot_self_restore(db: AsyncSession, data: dict) -> dict:
             db.add(_AppSettings(key=k, value=s.get("value", "")))
 
     await db.commit()
+    # The registry and the proxy settings may have changed: Pilot re-applies its proxy.
+    from src.routes.settings import apply_own_proxy
+    await apply_own_proxy(db)
     return {"ok": True, "id": _PILOT_INSTANCE_ID}
 
 
