@@ -455,8 +455,8 @@ Configure in Pilot > Settings > AI section. Keys are stored server-side and push
 
 For deployments where the backend hosts have **no direct internet access**
 and must reach outbound services (the LLM API; for Surface also the CVE
-feeds and the other third-party services its scanners query) through a
-**corporate forward proxy**:
+feeds, the third-party services its scanners query and the scans
+themselves) through a **corporate forward proxy**:
 
 Configure it **once in Pilot > Settings** (the `http_proxy`, `https_proxy`
 and `no_proxy` fields). On save, Pilot pushes the values to every module
@@ -480,11 +480,21 @@ Clearing a field in Pilot clears it in every module.
   PostgreSQL connections use asyncpg (not httpx) and are never proxied.
 - A proxy set in a module's own environment is the base: the one Pilot
   pushes replaces it, and clearing Pilot's brings it back.
-- Surface's scanners reach the scanned targets directly, not through the
-  proxy Pilot pushes; its calls to third-party services (CVE feeds, Shodan,
-  the certificate transparency logs) go through it. A proxy set in the
-  deployment's own environment, as in a standalone `.env`, the scanners
-  follow, as before.
+- Surface's scanners follow the proxy too: the HTTP scanners, nuclei (given
+  the proxy explicitly) and the screenshot browser (credentials included). A
+  target in the exceptions is reached directly, on every port (an
+  exception's `:port` does not narrow a scan); an exception by address or by
+  range applies to the scanners that connect to a resolved address (the
+  security headers, sensitive files and JavaScript checks, nuclei, the
+  browser), the others match the name. A proxy that
+  refuses (a 407 included), cannot be reached or does not answer is logged
+  and reported as an error finding of the scanner, rather than read as
+  "nothing found";
+  many proxies refuse a connection to a bare IP address, which is what the
+  HTTP scanners connect to. Scanners that open raw sockets — nmap (port scan
+  and discovery), the TLS checks, the SMB scanner — cannot use an HTTP proxy
+  and connect directly; nmap and the TLS checks log a warning when a proxy
+  applies.
 - Standalone single-module deployments have no Pilot: there the proxy is set
   directly via the `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` variables in the
   module's `.env` at deploy time (see each standalone `.env.example`).
