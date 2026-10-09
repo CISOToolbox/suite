@@ -455,23 +455,36 @@ Configure in Pilot > Settings > AI section. Keys are stored server-side and push
 
 For deployments where the backend hosts have **no direct internet access**
 and must reach outbound services (the LLM API; for Surface also the CVE
-feeds and scan probes) through a **corporate forward proxy**:
+feeds and the other third-party services its scanners query) through a
+**corporate forward proxy**:
 
 Configure it **once in Pilot > Settings** (the `http_proxy`, `https_proxy`
 and `no_proxy` fields). On save, Pilot pushes the values to every module
 over the internal service channel (`PUT /api/internal/proxy`, authenticated
-with `SERVICE_TOKEN`). Each module writes them into its process environment;
-httpx then routes **every** outbound call through the proxy — no restart and
-no per-module change needed. A module started or redeployed later receives
-the configuration on the next push.
+with `SERVICE_TOKEN`). Each module stores them (encrypted, a proxy URL may
+carry credentials) and writes them into its process environment; httpx then
+routes its outbound calls through the proxy — no restart and no per-module
+change needed. A module restores the stored proxy when it starts; one added
+to the deployment later receives it on the next save or "Resync modules".
+Clearing a field in Pilot clears it in every module.
 
-- The proxy URL is validated against the shared SSRF guard (an internal or
-  cloud-metadata target is rejected) and every change is audit-logged
-  (source IP + proxy host, credentials stripped).
-- `no_proxy` **must** list the internal hosts that stay on the Docker
-  network — the other modules, Pilot and the databases — so inter-module
-  traffic is never sent to the corporate proxy. PostgreSQL connections use
-  asyncpg (not httpx) and are never proxied regardless.
+- The proxy URL must be a single URL, and is validated against the shared
+  SSRF guard (an internal or cloud-metadata target is rejected). Each change
+  is logged with the proxy host only, credentials stripped.
+- `no_proxy` is the exception list: comma-separated IPs, domains (a domain
+  also covers its subdomains) and `*.domain`, each with an optional `:port`.
+  Pilot refuses an entry that is none of these, and ranges (list the
+  addresses). Internal traffic never goes through the proxy: while one is
+  set, each module adds the loopback names and the host of every internal
+  service URL it is configured with (`PILOT_URL`, `ASSET_URL`, …).
+  PostgreSQL connections use asyncpg (not httpx) and are never proxied.
+- A proxy set in a module's own environment is the base: the one Pilot
+  pushes replaces it, and clearing Pilot's brings it back.
+- Surface's scanners reach the scanned targets directly, not through the
+  proxy Pilot pushes; its calls to third-party services (CVE feeds, Shodan,
+  the certificate transparency logs) go through it. A proxy set in the
+  deployment's own environment, as in a standalone `.env`, the scanners
+  follow, as before.
 - Standalone single-module deployments have no Pilot: there the proxy is set
   directly via the `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` variables in the
   module's `.env` at deploy time (see each standalone `.env.example`).

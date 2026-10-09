@@ -18,6 +18,7 @@ from __future__ import annotations
 import logging
 import os
 import secrets
+from urllib.parse import urlparse
 
 from datetime import datetime, timedelta, timezone
 
@@ -25,6 +26,7 @@ from fastapi import APIRouter, HTTPException, Request, Depends
 from sqlalchemy import select, func, distinct
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.proxy_common import apply_proxy
 from src.database import async_session, get_db
 from src.models import Alert, AlertMatch, AppSettings, Scope, User, WatchTarget
 from src.settings_crypto import decrypt_setting, encrypt_setting_or_plain
@@ -285,6 +287,44 @@ async def delete_user(request: Request, db: AsyncSession = Depends(get_db)):
     await db.commit()
     return {"ok": True, "deleted": True}
 
+def _validate_proxy_url(url: str) -> None:
+    """Reject a proxy URL that points at an internal target.
+
+    The route below exports it into the process-wide HTTP(S)_PROXY, which
+    httpx honours (trust_env) for every outbound request the module makes,
+    including the ones another guard pinned to a resolved IP.
+    """
+    from src.ssrf_guard import validate_public_url
+
+    try:
+        validate_public_url(url)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Proxy endpoint not allowed: {e}")
+
+
+@router.put("/internal/proxy")
+async def internal_proxy(request: Request, db: AsyncSession = Depends(get_db)):
+    """Receive the outbound proxy config from Pilot: validated, then stored and
+    exported by src.proxy_common, which restores it at start-up. An empty
+    value clears it."""
+    _check_service_token(request)
+    body = await request.json()
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=400, detail="Expected a JSON object")
+    for key in ("http_proxy", "https_proxy"):
+        if body.get(key):
+            _validate_proxy_url(str(body[key]))
+    try:
+        changed = await apply_proxy(db, body)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Proxy endpoint not allowed: {e}")
+    # Host only: a proxy URL may carry credentials.
+    if changed:
+        logger.info("proxy config received from pilot (%s)", " ".join(
+            f"{k}={v if k == 'no_proxy' else (urlparse(v).hostname or '(cleared)')}" for k, v in changed.items()))
+    return {"ok": True}
+
+
 @router.put("/internal/ai-custom")
 async def set_ai_custom(request: Request):
     _check_service_token(request)
@@ -386,7 +426,7 @@ async def internal_export_item(item_id: str, request: Request, db: AsyncSession 
     settings_rows = (await db.execute(select(AppSettings))).scalars().all()
     safe_settings = [
         {"key": s.key, "value": s.value}
-        for s in settings_rows if not s.key.startswith("ai_")
+        for s in settings_rows if not s.key.startswith(("ai_", "proxy."))
     ]
 
     return {
@@ -432,7 +472,7 @@ async def internal_restore_item(item_id: str, request: Request, db: AsyncSession
     await db.execute(_delete(Scope))
     for s in data.get("app_settings") or []:
         k = s.get("key")
-        if k and not k.startswith("ai_"):
+        if k and not k.startswith(("ai_", "proxy.")):
             await db.execute(_delete(AppSettings).where(AppSettings.key == k))
 
     for row in data.get("scopes") or []:
@@ -454,7 +494,7 @@ async def internal_restore_item(item_id: str, request: Request, db: AsyncSession
     for row in data.get("digest_runs") or []:
         db.add(_BkDigest(**_bk_coerce(_BkDigest, row, dropped)))
     for s in data.get("app_settings") or []:
-        if s.get("key") and not s["key"].startswith("ai_"):
+        if s.get("key") and not s["key"].startswith(("ai_", "proxy.")):
             db.add(AppSettings(key=s["key"], value=s.get("value", "")))
 
     # Full-instance wipe+reinsert — always journaled (FEAT-30 review).
