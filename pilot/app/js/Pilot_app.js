@@ -2772,14 +2772,22 @@
             return '<option value="' + esc(m.id) + '"' + (m.id === selected ? ' selected' : '') + '>' + esc(m.label || m.id) + '</option>';
         }).join("");
     }
+    // A key field: bullets for a configured key, and a button that clears it
+    // (the field alone cannot tell "emptied on purpose" from "clicked into").
+    function _keyInput(id, placeholder, configured) {
+        var h = '<input type="password" id="' + id + '" class="ct-input" placeholder="' + esc(placeholder) + '" value="'
+            + (configured ? "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" : "") + '">';
+        if (configured)
+            h += '<button type="button" class="ct-btn ct-mt-1" data-size="xs" data-click="_clearAiKey" data-args=\'' + _da(id) + '\'>' + esc(t("pilot.settings.clear_key")) + '</button>';
+        return h;
+    }
     function _renderAiProviderFields(provider, s) {
         var h = '';
-        var bullets = "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022";
         if (provider === "anthropic") {
             h += '<div class="ct-form-grid">';
             h += '<div><label class="pilot-label">' + t("pilot.settings.model") + '</label><select id="set-ai-model" class="ct-select">' + _aiModelOptions("anthropic", s) + '</select></div>';
             h += '<div><label class="pilot-label">' + t("pilot.settings.api_key_anthropic") + '</label>';
-            h += '<input type="password" id="set-key-anthropic" class="ct-input" placeholder="sk-ant-..." value="' + (s.ai_key_anthropic === "configured" ? bullets : "") + '">';
+            h += _keyInput("set-key-anthropic", "sk-ant-...", s.ai_key_anthropic === "configured");
             h += '<div style="font-size:var(--ct-text-label);color:' + (s.ai_key_anthropic === "configured" ? 'var(--ct-low)' : 'var(--ct-ink-2)') + ';margin-top:2px">' + (s.ai_key_anthropic === "configured" ? t("pilot.settings.key_configured") : t("pilot.settings.key_not_configured")) + '</div></div>';
             h += '</div>';
         }
@@ -2787,7 +2795,7 @@
             h += '<div class="ct-form-grid">';
             h += '<div><label class="pilot-label">' + t("pilot.settings.model") + '</label><select id="set-ai-model" class="ct-select">' + _aiModelOptions("openai", s) + '</select></div>';
             h += '<div><label class="pilot-label">' + t("pilot.settings.api_key_openai") + '</label>';
-            h += '<input type="password" id="set-key-openai" class="ct-input" placeholder="sk-..." value="' + (s.ai_key_openai === "configured" ? bullets : "") + '">';
+            h += _keyInput("set-key-openai", "sk-...", s.ai_key_openai === "configured");
             h += '<div style="font-size:var(--ct-text-label);color:' + (s.ai_key_openai === "configured" ? 'var(--ct-low)' : 'var(--ct-ink-2)') + ';margin-top:2px">' + (s.ai_key_openai === "configured" ? t("pilot.settings.key_configured") : t("pilot.settings.key_not_configured")) + '</div></div>';
             h += '</div>';
         }
@@ -2795,7 +2803,7 @@
             h += '<div class="ct-form-grid">';
             h += '<div><label class="pilot-label">' + t("pilot.settings.model") + '</label><select id="set-ai-model" class="ct-select">' + _aiModelOptions("gemini", s) + '</select></div>';
             h += '<div><label class="pilot-label">' + t("pilot.settings.api_key_gemini") + '</label>';
-            h += '<input type="password" id="set-key-gemini" class="ct-input" placeholder="AIza..." value="' + (s.ai_key_gemini === "configured" ? bullets : "") + '">';
+            h += _keyInput("set-key-gemini", "AIza...", s.ai_key_gemini === "configured");
             h += '<div style="font-size:var(--ct-text-label);color:' + (s.ai_key_gemini === "configured" ? 'var(--ct-low)' : 'var(--ct-ink-2)') + ';margin-top:2px">' + (s.ai_key_gemini === "configured" ? t("pilot.settings.key_configured") : t("pilot.settings.key_not_configured")) + '</div></div>';
             h += '</div>';
         }
@@ -2806,16 +2814,36 @@
             h += '<div><label class="pilot-label">' + t("pilot.settings.model") + '</label><input type="text" id="set-ai-model" class="ct-input" placeholder="llama3, mistral-large, ..." value="' + esc(s.ai_model || s.ai_custom_model || '') + '"></div>';
             h += '</div>';
             h += '<div class="ct-mb-2"><label class="pilot-label">' + t("pilot.settings.endpoint_url") + '</label><input type="text" id="set-custom-endpoint" class="ct-input" placeholder="http://ollama:11434/v1" value="' + esc(s.ai_custom_endpoint || '') + '"></div>';
-            h += '<div><label class="pilot-label">' + t("pilot.settings.api_key_optional") + '</label><input type="password" id="set-custom-key" class="ct-input" placeholder="' + t("pilot.settings.no_auth_placeholder") + '" value="' + (s.ai_custom_key === "configured" ? bullets : "") + '"></div>';
+            h += '<div><label class="pilot-label">' + t("pilot.settings.api_key_optional") + '</label>' + _keyInput("set-custom-key", t("pilot.settings.no_auth_placeholder"), s.ai_custom_key === "configured") + '</div>';
         }
         return h;
     }
+    // The value to send for a key field, or null to leave the stored key alone:
+    // the bullets of a configured key, or an empty field, send nothing; a typed
+    // key is sent; only the clear button (``cleared``) sends it empty.
+    function _aiKeyToSend(value, cleared) {
+        if (value === null || value.indexOf("\u2022") >= 0)
+            return null;
+        return value || cleared ? value : null;
+    }
+    // "Clear the key": the field empty and marked, so the save sends it empty.
+    window._clearAiKey = function (id) {
+        var el = document.getElementById(id);
+        if (!el)
+            return;
+        el.value = "";
+        el.dataset.cleared = "1";
+        el.placeholder = t("pilot.settings.key_cleared_on_save");
+    };
     function _bindAiKeyFocusHandlers() {
         ["set-key-anthropic", "set-key-openai", "set-key-gemini", "set-custom-key"].forEach(function (id) {
             var el = document.getElementById(id);
-            if (el)
-                el.onfocus = function () { var inp = this; if (inp.value.indexOf("\u2022") >= 0)
-                    inp.value = ""; };
+            if (!el)
+                return;
+            // Focus clears the bullets: typing gives a new key, a field left
+            // empty keeps the stored one (only the clear button removes it).
+            el.onfocus = function () { var inp = this; if (inp.value.indexOf("\u2022") >= 0)
+                inp.value = ""; };
         });
     }
     function _renderSettings(c) {
@@ -2892,7 +2920,8 @@
         h += '<div><label class="pilot-label">HTTP_PROXY</label><input type="text" id="set-http-proxy" class="ct-input" placeholder="http://proxy:3128" value="' + esc(s.http_proxy || '') + '"></div>';
         h += '<div><label class="pilot-label">HTTPS_PROXY</label><input type="text" id="set-https-proxy" class="ct-input" placeholder="http://proxy:3128" value="' + esc(s.https_proxy || '') + '"></div>';
         h += '</div>';
-        h += '<div><label class="pilot-label">NO_PROXY</label><input type="text" id="set-no-proxy" class="ct-input" placeholder="localhost,127.0.0.1,.internal" value="' + esc(s.no_proxy || '') + '"></div>';
+        h += '<div><label class="pilot-label">NO_PROXY</label><input type="text" id="set-no-proxy" class="ct-input" placeholder="10.4.2.1,*.medsecure.local,ldap.medsecure.example:636" value="' + esc(s.no_proxy || '') + '">'
+            + '<div class="ct-text-label ct-muted ct-mt-1">' + esc(t("pilot.settings.no_proxy_hint")) + '</div></div>';
         h += '</div>';
         // SMTP section — consumed by Watch (daily digest) and future module notifications.
         var bullets = '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022';
@@ -2933,13 +2962,21 @@
             };
         _bindAiKeyFocusHandlers();
     }
+    // "module (reason)" for every module the settings push did not fully reach.
+    function _pushFailures(push) {
+        var ko = [];
+        for (var m in push || {})
+            if (push[m] !== "ok")
+                ko.push(m + " (" + push[m] + ")");
+        return ko;
+    }
     window._saveSettings = function () {
         function _val(id) { var el = document.getElementById(id); return el ? el.value : null; }
         var data = {
             ai_provider: _val("set-ai-provider"),
-            http_proxy: _val("set-http-proxy") || "",
-            https_proxy: _val("set-https-proxy") || "",
-            no_proxy: _val("set-no-proxy") || "",
+            http_proxy: (_val("set-http-proxy") || "").trim(),
+            https_proxy: (_val("set-https-proxy") || "").trim(),
+            no_proxy: (_val("set-no-proxy") || "").trim(),
         };
         var demoEl = document.getElementById("set-demo-mode");
         if (demoEl)
@@ -2947,20 +2984,18 @@
         var modelVal = _val("set-ai-model");
         if (modelVal !== null)
             data.ai_model = modelVal;
-        // Only send AI keys if user typed a real value (not bullets)
-        var kAnth = _val("set-key-anthropic");
-        var kOai = _val("set-key-openai");
-        if (kAnth && kAnth.indexOf("\u2022") < 0)
-            data.ai_key_anthropic = kAnth;
-        if (kOai && kOai.indexOf("\u2022") < 0)
-            data.ai_key_openai = kOai;
-        var kGem = _val("set-key-gemini");
-        if (kGem && kGem.indexOf("\u2022") < 0)
-            data.ai_key_gemini = kGem;
+        function _keyField(id, key) {
+            var el = document.getElementById(id);
+            var v = _aiKeyToSend(el ? el.value : null, !!(el && el.dataset.cleared));
+            if (v !== null)
+                data[key] = v;
+        }
+        _keyField("set-key-anthropic", "ai_key_anthropic");
+        _keyField("set-key-openai", "ai_key_openai");
+        _keyField("set-key-gemini", "ai_key_gemini");
         // Custom LLM (only present when provider === "custom")
         var customEndpoint = _val("set-custom-endpoint");
         var customLabel = _val("set-custom-label");
-        var customKey = _val("set-custom-key");
         if (customEndpoint !== null)
             data.ai_custom_endpoint = customEndpoint.trim();
         if (customLabel !== null)
@@ -2968,8 +3003,7 @@
         // Custom model is captured via set-ai-model when provider=custom; mirror to ai_custom_model
         if (data.ai_provider === "custom" && modelVal)
             data.ai_custom_model = modelVal.trim();
-        if (customKey && customKey.indexOf("\u2022") < 0)
-            data.ai_custom_key = customKey;
+        _keyField("set-custom-key", "ai_custom_key");
         // SMTP — only send password if user typed a real value (not the bullet
         // placeholder shown when a password is already configured).
         var smtpHost = _val("set-smtp-host");
@@ -3001,7 +3035,12 @@
                         msg += t("pilot.settings.key_valid", { provider: p });
                 }
             }
-            showStatus(msg);
+            // The push is not an HTTP error: a module that refused part of it, or
+            // a key Pilot could not decrypt and did not send, shows only here.
+            var ko = _pushFailures(resp.push);
+            if (ko.length)
+                msg = t("pilot.settings.saved_push_partial", { modules: ko.join(", ") });
+            showStatus(msg, ko.length > 0);
             _renderPanel();
         }).catch(function (e) {
             var msg = e.message || "";
@@ -3022,10 +3061,7 @@
         showStatus(t("pilot.settings.resyncing"));
         _fetch("/settings/resync", { method: "POST", body: {} }).then(function (resp) {
             var push = resp.push || {};
-            var ko = [];
-            for (var m in push)
-                if (push[m] !== "ok")
-                    ko.push(m + " (" + push[m] + ")");
+            var ko = _pushFailures(resp.push);
             showStatus(ko.length
                 ? t("pilot.settings.resync_partial", { modules: ko.join(", ") })
                 : t("pilot.settings.resync_done", { count: String(Object.keys(push).length) }));

@@ -194,6 +194,81 @@ def test_every_module_can_deprovision() -> list[str]:
     return problems
 
 
+# What Pilot pushes to every module from its settings (`_push_to_modules`).
+# Pilot did not read the answers, so a module without the route never got the
+# config and nothing said so: Surface had no `ai-custom` (its custom LLM always
+# answered "not configured"), and Surface, AppSec and Watch had no `proxy`.
+# A route Pilot pushes only to the modules that opted in is listed here.
+PILOT_PUSH_OPT_IN = {"smtp": "only the modules that send mail receive the relay config"}
+
+
+def _pilot_pushes() -> list[str]:
+    src = (REPO_ROOT / "pilot" / "src" / "routes" / "settings.py").read_text(encoding="utf-8")
+    return sorted(set(re.findall(r'client\.put\(base \+ "/api/internal/([a-z-]+)"', src)))
+
+
+def test_every_module_receives_what_pilot_pushes() -> list[str]:
+    pushed = [r for r in _pilot_pushes() if r not in PILOT_PUSH_OPT_IN]
+    if not pushed:
+        return ["no PUT /api/internal/* found in Pilot's settings push — has it moved?"]
+    problems = []
+    for f in sorted(REPO_ROOT.glob("*/src/routes/internal.py")):
+        if f.parts[-4] == "pilot":
+            continue
+        src = f.read_text(encoding="utf-8")
+        problems += [f"{f.parts[-4]}: no PUT /internal/{r} (pushed by Pilot)"
+                     for r in pushed if f'@router.put("/internal/{r}")' not in src]
+    return problems
+
+
+def test_every_module_restores_its_proxy_at_startup() -> list[str]:
+    """A module that receives Pilot's proxy stores it, and must export it again
+    when it starts: the environment does not outlive the process. Each such
+    module's `on_startup` awaits `restore_proxy` (src.proxy_common)."""
+    problems = []
+    for f in sorted(REPO_ROOT.glob("*/src/routes/internal.py")):
+        module = f.parts[-4]
+        if module == "pilot" or '@router.put("/internal/proxy")' not in f.read_text(encoding="utf-8"):
+            continue
+        tree = ast.parse((REPO_ROOT / module / "src" / "main.py").read_text(encoding="utf-8"))
+        startups = [n for n in ast.walk(tree)
+                    if isinstance(n, ast.AsyncFunctionDef) and n.name == "on_startup"]
+        awaited = {c.value.func.id for fn in startups for c in ast.walk(fn)
+                   if isinstance(c, ast.Await) and isinstance(c.value, ast.Call)
+                   and isinstance(c.value.func, ast.Name)}
+        if "restore_proxy" not in awaited:
+            problems.append(f"{module}: on_startup does not await restore_proxy "
+                            "(the pushed proxy is lost at every restart)")
+    return problems
+
+
+def test_backups_leave_out_what_pilot_pushes() -> list[str]:
+    """A module's backup/restore of `app_settings` leaves out what Pilot pushes
+    (`ai_*`, `proxy.*`): a restore must not bring back another deployment's
+    keys or an outbound proxy, which start-up exports without re-validating.
+    Every `startswith(...)` filter that names `ai_` must name `proxy.` too,
+    and a module that backs up `app_settings` must filter it at all.
+    (Surface's routes are also exercised: tests/unit/test_backup_settings.py.)"""
+    problems = []
+    for f in sorted(REPO_ROOT.glob("*/src/routes/internal.py")):
+        src = f.read_text(encoding="utf-8")
+        filters = []
+        for node in ast.walk(ast.parse(src)):
+            if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                    and node.func.attr == "startswith" and node.args):
+                arg = node.args[0]
+                values = [e.value for e in (arg.elts if isinstance(arg, ast.Tuple) else [arg])
+                          if isinstance(e, ast.Constant)]
+                if "ai_" in values:
+                    filters.append((node.lineno, values))
+        rel = f.relative_to(REPO_ROOT)
+        if '"app_settings"' in src and not filters:
+            problems.append(f"{rel}: backs up app_settings without leaving out ai_* / proxy.*")
+        problems += [f"{rel}:{line}: excludes ai_* but not proxy.*"
+                     for line, values in filters if "proxy." not in values]
+    return problems
+
+
 def test_user_fks_never_block_a_delete() -> list[str]:
     """Every FK to users.id must say what happens on delete. PostgreSQL's
     default (NO ACTION) makes the deletion fail as soon as the person owns
@@ -673,6 +748,9 @@ CHECKS = (
     ("every send validates the host", test_every_surface_send_validates_the_host),
     ("mail links use PUBLIC_BASE_URL", test_mail_links_use_the_suite_env_name),
     ("every module can de-provision", test_every_module_can_deprovision),
+    ("Pilot pushes reach every module", test_every_module_receives_what_pilot_pushes),
+    ("pushed proxy restored at start-up", test_every_module_restores_its_proxy_at_startup),
+    ("backups leave out what Pilot pushes", test_backups_leave_out_what_pilot_pushes),
     ("user FKs never block a delete", test_user_fks_never_block_a_delete),
     ("secrets decrypted on read", test_secret_settings_are_decrypted_on_read),
     ("one model catalogue", test_one_model_catalogue_everywhere),

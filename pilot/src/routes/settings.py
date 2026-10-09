@@ -72,8 +72,9 @@ async def get_settings(user: User = Depends(get_current_user), db: AsyncSession 
     settings = {}
     for key in SETTINGS_KEYS:
         val = await _get_setting(key, db)
-        # Mask secrets: API keys + Bedrock secret + SMTP password
-        if ("key_" in key or "secret_" in key or key == "smtp_password") and val and len(val) > 4:
+        # Mask every secret (the list that is encrypted at rest): matching
+        # names on "key_" let the custom LLM key go back in clear.
+        if is_secret_key(key) and val:
             settings[key] = "configured"
         else:
             settings[key] = val
@@ -137,10 +138,26 @@ async def update_settings(body: SettingsUpdate, user: User = Depends(get_current
     if body.ai_custom_endpoint and body.ai_custom_model:
         # C-3 fix: validate endpoint URL to prevent SSRF
         _validate_endpoint_url(body.ai_custom_endpoint)
-        valid, err = await _validate_ai_key("custom", body.ai_custom_key or "", body.ai_custom_endpoint, body.ai_custom_model)
+        # The screen does not send back a key it shows masked: validate with
+        # the stored one, or every save is refused by an LLM that requires it.
+        key = body.ai_custom_key if body.ai_custom_key is not None else await _get_setting("ai_custom_key", db)
+        valid, err = await _validate_ai_key("custom", key or "", body.ai_custom_endpoint, body.ai_custom_model)
         validation["custom"] = {"valid": valid, "error": err}
         if not valid:
             raise HTTPException(status_code=400, detail=f"LLM custom invalide: {err}")
+
+    # The proxy goes to every module as is: an exception httpx cannot parse
+    # breaks every HTTP client of a module, a list in a proxy URL reaches
+    # whatever its second entry names. Refused here, before anything is stored.
+    from src.proxy_common import _check_single_url, normalize_no_proxy
+    try:
+        for field in ("http_proxy", "https_proxy"):
+            if getattr(body, field):
+                _check_single_url(field, getattr(body, field))
+        if body.no_proxy is not None:
+            body.no_proxy = normalize_no_proxy(body.no_proxy)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     updates = body.model_dump(exclude_none=True)
     # If client re-sent the masked placeholder for smtp_password ("configured"),
@@ -298,51 +315,67 @@ async def _push_to_modules(db: AsyncSession) -> dict:
     result = await db.execute(select(ModuleRegistry))
     modules = result.scalars().all()
 
-    # Gather settings to push
-    ai_provider = await _get_setting("ai_provider", db)
-    ai_model = await _get_setting("ai_model", db)
-    ai_key_anthropic = await _get_setting("ai_key_anthropic", db)
-    ai_key_openai = await _get_setting("ai_key_openai", db)
-    ai_key_gemini = await _get_setting("ai_key_gemini", db)
-    ai_key_bedrock = await _get_setting("ai_key_bedrock", db)
-    ai_secret_bedrock = await _get_setting("ai_secret_bedrock", db)
-    ai_region_bedrock = await _get_setting("ai_region_bedrock", db)
+    # Gather settings to push. A secret Pilot cannot decrypt (ENCRYPTION_KEY
+    # changed) reads back as "": sending it would blank the modules' copy as
+    # if it had been cleared here. It is left out, and every module's report
+    # says so.
+    unreadable: list[str] = []
+
+    async def _secret(key: str) -> str | None:
+        value = await _get_setting(key, db)
+        if value or not is_secret_key(key):
+            return value
+        row = (await db.execute(select(AppSettings).where(AppSettings.key == key))).scalar_one_or_none()
+        if row is not None and (row.value or ""):
+            unreadable.append(key)
+            return None
+        return value
+
     ai_custom_endpoint = await _get_setting("ai_custom_endpoint", db)
     ai_custom_model = await _get_setting("ai_custom_model", db)
-    ai_custom_key = await _get_setting("ai_custom_key", db)
+    ai_custom_key = await _secret("ai_custom_key")
     ai_custom_label = await _get_setting("ai_custom_label", db)
     http_proxy = await _get_setting("http_proxy", db)
     https_proxy = await _get_setting("https_proxy", db)
     no_proxy = await _get_setting("no_proxy", db)
 
-    payload = {}
-    if ai_key_anthropic:
-        payload["anthropic"] = ai_key_anthropic
-    if ai_key_openai:
-        payload["openai"] = ai_key_openai
-    if ai_key_gemini:
-        payload["gemini"] = ai_key_gemini
-    # Bedrock: access key id goes under "bedrock", secret + region as extras
-    # (the module /api/ai/keys handler upserts ai_key_bedrock + ai_secret_bedrock
-    # + ai_region_bedrock).
-    if ai_key_bedrock:
-        payload["bedrock"] = ai_key_bedrock
-    if ai_secret_bedrock:
-        payload["ai_secret_bedrock"] = ai_secret_bedrock
-    if ai_region_bedrock:
-        payload["ai_region_bedrock"] = ai_region_bedrock
-    if ai_provider:
-        payload["provider"] = ai_provider
-    if ai_model:
-        payload["model"] = ai_model
+    # Every AI setting goes with each push, empty included: Pilot is
+    # authoritative, and one cleared here must be cleared in the module, which
+    # otherwise kept it for ever. Bedrock: the access key id goes under
+    # "bedrock", secret + region as extras (the module /api/ai/keys handler
+    # upserts ai_key_bedrock + ai_secret_bedrock + ai_region_bedrock).
+    candidates = {
+        "anthropic": await _secret("ai_key_anthropic"),
+        "openai": await _secret("ai_key_openai"),
+        "gemini": await _secret("ai_key_gemini"),
+        "bedrock": await _secret("ai_key_bedrock"),
+        "ai_secret_bedrock": await _secret("ai_secret_bedrock"),
+        "ai_region_bedrock": await _get_setting("ai_region_bedrock", db),
+        "provider": await _get_setting("ai_provider", db),
+        "model": await _get_setting("ai_model", db),
+        # The custom LLM also goes with the keys, which the module stores (key
+        # encrypted) and reads when its in-memory copy is empty: a module
+        # restart no longer loses it, label included.
+        "ai_custom_endpoint": ai_custom_endpoint,
+        "ai_custom_key": ai_custom_key,
+        "ai_custom_model": ai_custom_model,
+        "ai_custom_label": ai_custom_label,
+    }
+    if ai_custom_key is None:  # the whole custom LLM stays as the module has it:
+        candidates = {k: v for k, v in candidates.items() if not k.startswith("ai_custom_")}
+        # a new endpoint would otherwise be paired with the module's old key
+    payload = {k: v for k, v in candidates.items() if v is not None}
 
-    proxy_payload = {}
-    if http_proxy:
-        proxy_payload["http_proxy"] = http_proxy
-    if https_proxy:
-        proxy_payload["https_proxy"] = https_proxy
-    if no_proxy:
-        proxy_payload["no_proxy"] = no_proxy
+    # Every field, empty included: the module stores the proxy and restores it
+    # at start-up, so one cleared here must be cleared there.
+    # An exception list stored before they were validated (a range, typically)
+    # would make every module refuse the whole proxy: its unreadable entries
+    # are left out, and reported.
+    from src.proxy_common import normalize_no_proxy
+    kept = normalize_no_proxy(no_proxy, strict=False)
+    left_out = [e.strip() for e in (no_proxy or "").split(",")
+                if e.strip() and not normalize_no_proxy(e, strict=False)]
+    proxy_payload = {"http_proxy": http_proxy, "https_proxy": https_proxy, "no_proxy": kept}
 
     # SMTP payload — only sent if host is set; password is sent in clear over
     # the internal-network channel (already protected by SERVICE_TOKEN + the
@@ -354,7 +387,7 @@ async def _push_to_modules(db: AsyncSession) -> dict:
             "host": smtp_host,
             "port": await _get_setting("smtp_port", db),
             "user": await _get_setting("smtp_user", db),
-            "password": await _get_setting("smtp_password", db),
+            "password": await _secret("smtp_password"),
             "from_addr": await _get_setting("smtp_from", db),
             "tls": await _get_setting("smtp_tls", db),
         }
@@ -368,16 +401,24 @@ async def _push_to_modules(db: AsyncSession) -> dict:
                 report[m.id] = "skipped"
                 continue
             base = m.internal_url.rstrip("/")
+            failed: list[str] = []
             try:
                 # Push AI keys
-                if payload:
-                    resp = await client.put(base + "/api/ai/keys", headers=headers, json=payload)
-                    if not resp.is_success:
-                        report[m.id] = f"ai_keys: HTTP {resp.status_code}"
-                        continue
+                resp = await client.put(base + "/api/ai/keys", headers=headers, json=payload)
+                # Reported, not fatal, like the pushes below: the proxy (empty
+                # included, to clear it) must still reach the module.
+                if not resp.is_success:
+                    failed.append(f"ai_keys: HTTP {resp.status_code}")
 
-                # Push custom LLM config
-                if ai_custom_endpoint:
+                if left_out:
+                    failed.append(f"no_proxy: left out {', '.join(left_out)} (re-enter the exceptions)")
+                if unreadable:
+                    failed.append("not sent, unreadable in Pilot (re-enter it): " + ", ".join(unreadable))
+
+                # Push custom LLM config; an empty endpoint clears the
+                # module's in-memory copy. Not with an unreadable key: the
+                # push replaces the whole config, key included.
+                if ai_custom_key is not None:
                     custom_payload = {
                         "endpoint": ai_custom_endpoint,
                         "model": ai_custom_model,
@@ -385,19 +426,28 @@ async def _push_to_modules(db: AsyncSession) -> dict:
                         "label": ai_custom_label or "Custom LLM",
                     }
                     resp = await client.put(base + "/api/internal/ai-custom", headers=headers, json=custom_payload)
-                    # Ignore 404 if module doesn't support it yet
+                    # Reported, not fatal: the pushes below still go out. A
+                    # module that refuses it would otherwise read "ok" while
+                    # its AI answers "Custom LLM not configured".
+                    if not resp.is_success:
+                        failed.append(f"ai_custom: HTTP {resp.status_code}")
 
                 # Push proxy config
-                if proxy_payload:
-                    resp = await client.put(base + "/api/internal/proxy", headers=headers, json=proxy_payload)
+                resp = await client.put(base + "/api/internal/proxy", headers=headers, json=proxy_payload)
+                if not resp.is_success:
+                    failed.append(f"proxy: HTTP {resp.status_code}")
 
                 # Push SMTP config (only modules that opted in via the route
-                # will accept it; 404 is silently ignored).
-                if smtp_payload:
+                # will accept it; 404 or 405 is a module that sends no mail). Not
+                # with an unreadable password: the push replaces the whole
+                # config, and the module would lose its working one.
+                if smtp_payload and smtp_payload["password"] is not None:
                     try:
-                        await client.put(base + "/api/internal/smtp", headers=headers, json=smtp_payload)
-                    except httpx.HTTPError:
-                        pass
+                        resp = await client.put(base + "/api/internal/smtp", headers=headers, json=smtp_payload)
+                        if not resp.is_success and resp.status_code not in (404, 405):
+                            failed.append(f"smtp: HTTP {resp.status_code}")
+                    except httpx.HTTPError as e:
+                        failed.append(f"smtp: {type(e).__name__}")
 
                 # Push centralised connector credentials. Re-discovers
                 # consumers each pass via GET /api/connectors so new
@@ -407,9 +457,9 @@ async def _push_to_modules(db: AsyncSession) -> dict:
                 # skip them silently. See docs/CHANTIER_CONNECTEURS.md.
                 await _push_connectors_to(client, base, headers, db)
 
-                report[m.id] = "ok"
+                report[m.id] = "; ".join(failed) or "ok"
             except Exception as e:
-                report[m.id] = f"error: {str(e)[:50]}"
+                report[m.id] = "; ".join(failed + [f"error: {str(e)[:50]}"])
 
     return report
 

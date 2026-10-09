@@ -4,6 +4,7 @@ import asyncio
 import logging
 import os
 import secrets
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import func, select
@@ -11,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from datetime import datetime, timezone
 
+from src.proxy_common import apply_proxy
 from src.database import get_db
 from src.settings_crypto import encrypt_setting_or_plain
 from src.models import (
@@ -31,7 +33,9 @@ SERVICE_TOKEN = os.getenv("SERVICE_TOKEN", "")
 MODULE_NAME = os.getenv("MODULE_NAME", "surface")
 PILOT_URL = os.getenv("PILOT_URL", "")
 
-# Placeholder for custom LLM config (consumed by ai.py). Empty by default.
+# Custom LLM config pushed by Pilot at PUT /internal/ai-custom, held in
+# memory. Read by src.ai_proxy_common._get_custom_llm, which falls back on
+# the copy Pilot also sends with the AI keys, stored (after a restart).
 _custom_llm: dict = {}
 
 
@@ -435,7 +439,7 @@ async def internal_export_item(item_id: str, request: Request, db: AsyncSession 
     safe_settings = [
         {"key": s.key, "value": s.value}
         for s in settings_rows
-        if not s.key.startswith("ai_")
+        if not s.key.startswith(("ai_", "proxy."))
     ]
 
     exclusions = (await db.execute(select(ScanExclusion))).scalars().all()
@@ -503,7 +507,7 @@ async def internal_restore_item(item_id: str, request: Request, db: AsyncSession
     # rewrite — leaves ai_* and any operator-managed keys intact.
     for s in data.get("app_settings") or []:
         k = s.get("key")
-        if k and not k.startswith("ai_"):
+        if k and not k.startswith(("ai_", "proxy.")):
             await db.execute(_delete(AppSettings).where(AppSettings.key == k))
 
     # Restore in FK order: findings before measures (FK), assets first.
@@ -519,7 +523,7 @@ async def internal_restore_item(item_id: str, request: Request, db: AsyncSession
     for row in data.get("scan_exclusions") or []:
         db.add(ScanExclusion(**_coerce(ScanExclusion, row, dropped)))
     for s in data.get("app_settings") or []:
-        if s.get("key") and not s["key"].startswith("ai_"):
+        if s.get("key") and not s["key"].startswith(("ai_", "proxy.")):
             db.add(AppSettings(key=s["key"], value=s.get("value", "")))
 
     # Full-instance wipe+reinsert — always journaled (FEAT-30 review).
@@ -689,6 +693,65 @@ async def internal_smtp(request: Request, db: AsyncSession = Depends(get_db)):
             await db.delete(row)
     await db.commit()
     logger.info("smtp config received from pilot (host=%s)", body.get("host", ""))
+    return {"ok": True}
+
+
+def _validate_proxy_url(url: str) -> None:
+    """Reject a proxy URL that points at an internal target.
+
+    The route below exports it into the process-wide HTTP(S)_PROXY, which
+    httpx honours (trust_env) for every outbound request the module makes,
+    including the ones another guard pinned to a resolved IP.
+    """
+    from src.ssrf_guard import validate_public_url
+
+    try:
+        validate_public_url(url)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Proxy endpoint not allowed: {e}")
+
+
+@router.put("/internal/proxy")
+async def internal_proxy(request: Request, db: AsyncSession = Depends(get_db)):
+    """Receive the outbound proxy config from Pilot: validated, then stored and
+    exported by src.proxy_common, which restores it at start-up. An empty
+    value clears it."""
+    _check_service_token(request)
+    body = await request.json()
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=400, detail="Expected a JSON object")
+    for key in ("http_proxy", "https_proxy"):
+        if body.get(key):
+            _validate_proxy_url(str(body[key]))
+    try:
+        changed = await apply_proxy(db, body)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Proxy endpoint not allowed: {e}")
+    # Host only: a proxy URL may carry credentials.
+    if changed:
+        logger.info("proxy config received from pilot (%s)", " ".join(
+            f"{k}={v if k == 'no_proxy' else (urlparse(v).hostname or '(cleared)')}" for k, v in changed.items()))
+    return {"ok": True}
+
+
+@router.put("/internal/ai-custom")
+async def internal_ai_custom(request: Request):
+    """Receive the custom LLM config from Pilot. Each push replaces the
+    previous one, so a key cleared in Pilot is cleared here too."""
+    _check_service_token(request)
+    body = await request.json()
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=400, detail="Expected a JSON object")
+    _custom_llm.clear()
+    _custom_llm.update({
+        "endpoint": str(body.get("endpoint") or ""),
+        "model": str(body.get("model") or ""),
+        "key": str(body.get("key") or ""),
+        "label": str(body.get("label") or "Custom LLM"),
+    })
+    # Host only: the endpoint may carry credentials, the key is never logged.
+    logger.info("custom LLM config received from pilot (host=%s, key set=%s)",
+                urlparse(_custom_llm["endpoint"]).hostname or "(none)", bool(_custom_llm["key"]))
     return {"ok": True}
 
 
