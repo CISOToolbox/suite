@@ -481,20 +481,27 @@ Clearing a field in Pilot clears it in every module.
 - A proxy set in a module's own environment is the base: the one Pilot
   pushes replaces it, and clearing Pilot's brings it back.
 - Surface's scanners follow the proxy too: the HTTP scanners, nuclei (given
-  the proxy explicitly) and the screenshot browser (credentials included). A
-  target in the exceptions is reached directly, on every port (an
-  exception's `:port` does not narrow a scan); an exception by address or by
-  range applies to the scanners that connect to a resolved address (the
-  security headers, sensitive files and JavaScript checks, nuclei, the
-  browser), the others match the name. A proxy that
-  refuses (a 407 included), cannot be reached or does not answer is logged
-  and reported as an error finding of the scanner, rather than read as
-  "nothing found";
-  many proxies refuse a connection to a bare IP address, which is what the
-  HTTP scanners connect to. Scanners that open raw sockets — nmap (port scan
-  and discovery), the TLS checks, the SMB scanner — cannot use an HTTP proxy
-  and connect directly; nmap and the TLS checks log a warning when a proxy
-  applies.
+  the proxy explicitly) and the screenshot browser (credentials included,
+  with the exception list). A target in the exceptions is reached directly,
+  on every port (an exception's `:port` does not narrow a scan), by name or
+  by the address it resolves to (an exception by address or by IPv4 range).
+  A proxy that refuses (a 407 included), cannot be reached, does not answer
+  the `CONNECT` or hangs up on it is logged and reported as an error finding
+  of the scanner, rather than read as "nothing found"; a failure once the
+  tunnel is open (a TLS handshake with the target, for instance) is the
+  target's. Scanners that open raw sockets — nmap (port scan and discovery),
+  the TLS checks, the SMB scanner — cannot use an HTTP proxy and connect
+  directly; nmap and the TLS checks log a warning when a proxy applies.
+- **Through the proxy, the name is resolved by the proxy.** The HTTP
+  scanners and a custom LLM endpoint are validated locally (an internal or
+  metadata name, address or resolution is refused), then requested by name:
+  a proxy filtering by name accepts them, and plain HTTP reaches the scanned
+  virtual host. Directly, they connect to the address validated (the
+  scripts the JavaScript check finds are fetched by name). A name the
+  attacker's DNS answers differently to the proxy (DNS rebinding) can then
+  lead the proxy to an internal address, and what it reads comes back in the
+  findings: **the proxy must refuse internal, loopback and cloud-metadata
+  destinations** (`169.254.169.254` included), as an egress proxy should.
 - Standalone single-module deployments have no Pilot: there the proxy is set
   directly via the `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` variables in the
   module's `.env` at deploy time (see each standalone `.env.example`).
