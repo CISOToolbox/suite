@@ -54,6 +54,20 @@ for _t in Base.metadata.tables.values():
             _c.type = JSON()
 
 
+@pytest.fixture(autouse=True)
+def _no_proxy_left_behind(monkeypatch):
+    """The push applies Pilot's own proxy to the process: undo it after each test."""
+    from src import proxy_common
+    for var in ("HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "no_proxy"):
+        monkeypatch.setenv(var, "")
+        monkeypatch.delenv(var)
+    monkeypatch.setattr(proxy_common, "_ENV_PROXY", {"http_proxy": "", "https_proxy": ""})
+    monkeypatch.setattr(proxy_common, "_ENV_NO_PROXY", "")
+    monkeypatch.setattr(proxy_common, "_pushed", {"http_proxy": "", "https_proxy": ""})
+    monkeypatch.setattr(proxy_common, "_pushed_no_proxy", "")
+    monkeypatch.setattr(proxy_common, "_extra_internal", [])
+
+
 @pytest_asyncio.fixture
 async def db():
     engine = create_async_engine("sqlite+aiosqlite://", connect_args={"check_same_thread": False},

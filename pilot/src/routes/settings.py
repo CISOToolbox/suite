@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
+import logging
 import os
 import re
+from urllib.parse import urlparse
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
@@ -17,6 +20,7 @@ from src.models import AppSettings, ModuleRegistry, User
 from src.settings_crypto import decrypt_setting, encrypt_setting, is_secret_key
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
+logger = logging.getLogger("pilot.settings")
 
 SERVICE_TOKEN = os.getenv("SERVICE_TOKEN", "")
 
@@ -150,10 +154,14 @@ async def update_settings(body: SettingsUpdate, user: User = Depends(get_current
     # breaks every HTTP client of a module, a list in a proxy URL reaches
     # whatever its second entry names. Refused here, before anything is stored.
     from src.proxy_common import _check_single_url, normalize_no_proxy
+    from src.ssrf_guard import validate_public_url
     try:
         for field in ("http_proxy", "https_proxy"):
             if getattr(body, field):
                 _check_single_url(field, getattr(body, field))
+                # Pilot follows it too now: never towards an internal or
+                # metadata address (the modules refuse those as well).
+                validate_public_url(getattr(body, field))
         if body.no_proxy is not None:
             body.no_proxy = normalize_no_proxy(body.no_proxy)
     except ValueError as e:
@@ -310,8 +318,80 @@ async def _validate_ai_key(provider: str, key: str, endpoint: str = "", model: s
     return False, "Fournisseur inconnu"
 
 
+async def apply_own_proxy(db: AsyncSession) -> None:
+    """Pilot's own outbound calls (connectors, AI key checks) follow the proxy
+    of its settings: httpx and boto3 read it from the process environment.
+    Every module Pilot calls with the service token is an exception — the
+    hosts of its registry and of the default module URLs — so the token
+    never crosses an outside proxy."""
+    from src.proxy_common import export_proxy
+    urls = [m.internal_url for m in (await db.execute(select(ModuleRegistry))).scalars().all()]
+    export_proxy(await _get_setting("http_proxy", db), await _get_setting("https_proxy", db),
+                 await _get_setting("no_proxy", db), _hosts(urls) + _default_module_hosts())
+
+
+def _hosts(urls) -> list[str]:
+    hosts = []
+    for url in filter(None, urls):
+        try:
+            hosts.append(urlparse(url).hostname or "")
+        except ValueError:  # a malformed URL names no host to exempt
+            continue
+    return hosts
+
+
+def _default_module_hosts() -> list[str]:
+    """The services Pilot calls with a token whatever its database says: the
+    default module URLs and the backup agent."""
+    from src.routes.modules import _DEFAULTS
+    from src.routes.restore import AGENT_URL
+    return _hosts([*(info["internal_url"] for info in _DEFAULTS.values()), AGENT_URL])
+
+
+_OWN_PROXY_RETRY_SECONDS = 30
+_own_proxy_retry: asyncio.Task | None = None
+
+
+async def restore_own_proxy(session_factory) -> asyncio.Task | None:
+    """Apply Pilot's proxy at start-up, before anything goes out. A database
+    error leaves the deployment's own proxy, with the default module URLs
+    exempt, says so, and retries in the background until the proxy of the
+    settings applies (returned task). Any other error is a bug: it stops the
+    start-up rather than leave Pilot on the wrong proxy."""
+    from sqlalchemy.exc import SQLAlchemyError
+
+    from src.proxy_common import export_proxy
+    try:
+        async with session_factory() as db:
+            await apply_own_proxy(db)
+        return None
+    except (SQLAlchemyError, OSError) as e:
+        logger.warning("own proxy not applied: %s; the deployment's own is used, retrying every %ss",
+                       e, _OWN_PROXY_RETRY_SECONDS)
+        export_proxy("", "", "", _default_module_hosts())
+
+    async def retry() -> None:
+        while True:
+            await asyncio.sleep(_OWN_PROXY_RETRY_SECONDS)
+            try:
+                async with session_factory() as db:
+                    await apply_own_proxy(db)
+                logger.info("own proxy applied")
+                return
+            except (SQLAlchemyError, OSError) as e:
+                logger.warning("own proxy still not applied: %s", e)
+            except Exception:  # a bug: said, not retried forever
+                logger.exception("own proxy not applied, retry stopped: the deployment's own stays in use")
+                return
+
+    global _own_proxy_retry  # a task nobody references can be collected mid-way
+    _own_proxy_retry = asyncio.get_running_loop().create_task(retry())
+    return _own_proxy_retry
+
+
 async def _push_to_modules(db: AsyncSession) -> dict:
     """Push AI keys and proxy config to all modules via their internal API."""
+    await apply_own_proxy(db)  # every save and resync passes here
     result = await db.execute(select(ModuleRegistry))
     modules = result.scalars().all()
 

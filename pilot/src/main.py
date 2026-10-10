@@ -159,6 +159,11 @@ async def on_startup():
         await conn.run_sync(Base.metadata.create_all)
     logger.info("Pilot database tables created")
 
+    # Pilot's own outbound proxy (connectors, AI key checks), before anything goes out.
+    from src.database import async_session as _sessions
+    from src.routes.settings import restore_own_proxy
+    await restore_own_proxy(_sessions)
+
     # Idempotent KPI catalogue seed. Safe to run on every boot — only
     # the definition shape is refreshed; user-tuned target/threshold/active
     # are preserved (see seeds/kpi_catalog.py docstring).
