@@ -2698,7 +2698,8 @@
             // Blocking confirmation: a restore can take a while and the 3 s toast
             // is easy to miss — the admin must know it is DONE.
             alert(t("pilot.backups.restored_confirm", { mod: r.module, n: r.restored })
-                + (r.errors ? "\n" + t("pilot.backups.restore_errors", { n: r.errors }) : ""));
+                + (r.errors ? "\n" + t("pilot.backups.restore_errors", { n: r.errors }) : "")
+                + (r.left_out && r.left_out.length ? "\n" + t("pilot.backups.restore_left_out", { keys: r.left_out.join(", ") }) : ""));
             _backupList = null;
             _renderPanel();
         }).catch(function (e) { alert(t("pilot.backups.restore_failed", { msg: e.message || String(e) })); });
@@ -3051,7 +3052,7 @@
                 }
                 catch (x) { }
             }
-            showStatus(t("pilot.common.error_msg", { msg: msg }));
+            showStatus(t("pilot.common.error_msg", { msg: msg }), true);
         });
     };
     // Re-push the stored settings without editing them. Needed after adding a
@@ -3064,9 +3065,9 @@
             var ko = _pushFailures(resp.push);
             showStatus(ko.length
                 ? t("pilot.settings.resync_partial", { modules: ko.join(", ") })
-                : t("pilot.settings.resync_done", { count: String(Object.keys(push).length) }));
+                : t("pilot.settings.resync_done", { count: String(Object.keys(push).length) }), ko.length > 0);
         }).catch(function (e) {
-            showStatus(t("pilot.common.error_msg", { msg: e.message || "" }));
+            showStatus(t("pilot.common.error_msg", { msg: e.message || "" }), true);
         });
     };
     // ═══════════════════════════════════════════════════════════════

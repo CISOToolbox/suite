@@ -144,6 +144,30 @@ def _check_ai_access(user: Optional[User]) -> None:
         raise HTTPException(status_code=403, detail="AI access not granted. Contact your administrator.")
 
 
+async def _post_custom_llm(custom: dict, timeout: float, payload: dict) -> httpx.Response:
+    """POST ``payload`` to the custom LLM. SSRF guard: this POST carries the
+    API key. Validating the hostname and then handing the *name* to httpx
+    left a rebinding window — httpx re-resolves, so the vetted IP need not be
+    the one connected to. Directly, connect to the pinned IP, keeping the
+    Host header + SNI so TLS still verifies the name; through the outbound
+    proxy, ask it for the name. Redirects are never followed (a redirect is
+    a new URL that never went through the guard)."""
+    url = custom["endpoint"].rstrip("/")
+    if not url.endswith("/chat/completions"):
+        url += "/chat/completions"
+    from src.ssrf_guard import resolve_safe_request
+    try:
+        url, host_headers, extensions, proxy = resolve_safe_request(url, require_https=True)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Custom LLM endpoint blocked: {e}")
+    headers = {"Content-Type": "application/json", **host_headers}
+    if custom.get("key"):
+        headers["Authorization"] = f"Bearer {custom['key']}"
+    async with httpx.AsyncClient(timeout=timeout, follow_redirects=False,
+                                 transport=httpx.AsyncHTTPTransport(proxy=proxy)) as client:
+        return await client.post(url, headers=headers, extensions=extensions, json=payload)
+
+
 async def call_llm_text(
     db: AsyncSession,
     system: str,
@@ -170,9 +194,8 @@ async def call_llm_text(
     if provider != "custom" and not provider_conf:
         raise HTTPException(status_code=400, detail=f"Unknown provider: {provider}")
 
-    # follow_redirects=False is httpx's default, stated here because the
-    # custom-provider branch connects to a pinned IP: a redirect is a new
-    # URL that never went through the guard.
+    # follow_redirects=False is httpx's default, stated here: a redirect is a
+    # new URL. The custom LLM has its own guarded client (_post_custom_llm).
     async with httpx.AsyncClient(timeout=timeout, follow_redirects=False) as client:
         try:
             if provider == "anthropic":
@@ -194,23 +217,7 @@ async def call_llm_text(
                 custom = await _get_custom_llm(db)
                 if not custom.get("endpoint"):
                     raise HTTPException(status_code=503, detail="Custom LLM not configured")
-                url = custom["endpoint"].rstrip("/")
-                if not url.endswith("/chat/completions"):
-                    url += "/chat/completions"
-                # SSRF guard: this POST carries the API key. Validating the
-                # hostname and then handing the *name* to httpx left a
-                # rebinding window — httpx re-resolves, so the vetted IP need
-                # not be the one connected to. Connect to the pinned IP, and
-                # keep the Host header + SNI so TLS still verifies the name.
-                from src.ssrf_guard import resolve_safe_url
-                try:
-                    url, _host_headers, _ext = resolve_safe_url(url, require_https=True)
-                except ValueError as e:
-                    raise HTTPException(status_code=400, detail=f"Custom LLM endpoint blocked: {e}")
-                hdrs = {"Content-Type": "application/json", **_host_headers}
-                if custom.get("key"):
-                    hdrs["Authorization"] = f"Bearer {custom['key']}"
-                resp = await client.post(url, headers=hdrs, extensions=_ext, json={
+                resp = await _post_custom_llm(custom, timeout, {
                     "model": custom.get("model") or model,
                     "max_tokens": max_tokens,
                     "messages": [
@@ -280,17 +287,18 @@ async def call_llm_text(
 async def ai_complete(body: AICompleteRequest, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     _check_ai_access(user)
     _check_rate_limit(str(user.id) if user else "anonymous")
+    # The custom LLM has neither a provider key nor a catalogue entry: its
+    # endpoint and key come with its own config (as in call_llm_text).
     api_key = await _get_api_key(body.provider, db)
-    if not api_key:
+    if not api_key and body.provider != "custom":
         raise HTTPException(status_code=503, detail=f"API key not configured for provider: {body.provider}")
 
     provider_conf = AI_PROVIDERS.get(body.provider)
-    if not provider_conf:
+    if body.provider != "custom" and not provider_conf:
         raise HTTPException(status_code=400, detail=f"Unknown provider: {body.provider}")
 
-    # follow_redirects=False is httpx's default, stated here because the
-    # custom-provider branch connects to a pinned IP: a redirect is a new
-    # URL that never went through the guard.
+    # follow_redirects=False is httpx's default, stated here: a redirect is a
+    # new URL. The custom LLM has its own guarded client (_post_custom_llm).
     async with httpx.AsyncClient(timeout=170.0, follow_redirects=False) as client:
         try:
             if body.provider == "anthropic":
@@ -323,33 +331,14 @@ async def ai_complete(body: AICompleteRequest, user: User = Depends(get_current_
                 custom = await _get_custom_llm(db)
                 if not custom.get("endpoint"):
                     raise HTTPException(status_code=503, detail="Custom LLM not configured")
-                url = custom["endpoint"].rstrip("/")
-                if not url.endswith("/chat/completions"):
-                    url += "/chat/completions"
-                # SSRF guard: this POST carries the API key. Validating the
-                # hostname and then handing the *name* to httpx left a
-                # rebinding window — httpx re-resolves, so the vetted IP need
-                # not be the one connected to. Connect to the pinned IP, and
-                # keep the Host header + SNI so TLS still verifies the name.
-                from src.ssrf_guard import resolve_safe_url
-                try:
-                    url, _host_headers, _ext = resolve_safe_url(url, require_https=True)
-                except ValueError as e:
-                    raise HTTPException(status_code=400, detail=f"Custom LLM endpoint blocked: {e}")
-                hdrs = {"Content-Type": "application/json", **_host_headers}
-                if custom.get("key"):
-                    hdrs["Authorization"] = f"Bearer {custom['key']}"
-                resp = await client.post(
-                    url, headers=hdrs, extensions=_ext,
-                    json={
-                        "model": custom.get("model") or body.model,
-                        "max_tokens": 4096,
-                        "messages": [
-                            {"role": "system", "content": body.system},
-                            {"role": "user", "content": body.user},
-                        ],
-                    },
-                )
+                resp = await _post_custom_llm(custom, 170.0, {
+                    "model": custom.get("model") or body.model,
+                    "max_tokens": 4096,
+                    "messages": [
+                        {"role": "system", "content": body.system},
+                        {"role": "user", "content": body.user},
+                    ],
+                })
             elif body.provider == "bedrock":
                 region = _safe_bedrock_region(
                     await _get_setting("ai_region_bedrock", db) or "us-east-1")

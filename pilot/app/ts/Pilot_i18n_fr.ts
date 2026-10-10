@@ -71,6 +71,7 @@ _registerTranslations("fr", {
   "pilot.backups.restore": "Restaurer",
   "pilot.backups.restore_confirm": "Restaurer cette sauvegarde dans le module {mod} ? Les données actuelles seront remplacées.",
   "pilot.backups.restore_errors": ", {n} erreurs",
+  "pilot.backups.restore_left_out": "Non restauré, refusé (la valeur actuelle reste) : {keys}",
   "pilot.backups.restored": "Restauration {mod} : {n} éléments restaurés",
   "pilot.backups.restoring": "Restauration en cours...",
   "pilot.backups.run": "Sauvegarder",

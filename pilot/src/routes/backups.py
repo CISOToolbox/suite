@@ -314,11 +314,27 @@ async def _pilot_self_restore(db: AsyncSession, data: dict) -> dict:
     await db.execute(_delete(_User))
     # AppSettings: only wipe the keys we are about to rewrite — leave
     # backup_* and ai_* untouched (so the restore does not delete the
-    # other backups it is filed alongside).
+    # other backups it is filed alongside). A backup comes from anywhere:
+    # the proxy it carries goes through the checks of a save, and one
+    # refused is left out (the current value stays).
+    from src.routes.settings import PROXY_SETTING_KEYS, check_proxy_setting
+    restored_settings: list[tuple[str, str]] = []
+    left_out: list[str] = []
     for s in data.get("app_settings") or []:
-        k = s.get("key")
-        if k and not k.startswith("backup_") and not k.startswith("ai_"):
-            await db.execute(_delete(_AppSettings).where(_AppSettings.key == k))
+        k, v = s.get("key"), s.get("value", "")
+        if not k or k.startswith("backup_") or k.startswith("ai_"):
+            continue
+        if k in PROXY_SETTING_KEYS:
+            try:
+                v = check_proxy_setting(k, v or "")
+            except ValueError as e:
+                import logging
+                logging.getLogger("pilot").warning("restore: %s left out, the current value stays: %s", k, e)
+                left_out.append(k)
+                continue
+        restored_settings.append((k, v))
+    for k, _v in restored_settings:
+        await db.execute(_delete(_AppSettings).where(_AppSettings.key == k))
 
     # Parents first, then children
     for row in data.get("users") or []:
@@ -344,16 +360,14 @@ async def _pilot_self_restore(db: AsyncSession, data: dict) -> dict:
         db.add(_KpiSnapshot(**_coerce(_KpiSnapshot, row)))
     for row in data.get("kpi_tombstones") or []:
         db.add(_KpiTombstone(**_coerce(_KpiTombstone, row)))
-    for s in data.get("app_settings") or []:
-        k = s.get("key")
-        if k and not k.startswith("backup_") and not k.startswith("ai_"):
-            db.add(_AppSettings(key=k, value=s.get("value", "")))
+    for k, v in restored_settings:
+        db.add(_AppSettings(key=k, value=v))
 
     await db.commit()
     # The registry and the proxy settings may have changed: Pilot re-applies its proxy.
     from src.routes.settings import apply_own_proxy
     await apply_own_proxy(db)
-    return {"ok": True, "id": _PILOT_INSTANCE_ID}
+    return {"ok": True, "id": _PILOT_INSTANCE_ID, "left_out": left_out}
 
 
 async def _fetch_module_data(module_id: str, internal_url: str) -> list[dict] | None:
@@ -601,10 +615,11 @@ async def restore_backup(backup_key: str, user: User = Depends(get_current_user)
     if module_id == "pilot":
         restored = 0
         errors = 0
+        left_out: list[str] = []  # proxy settings refused, the current ones kept
         for item in items:
             item_data = item.get("data", {})
             try:
-                await _pilot_self_restore(db, item_data)
+                left_out += (await _pilot_self_restore(db, item_data))["left_out"]
                 restored += 1
             except Exception as e:
                 import logging
@@ -620,7 +635,7 @@ async def restore_backup(backup_key: str, user: User = Depends(get_current_user)
                             provider=user.provider, provider_id=user.provider_id,
                             role="admin", modules=user.modules or []))
                 await db.commit()
-        return {"ok": True, "module": "pilot", "restored": restored, "errors": errors}
+        return {"ok": True, "module": "pilot", "restored": restored, "errors": errors, "left_out": left_out}
 
     result = await db.execute(select(ModuleRegistry).where(ModuleRegistry.id == module_id))
     mod = result.scalar_one_or_none()

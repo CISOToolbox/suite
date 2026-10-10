@@ -73,12 +73,14 @@ async def _stored(db, key: str):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("value", ["localhost,bad entry", "10.0.0.0/8", "http://proxy.medsecure.example"])
-async def test_an_invalid_exception_is_refused(db, value):
+@pytest.mark.parametrize("value, entry", [("localhost,bad entry", "bad entry"), ("10.0.0.0/8", "10.0.0.0/8"),
+                                          ("http://proxy.medsecure.example", "http://proxy.medsecure.example")])
+async def test_an_invalid_exception_is_refused(db, value, entry):
     with pytest.raises(HTTPException) as exc:
         await settings.update_settings(settings.SettingsUpdate(no_proxy=value), user=None, db=db)
     assert exc.value.status_code == 400
     assert "no_proxy" in exc.value.detail
+    assert repr(entry) in exc.value.detail  # the admin is told which one
     assert await _stored(db, "no_proxy") is None
 
 
@@ -120,16 +122,17 @@ async def test_the_custom_llm_is_validated_with_its_stored_key(db, monkeypatch):
     """The screen does not send back a key it shows as bullets: validating the
     endpoint without it was refused by any LLM that requires one, and every
     save of the settings page failed with it."""
+    await settings._set_setting("ai_custom_endpoint", "https://api.mistral.ai/v1", db)
     await settings._set_setting("ai_custom_key", "sk-medsecure-llm", db)
     await db.commit()
     seen = {}
 
-    async def validate(provider, key, endpoint="", model=""):
+    async def validate(provider, key, endpoint="", model="", **_kw):
         seen["key"] = key
         return True, ""
 
     monkeypatch.setattr(settings, "_validate_ai_key", validate)
-    monkeypatch.setattr(settings, "_validate_endpoint_url", lambda url: None)
+    monkeypatch.setattr(settings, "_validate_endpoint_url", lambda url, proxies: None)
     await settings.update_settings(settings.SettingsUpdate(
         ai_custom_endpoint="https://api.mistral.ai/v1", ai_custom_model="mistral-small-latest"), user=None, db=db)
     assert seen["key"] == "sk-medsecure-llm"

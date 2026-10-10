@@ -342,3 +342,37 @@ async def test_a_restored_backup_re_applies_it(db, modules):
     })
     assert os.environ["HTTPS_PROXY"] == _PROXY
     assert _direct("asset-restored") and not _direct("graph.microsoft.com")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("restored", [
+    {"https_proxy": "http://169.254.169.254"},                                   # metadata
+    {"https_proxy": "http://proxy.internal.example:3128"},                       # resolves to 10.0.0.8
+    {"https_proxy": "http://1.1.1.1:3128/,http://127.0.0.1:8080"},               # a list
+    {"no_proxy": "10.0.0.0/8"},                                                  # a range
+])
+async def test_a_restored_proxy_is_validated_like_a_saved_one(db, modules, caplog, restored):
+    """A backup comes from anywhere: the proxy it carries goes through the
+    checks of a save. One refused leaves the current value in place, logged."""
+    from src.routes import backups
+    db.add_all([AppSettings(key="https_proxy", value=_PROXY), AppSettings(key="no_proxy", value="ldap.medsecure.example")])
+    await db.commit()
+    with caplog.at_level(logging.WARNING):
+        result = await backups._pilot_self_restore(db, {
+            "app_settings": [{"key": k, "value": v} for k, v in restored.items()]})
+    [(key, _value)] = restored.items()
+    assert result["left_out"] == [key]
+    assert await settings._get_setting("https_proxy", db) == _PROXY
+    assert await settings._get_setting("no_proxy", db) == "ldap.medsecure.example"
+    assert os.environ["HTTPS_PROXY"] == _PROXY
+    assert [r for r in caplog.records if key in r.getMessage()]
+
+
+@pytest.mark.asyncio
+async def test_the_restore_route_says_which_proxy_setting_it_left_out(db, modules):
+    from src.routes import backups
+    db.add(AppSettings(key="backup_pilot_20261010_120000", value=json.dumps({"module": "pilot", "data": [
+        {"data": {"app_settings": [{"key": "https_proxy", "value": "http://169.254.169.254"}]}}]})))
+    await db.commit()
+    answer = await backups.restore_backup("backup_pilot_20261010_120000", user=None, db=db)
+    assert answer["left_out"] == ["https_proxy"]

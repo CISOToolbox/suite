@@ -69,6 +69,7 @@ _registerTranslations("en", {
     "pilot.backups.restore": "Restore",
     "pilot.backups.restore_confirm": "Restore this backup into module {mod}? Current data will be replaced.",
     "pilot.backups.restore_errors": ", {n} errors",
+    "pilot.backups.restore_left_out": "Not restored, refused (the current value stays): {keys}",
     "pilot.backups.restored": "Restore {mod}: {n} items restored",
     "pilot.backups.restoring": "Restoring...",
     "pilot.backups.run": "Back up",

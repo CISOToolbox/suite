@@ -476,7 +476,8 @@ def _modules() -> list[Path]:
 #     DEFINES the functions being looked for;
 #   - asserting `"ssrf_guard" in src` matched the function's DOCSTRING and
 #     survived deleting the delegation, hence the import-form assertion.
-GUARD_CALLS = ("resolve_safe_url", "resolve_safe_target")
+# resolve_safe_request: pinned like resolve_safe_url directly, by name through the proxy.
+GUARD_CALLS = ("resolve_safe_url", "resolve_safe_target", "resolve_safe_request")
 
 
 def test_every_custom_llm_branch_has_ssrf_guard() -> list[str]:
