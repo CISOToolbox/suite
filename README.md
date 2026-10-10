@@ -496,8 +496,12 @@ Clearing a field in Pilot clears it in every module.
   scanners and a custom LLM endpoint are validated locally (an internal or
   metadata name, address or resolution is refused), then requested by name:
   a proxy filtering by name accepts them, and plain HTTP reaches the scanned
-  virtual host. Directly, they connect to the address validated (the
-  scripts the JavaScript check finds are fetched by name). A name the
+  virtual host. Directly, the security-headers, sensitive-files and
+  JavaScript checks connect to the address validated, the name sent as
+  `Host` and as TLS SNI (the takeover check still connects by name). The
+  JavaScript check treats each script's host the same way: validated, then
+  reached through the proxy or directly as that host's own exceptions say.
+  A name the
   attacker's DNS answers differently to the proxy (DNS rebinding) can then
   lead the proxy to an internal address, and what it reads comes back in the
   findings: **the proxy must refuse internal, loopback and cloud-metadata
