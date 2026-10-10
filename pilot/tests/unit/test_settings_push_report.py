@@ -260,7 +260,9 @@ async def test_an_smtp_password_pilot_cannot_decrypt_leaves_the_modules_smtp_alo
     seen = _modules(monkeypatch)
     report = await settings._push_to_modules(db)
     assert not [p for _h, p, _b in seen if p == "/api/internal/smtp"]
-    assert report["surface"] == "not sent, unreadable in Pilot (re-enter it): smtp_password"
+    # Reported once, by Pilot: it cannot tell which modules send mail.
+    assert report == {"surface": "ok", "risk": "ok",
+                      "pilot": "not sent, unreadable in Pilot (re-enter it): smtp_password"}
 
 
 @pytest.mark.asyncio

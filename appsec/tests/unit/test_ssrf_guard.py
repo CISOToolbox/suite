@@ -57,5 +57,6 @@ def test_ai_route_no_longer_imports_resolver_from_scanners():
     # resolve_safe_url, not resolve_safe_target: the latter only vetted the
     # hostname and then let httpx re-resolve it, leaving a DNS-rebinding window
     # on a request that carries the API key. The guard now returns a URL
-    # pinned to the resolved IP, so that is what this asserts.
-    assert "from src.ssrf_guard import resolve_safe_url" in combined
+    # pinned to the resolved IP (resolve_safe_request: directly; through the
+    # outbound proxy, the proxy is asked for the checked name).
+    assert "from src.ssrf_guard import resolve_safe_request" in combined

@@ -125,47 +125,63 @@ async def update_settings(body: SettingsUpdate, user: User = Depends(get_current
         if not _BEDROCK_REGION_RE.fullmatch(body.ai_region_bedrock.strip()):
             raise HTTPException(status_code=400, detail="Region Bedrock invalide")
         body.ai_region_bedrock = body.ai_region_bedrock.strip()
+    # The proxy goes to every module as is: an exception httpx cannot parse
+    # breaks every HTTP client of a module, a list in a proxy URL reaches
+    # whatever its second entry names. Refused here, before anything is stored
+    # and before a key is checked through it.
+    try:
+        for field in PROXY_SETTING_KEYS:
+            if getattr(body, field) is not None:
+                setattr(body, field, check_proxy_setting(field, getattr(body, field)))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    # The keys are checked through the proxy being saved: Pilot's environment
+    # holds the previous one until the save applies it.
+    proxies = {}
+    for field in PROXY_SETTING_KEYS:
+        value = getattr(body, field)
+        proxies[field] = value if value is not None else await _get_setting(field, db)
+
     if body.ai_key_anthropic:
-        valid, err = await _validate_ai_key("anthropic", body.ai_key_anthropic)
+        valid, err = await _validate_ai_key("anthropic", body.ai_key_anthropic, proxies=proxies)
         validation["anthropic"] = {"valid": valid, "error": err}
         if not valid:
             raise HTTPException(status_code=400, detail=f"Cle Anthropic invalide: {err}")
     if body.ai_key_gemini:
-        valid, err = await _validate_ai_key("gemini", body.ai_key_gemini)
+        valid, err = await _validate_ai_key("gemini", body.ai_key_gemini, proxies=proxies)
         if not valid:
             raise HTTPException(status_code=422, detail=f"Clé Gemini invalide : {err}")
     if body.ai_key_openai:
-        valid, err = await _validate_ai_key("openai", body.ai_key_openai)
+        valid, err = await _validate_ai_key("openai", body.ai_key_openai, proxies=proxies)
         validation["openai"] = {"valid": valid, "error": err}
         if not valid:
             raise HTTPException(status_code=400, detail=f"Cle OpenAI invalide: {err}")
-    if body.ai_custom_endpoint and body.ai_custom_model:
-        # C-3 fix: validate endpoint URL to prevent SSRF
-        _validate_endpoint_url(body.ai_custom_endpoint)
+    if body.ai_custom_endpoint:
+        # C-3 fix: validate endpoint URL to prevent SSRF — through the proxy
+        # being saved, which resolves the name when it applies.
+        _validate_endpoint_url(body.ai_custom_endpoint, proxies)
+        model = body.ai_custom_model or await _get_setting("ai_custom_model", db)
         # The screen does not send back a key it shows masked: validate with
         # the stored one, or every save is refused by an LLM that requires it.
-        key = body.ai_custom_key if body.ai_custom_key is not None else await _get_setting("ai_custom_key", db)
-        valid, err = await _validate_ai_key("custom", key or "", body.ai_custom_endpoint, body.ai_custom_model)
+        # Only against the endpoint it was saved with: a new endpoint would
+        # receive it, then every module would.
+        key = body.ai_custom_key
+        if key is None:
+            key = await _get_setting("ai_custom_key", db)
+            stored_endpoint = await _get_setting("ai_custom_endpoint", db)
+            if key and body.ai_custom_endpoint.rstrip("/") != stored_endpoint.rstrip("/"):
+                raise HTTPException(status_code=400, detail=(
+                    "Custom LLM: a new endpoint needs its API key typed again (or the key cleared)"))
+        valid, err = await _validate_ai_key("custom", key or "", body.ai_custom_endpoint, model,
+                                            proxies=proxies)
         validation["custom"] = {"valid": valid, "error": err}
+        if not valid and body.ai_custom_key == "" and err == _CUSTOM_KEY_REFUSED:
+            raise HTTPException(status_code=400, detail=(
+                "Custom LLM: it refuses a request without an API key; to remove the key, "
+                "clear the endpoint as well"))
         if not valid:
             raise HTTPException(status_code=400, detail=f"LLM custom invalide: {err}")
-
-    # The proxy goes to every module as is: an exception httpx cannot parse
-    # breaks every HTTP client of a module, a list in a proxy URL reaches
-    # whatever its second entry names. Refused here, before anything is stored.
-    from src.proxy_common import _check_single_url, normalize_no_proxy
-    from src.ssrf_guard import validate_public_url
-    try:
-        for field in ("http_proxy", "https_proxy"):
-            if getattr(body, field):
-                _check_single_url(field, getattr(body, field))
-                # Pilot follows it too now: never towards an internal or
-                # metadata address (the modules refuse those as well).
-                validate_public_url(getattr(body, field))
-        if body.no_proxy is not None:
-            body.no_proxy = normalize_no_proxy(body.no_proxy)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
 
     updates = body.model_dump(exclude_none=True)
     # If client re-sent the masked placeholder for smtp_password ("configured"),
@@ -214,7 +230,7 @@ async def resync_modules(user: User = Depends(get_current_user),
     from src.audit import log_write
     await log_write(db, user, None, "settings.resync",
                     entity_type="settings", entity_id="pilot",
-                    details={"modules": sorted(report)})
+                    details={"modules": sorted(m for m in report if m != "pilot")})
     await db.commit()
     return {"ok": True, "push": report}
 
@@ -224,12 +240,30 @@ async def resync_modules(user: User = Depends(get_current_user),
 # Authorization header (see _validate_ai_key), and the URL is then pushed
 # to every module. Setting it to "true" accepts http:// — the key then
 # travels in clear text, which is why it is an explicit, documented choice.
+PROXY_SETTING_KEYS = ("http_proxy", "https_proxy", "no_proxy")
+
+
+def check_proxy_setting(field: str, value: str) -> str:
+    """One proxy setting as Pilot stores it, or ValueError: a single URL,
+    never towards an internal or metadata address (Pilot follows it, and the
+    modules refuse those too); exceptions normalized. Saves and restored
+    backups both go through it."""
+    from src.proxy_common import _check_single_url, normalize_no_proxy
+    from src.ssrf_guard import validate_public_url
+    if field == "no_proxy":
+        return normalize_no_proxy(value)
+    if value:
+        _check_single_url(field, value)
+        validate_public_url(value)
+    return value
+
+
 _ALLOW_INSECURE_LLM_ENDPOINT = os.getenv(
     "ALLOW_INSECURE_CUSTOM_LLM_ENDPOINT", "false"
 ).lower() in ("1", "true", "yes")
 
 
-def _validate_endpoint_url(url: str) -> None:
+def _validate_endpoint_url(url: str, proxies: dict[str, str]) -> None:
     """Prevent SSRF: block private IPs, metadata endpoints, non-HTTPS.
 
     The previous version only inspected *IP literals* — a hostname landed
@@ -239,20 +273,75 @@ def _validate_endpoint_url(url: str) -> None:
     name pointing at 127.0.0.1, a Docker sibling or the metadata service
     is refused, and https is required unless explicitly opted out of.
     """
-    from src.ssrf_guard import resolve_safe_url
+    from src.ssrf_guard import resolve_safe_request
     try:
-        resolve_safe_url(url, require_https=not _ALLOW_INSECURE_LLM_ENDPOINT)
+        resolve_safe_request(url, require_https=not _ALLOW_INSECURE_LLM_ENDPOINT, proxies=_check_proxies(proxies))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=f"Endpoint not allowed: {e}")
 
 
-async def _validate_ai_key(provider: str, key: str, endpoint: str = "", model: str = "") -> tuple[bool, str]:
-    """Test an AI API key with a minimal request."""
+_AI_CHECK_URLS = {
+    "anthropic": "https://api.anthropic.com/v1/messages",
+    "openai": "https://api.openai.com/v1/chat/completions",
+    "gemini": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent",
+}
+_CUSTOM_KEY_REFUSED = "Cle invalide ou acces refuse"
+
+
+def _check_proxies(proxies: dict[str, str]) -> dict[str, str]:
+    """The settings being saved (``http_proxy``…), as ``ssrf_guard.proxy_for``
+    reads them: a proxy left empty falls back to the deployment's own, the
+    exceptions are Pilot's and the deployment's, as ``export_proxy`` will set
+    them once the save applies."""
+    from src.proxy_common import _ENV_PROXY, _deployment_entries, normalize_no_proxy
+    return {
+        "http": proxies.get("http_proxy") or _ENV_PROXY.get("http_proxy") or "",
+        "https": proxies.get("https_proxy") or _ENV_PROXY.get("https_proxy") or "",
+        "no": ",".join([*normalize_no_proxy(proxies.get("no_proxy") or "", strict=False).split(","),
+                        *_deployment_entries()]),
+    }
+
+
+def _check_client(proxy: str | None) -> httpx.AsyncClient:
+    """A client for one key check, through ``proxy`` (None: directly), never
+    the proxy of the process environment of the moment."""
+    return httpx.AsyncClient(timeout=15.0, transport=httpx.AsyncHTTPTransport(proxy=proxy))
+
+
+async def _validate_ai_key(provider: str, key: str, endpoint: str = "", model: str = "", *,
+                           proxies: dict[str, str]) -> tuple[bool, str]:
+    """Test an AI API key with a minimal request, through ``proxies`` (the
+    proxy settings being saved)."""
+    from src.ssrf_guard import proxy_for, resolve_safe_request
+    route = _check_proxies(proxies)
+    if provider == "custom":
+        if not endpoint:
+            return False, "Endpoint requis"
+        if not model:
+            return False, "Modele requis"
+        target = endpoint.rstrip("/")
+        if not target.endswith("/chat/completions"):
+            target += "/chat/completions"
+        # Re-validate and pin: this request carries the API key in an
+        # Authorization header, so it must reach the host that was validated
+        # — not whatever the name resolves to a second later (DNS
+        # rebinding). Through the proxy, the proxy is asked for the name.
+        # Redirects are not followed for the same reason (httpx default).
+        try:
+            target, host_headers, extensions, proxy = resolve_safe_request(
+                target, require_https=not _ALLOW_INSECURE_LLM_ENDPOINT, proxies=route)
+        except ValueError as e:
+            return False, f"Endpoint refuse: {e}"
+    elif provider in _AI_CHECK_URLS:
+        target = _AI_CHECK_URLS[provider]
+        proxy = proxy_for(target, route)
+    else:
+        return False, "Fournisseur inconnu"
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
+        async with _check_client(proxy) as client:
             if provider == "anthropic":
                 resp = await client.post(
-                    "https://api.anthropic.com/v1/messages",
+                    target,
                     headers={"Content-Type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01"},
                     json={"model": "claude-sonnet-4-6", "max_tokens": 1, "messages": [{"role": "user", "content": "hi"}]},
                 )
@@ -261,7 +350,7 @@ async def _validate_ai_key(provider: str, key: str, endpoint: str = "", model: s
                 return True, ""
             elif provider == "openai":
                 resp = await client.post(
-                    "https://api.openai.com/v1/chat/completions",
+                    target,
                     headers={"Content-Type": "application/json", "Authorization": f"Bearer {key}"},
                     json={"model": "gpt-4o-mini", "max_tokens": 1, "messages": [{"role": "user", "content": "hi"}]},
                 )
@@ -270,7 +359,7 @@ async def _validate_ai_key(provider: str, key: str, endpoint: str = "", model: s
                 return True, ""
             elif provider == "gemini":
                 resp = await client.post(
-                    "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent",
+                    target,
                     headers={"Content-Type": "application/json", "x-goog-api-key": key},
                     json={"contents": [{"role": "user", "parts": [{"text": "hi"}]}],
                           "generationConfig": {"maxOutputTokens": 1}},
@@ -278,34 +367,16 @@ async def _validate_ai_key(provider: str, key: str, endpoint: str = "", model: s
                 if resp.status_code in (401, 403):
                     return False, "Cle invalide ou expiree"
                 return True, ""
-            elif provider == "custom":
-                if not endpoint:
-                    return False, "Endpoint requis"
-                if not model:
-                    return False, "Modele requis"
-                url = endpoint.rstrip("/")
-                if not url.endswith("/chat/completions"):
-                    url += "/chat/completions"
-                # Re-validate and pin: this request carries the API key in an
-                # Authorization header, so it must reach the host that was
-                # validated — not whatever the name resolves to a second later
-                # (DNS rebinding). Redirects are not followed for the same
-                # reason (httpx default).
-                from src.ssrf_guard import resolve_safe_url
-                try:
-                    pinned_url, host_headers, extensions = resolve_safe_url(
-                        url, require_https=not _ALLOW_INSECURE_LLM_ENDPOINT)
-                except ValueError as e:
-                    return False, f"Endpoint refuse: {e}"
+            else:  # custom
                 headers = {"Content-Type": "application/json", **host_headers}
                 if key:
                     headers["Authorization"] = f"Bearer {key}"
                 resp = await client.post(
-                    pinned_url, headers=headers, extensions=extensions,
+                    target, headers=headers, extensions=extensions,
                     json={"model": model, "max_tokens": 1, "messages": [{"role": "user", "content": "hi"}]},
                 )
                 if resp.status_code in (401, 403):
-                    return False, "Cle invalide ou acces refuse"
+                    return False, _CUSTOM_KEY_REFUSED
                 if resp.status_code >= 500:
                     return False, f"Serveur erreur {resp.status_code}"
                 if resp.status_code == 404:
@@ -315,7 +386,6 @@ async def _validate_ai_key(provider: str, key: str, endpoint: str = "", model: s
         return False, "Impossible de se connecter a l'endpoint"
     except httpx.RequestError:
         return False, "Erreur reseau lors de la validation"
-    return False, "Fournisseur inconnu"
 
 
 async def apply_own_proxy(db: AsyncSession) -> None:
@@ -471,6 +541,11 @@ async def _push_to_modules(db: AsyncSession) -> dict:
             "from_addr": await _get_setting("smtp_from", db),
             "tls": await _get_setting("smtp_tls", db),
         }
+    # Pilot cannot tell which modules send mail: an SMTP password it cannot
+    # decrypt is reported once, as its own, not by every module.
+    smtp_unreadable = "smtp_password" in unreadable
+    if smtp_unreadable:
+        unreadable.remove("smtp_password")
 
     report = {}
     headers = {"X-Service-Token": SERVICE_TOKEN, "Content-Type": "application/json"}
@@ -541,6 +616,8 @@ async def _push_to_modules(db: AsyncSession) -> dict:
             except Exception as e:
                 report[m.id] = "; ".join(failed + [f"error: {str(e)[:50]}"])
 
+    if smtp_unreadable:
+        report["pilot"] = "not sent, unreadable in Pilot (re-enter it): smtp_password"
     return report
 
 
