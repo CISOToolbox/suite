@@ -487,10 +487,18 @@ Clearing a field in Pilot clears it in every module.
   by the address it resolves to (an exception by address or by IPv4 range).
   A proxy that refuses (a 407 included), cannot be reached, does not answer
   the `CONNECT` or hangs up on it is logged and reported as an error finding
-  of the scanner, rather than read as "nothing found"; a failure once the
-  tunnel is open (a TLS handshake with the target, for instance) is the
-  target's. Scanners that open raw sockets — nmap (port scan and discovery),
-  the TLS checks, the SMB scanner — cannot use an HTTP proxy and connect
+  of the scanner, rather than read as "nothing found", naming the origin
+  refused. Only a later answer on that same origin clears it: neither an
+  earlier one (a probe of the root) nor one on another origin of the target
+  (a script on another port is not covered by the root; https and http
+  tried as alternatives are). A failure once the tunnel is open (a TLS
+  handshake with the target, for instance) is the target's. A proxy
+  refusing plain HTTP answers in the target's place (a 403 page, for
+  instance): apart from a 407, that answer cannot be told from the
+  target's own and is read as the target's, and a 502, 503 or 504 on plain
+  HTTP is counted as neither. Scanners that open raw sockets — nmap (port
+  scan and discovery), the TLS checks, the SMB scanner — cannot use an HTTP
+  proxy and connect
   directly; nmap and the TLS checks log a warning when a proxy applies.
 - **Through the proxy, the name is resolved by the proxy.** The HTTP
   scanners and a custom LLM endpoint are validated locally (an internal or
