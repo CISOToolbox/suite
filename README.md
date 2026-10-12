@@ -507,11 +507,20 @@ Clearing a field in Pilot clears it in every module.
   virtual host. Directly, the security-headers, sensitive-files and
   JavaScript checks connect to the address validated, the name sent as
   `Host` and as TLS SNI (the takeover check still connects by name). The
-  JavaScript check treats each script's host the same way: validated, then
-  reached through the proxy or directly as that host's own exceptions say.
-  A name the
-  attacker's DNS answers differently to the proxy (DNS rebinding) can then
-  lead the proxy to an internal address, and what it reads comes back in the
+  JavaScript check treats each script's host the same way: validated (a
+  host of the scan blocklist is skipped), then reached through the proxy or
+  directly as that host's own exceptions say.
+  The JavaScript and security-headers checks follow the home page's
+  redirects as the target's setting says (those on its registrable domain
+  by default, all of them, or none). httpx never follows a redirect itself:
+  each hop is validated and reached like a script host, at most 5 hops, and
+  a host of the scan blocklist is not contacted. A hop refused or failing
+  leaves the previous response as the page, and the finding says so: the
+  JavaScript check reports that it did not analyse the page, the
+  security-headers grade names the redirect it graded and why it was not
+  followed. A name the attacker's DNS
+  answers differently to the proxy (DNS rebinding) can then lead the proxy
+  to an internal address, and what it reads comes back in the
   findings: **the proxy must refuse internal, loopback and cloud-metadata
   destinations** (`169.254.169.254` included), as an egress proxy should.
 - Standalone single-module deployments have no Pilot: there the proxy is set
