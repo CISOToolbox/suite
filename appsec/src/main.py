@@ -98,6 +98,8 @@ app.include_router(notifications_routes.router)
 from src.routes.nonconformities import router as nonconformities_router, internal_router as nonconformities_internal_router  # noqa: E402 — FEAT-45
 app.include_router(nonconformities_router)
 app.include_router(nonconformities_internal_router)
+from src.proxy_settings_common import router as proxy_settings_router  # noqa: E402 — FEAT-58
+app.include_router(proxy_settings_router)
 
 try:
     from src.routes import internal

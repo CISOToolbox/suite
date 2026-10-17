@@ -85,6 +85,8 @@ app.include_router(plugins_proj_router)
 _CONNECTORS_MAP = build_connectors_map()
 app.state.connectors = _CONNECTORS_MAP
 app.include_router(make_connectors_router(_CONNECTORS_MAP))
+from src.proxy_settings_common import router as proxy_settings_router  # noqa: E402 — FEAT-58
+app.include_router(proxy_settings_router)
 
 
 @app.get("/api/health")

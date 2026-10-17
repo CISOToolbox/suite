@@ -106,6 +106,8 @@ app.include_router(targets.router)
 app.include_router(alerts.router)
 app.include_router(digest.router)
 app.include_router(dashboard.router)
+from src.proxy_settings_common import router as proxy_settings_router  # noqa: E402 — FEAT-58
+app.include_router(proxy_settings_router)
 
 # Suite-integration routers (only present when deployed alongside Pilot).
 try:

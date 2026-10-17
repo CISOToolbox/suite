@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import func, select, case as sa_case
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.proxy_common import apply_proxy
+from src.proxy_common import apply_proxy, check_proxy_url
 from src.database import async_session, get_db
 from src.models import Application, AppSettings, Finding, Measure, ScanJob, User
 
@@ -303,16 +303,10 @@ async def delete_user(request: Request, db: AsyncSession = Depends(get_db)):
     return {"ok": True, "deleted": True}
 
 def _validate_proxy_url(url: str) -> None:
-    """Reject a proxy URL that points at an internal target.
-
-    The route below exports it into the process-wide HTTP(S)_PROXY, which
-    httpx honours (trust_env) for every outbound request the module makes,
-    including the ones another guard pinned to a resolved IP.
-    """
-    from src.ssrf_guard import validate_public_url
-
+    """Reject a proxy URL that points at an internal target (see
+    ``proxy_common.check_proxy_url``)."""
     try:
-        validate_public_url(url)
+        check_proxy_url(url)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=f"Proxy endpoint not allowed: {e}")
 

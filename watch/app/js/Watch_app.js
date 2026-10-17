@@ -911,9 +911,10 @@ function _closeModal() {
 window.AI_APP_CONFIG = {
     storagePrefix: "watch",
     hideAI: true,
-    settingsExtraHTML: function () { return window._ctSmtpSettingsHTML ? window._ctSmtpSettingsHTML() : ""; },
+    settingsExtraHTML: function () { return (window._ctSmtpSettingsHTML ? window._ctSmtpSettingsHTML() : "") + (window._ctProxySettingsHTML ? window._ctProxySettingsHTML() : ""); },
     onSettingsRendered: function () { if (window._ctSmtpSettingsLoad)
-        window._ctSmtpSettingsLoad(); }
+        window._ctSmtpSettingsLoad(); if (window._ctProxySettingsLoad)
+        window._ctProxySettingsLoad(); }
 };
 function _boot() {
     var tr = document.getElementById("toolbar-right");
