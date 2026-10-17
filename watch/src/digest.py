@@ -77,6 +77,8 @@ _FIRST_RUN_LOOKBACK_DAYS = int(os.getenv("WATCH_FIRST_RUN_LOOKBACK_DAYS", "7"))
 # "en" for when we add a per-scope locale.
 _DIGEST_LANGUAGE = "fr"
 
+_DEFAULT_FROM = "watch@cisotoolbox.local"
+
 
 def _smtp_settings() -> dict:
     """Resolve SMTP config: Pilot in-memory push > env vars (standalone).
@@ -87,7 +89,7 @@ def _smtp_settings() -> dict:
         from src.routes.internal import _smtp_config as pushed
     except Exception:
         pushed = {}
-    return resolve_pushed_config(pushed, "watch@cisotoolbox.local")
+    return resolve_pushed_config(pushed, _DEFAULT_FROM)
 
 # Match window for "is it digest time?". Must be ≥ scheduler tick interval
 # so we don't miss a window when the tick lands just before the configured

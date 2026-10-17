@@ -905,7 +905,21 @@ function _closeModal() {
 // ═══════════════════════════════════════════════════════════════
 // BOOT
 // ═══════════════════════════════════════════════════════════════
+// Settings drawer: language and outgoing mail. Watch's AI runs on the server,
+// so the drawer carries no browser-side AI settings. Set at load: ai_backend.js
+// reads it when it loads, right after this script.
+window.AI_APP_CONFIG = {
+    storagePrefix: "watch",
+    hideAI: true,
+    settingsExtraHTML: function () { return window._ctSmtpSettingsHTML ? window._ctSmtpSettingsHTML() : ""; },
+    onSettingsRendered: function () { if (window._ctSmtpSettingsLoad)
+        window._ctSmtpSettingsLoad(); }
+};
 function _boot() {
+    var tr = document.getElementById("toolbar-right");
+    if (tr && !tr.querySelector(".toolbar-settings")) {
+        tr.insertAdjacentHTML("afterbegin", '<span class="toolbar-settings">' + _getSettingsButtonHTML() + '</span>');
+    }
     _render();
 }
 // ═══════════════════════════════════════════════════════════════

@@ -113,6 +113,10 @@ try:
     app.include_router(internal.router)
 except ImportError:
     pass
+else:
+    # The SMTP settings keep their state in internal's _smtp_config.
+    from src.routes import smtp
+    app.include_router(smtp.router)
 
 try:
     from src.routes import directory_proxy

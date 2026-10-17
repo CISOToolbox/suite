@@ -20,6 +20,7 @@ from src.routes.users import router as users_router
 from src.routes.directory_proxy import router as directory_router
 from src.routes.internal import router as internal_router
 from src.routes.plugins import router as plugins_router, proj_router as plugins_proj_router
+from src.routes.smtp import router as smtp_router
 
 from src.connectors_bridge import build_connectors_map
 from src.connectors_common import make_router as make_connectors_router
@@ -76,6 +77,7 @@ app.include_router(ai_router)
 app.include_router(users_router)
 app.include_router(directory_router)
 app.include_router(internal_router)
+app.include_router(smtp_router)
 app.include_router(plugins_router)
 app.include_router(plugins_proj_router)
 

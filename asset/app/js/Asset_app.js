@@ -25,7 +25,10 @@ var _selectedAsset = null;
 var _selectedGroupe = null;
 var _groupeTab = "info";
 window.AI_APP_CONFIG = {
-    storagePrefix: "asset"
+    storagePrefix: "asset",
+    settingsExtraHTML: function () { return window._ctSmtpSettingsHTML ? window._ctSmtpSettingsHTML() : ""; },
+    onSettingsRendered: function () { if (window._ctSmtpSettingsLoad)
+        window._ctSmtpSettingsLoad(); }
 };
 function renderAll() {
     var tr = document.getElementById("toolbar-right");

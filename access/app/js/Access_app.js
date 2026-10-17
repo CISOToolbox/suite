@@ -21,7 +21,12 @@ var _selectedUser = null, _selectedApp = null, _selectedReview = null, _selected
 var _reviewReturn = null;
 // Reviews-list section toggles (default: in-progress + overdue-to-start).
 var _reviewListFilter = null;
-window.AI_APP_CONFIG = { storagePrefix: "access" };
+window.AI_APP_CONFIG = {
+    storagePrefix: "access",
+    settingsExtraHTML: function () { return window._ctSmtpSettingsHTML ? window._ctSmtpSettingsHTML() : ""; },
+    onSettingsRendered: function () { if (window._ctSmtpSettingsLoad)
+        window._ctSmtpSettingsLoad(); }
+};
 function renderAll() {
     var tr = document.getElementById("toolbar-right");
     if (tr) {
@@ -744,7 +749,7 @@ function renderUserDetail() {
     h += '<button class="ct-btn" data-variant="ghost" data-size="sm" data-click="backToUsers">&laquo; ' + t("nav.users") + '</button>';
     h += '<h2 class="ct-m-0">' + esc((u.prenom + " " + u.nom).trim() || t("user.new")) + '</h2>';
     if (lockedByPilot) {
-        h += '<span title="' + esc(t("user.managed_by_pilot_tooltip") || "Ces champs d\'identite sont synchronises depuis Pilot et ne peuvent pas etre modifies ici") + '" style="display:inline-flex;align-items:center;gap:var(--ct-s1);padding:var(--ct-s1) var(--ct-s2);border-radius:var(--ct-r-xl);background:var(--ct-accent-tint);color:var(--access-accent-on-tint,var(--ct-accent));font-size:var(--ct-text-label);font-weight:600">🔒 ' + (t("user.managed_by_pilot") || "Géré par Pilot") + '</span>';
+        h += '<span title="' + esc(t("user.managed_by_pilot_tooltip") || "Ces champs d\'identite sont synchronises depuis Pilot et ne peuvent pas etre modifies ici") + '" style="display:inline-flex;align-items:center;gap:var(--ct-s1);padding:var(--ct-s1) var(--ct-s2);border-radius:var(--ct-r-xl);background:var(--ct-accent-tint);color:var(--ct-accent);font-size:var(--ct-text-label);font-weight:600">🔒 ' + (t("user.managed_by_pilot") || "Géré par Pilot") + '</span>';
     }
     h += '<span class="ct-flex-1"></span>';
     h += '<button class="ct-btn mt-8" data-write data-variant="danger" data-click="deleteUser">' + t("btn_delete") + '</button></div>';
@@ -1084,11 +1089,11 @@ window.removeEntitlement = function (eid) {
         .catch(function (e) { showStatus((e && e.message) || "Erreur", true); });
 };
 function _field(name, label, type, val, disabled) {
-    var extra = disabled ? ' disabled style="background:var(--ct-surface-2);color:var(--access-disabled-ink,var(--ct-ink-1));cursor:not-allowed"' : '';
+    var extra = disabled ? ' disabled style="background:var(--ct-surface-2);color:var(--ct-ink-1);cursor:not-allowed"' : '';
     return '<div class="ct-form-row"><label>' + esc(label) + '</label><input type="' + type + '" value="' + esc(String(val != null ? val : "")) + '"' + extra + ' data-change="saveUserField" data-args=\'["' + name + '"]\' data-pass-value></div>';
 }
 function _sel(name, label, opts, val, disabled) {
-    var extra = disabled ? ' disabled style="background:var(--ct-surface-2);color:var(--access-disabled-ink,var(--ct-ink-1));cursor:not-allowed"' : '';
+    var extra = disabled ? ' disabled style="background:var(--ct-surface-2);color:var(--ct-ink-1);cursor:not-allowed"' : '';
     var h = '<div class="ct-form-row"><label>' + esc(label) + '</label><select' + extra + ' data-change="saveUserField" data-args=\'["' + name + '"]\' data-pass-value>';
     opts.forEach(function (o) { h += '<option value="' + esc(String(o.v)) + '"' + (String(val) === String(o.v) ? " selected" : "") + '>' + esc(o.l) + '</option>'; });
     return h + '</select></div>';
