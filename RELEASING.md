@@ -103,9 +103,9 @@ Rules that keep the two levels coherent:
 
 `tools/release-check.sh` checks versions, pins, matrix and changelog offline;
 `--remote` adds rule 1 (every pinned tag exists on its module repository)
-and the multi-arch images on GHCR; `--strict` requires each pin to equal the
-module's VERSION (release time — between two suite releases a module VERSION
-may run ahead of its pin). CI runs `--remote` and `tools/pin-images.sh --check`
+and the multi-arch images on GHCR; `--strict` requires each pin and each
+matrix cell to equal the module's VERSION (release time — between two suite
+releases a module VERSION may run ahead of its pin and of its matrix cell). CI runs `--remote` and `tools/pin-images.sh --check`
 on every pull request, with `--strict` on `release/*` branches.
 
 ## Release procedure

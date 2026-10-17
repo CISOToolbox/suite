@@ -9,8 +9,9 @@
 #      otherwise at most equal — between a module release and the next suite
 #      release, a module VERSION is legitimately ahead of its pin
 #   4. the compatibility matrix in RELEASING.md has a row for the suite
-#      version that agrees with the VERSION files, and CHANGELOG.md has the
-#      section of the suite version
+#      version that agrees with the VERSION files — equal with --strict,
+#      otherwise a module may be ahead, as for the pins — and CHANGELOG.md has
+#      the section of the suite version
 #   5. --remote : every tag the compose pins exists on the module's repository
 #      and has a multi-arch image on GHCR (a repository that cannot be read
 #      from here — private, no token — is a warning, the image is still checked)
@@ -109,7 +110,16 @@ if [ -n "$SUITE_V" ]; then
             i=$((i + 1))
             cell="$(echo "${cells[$i]:-}" | tr -d '[:space:]')"
             v="$(tr -d '[:space:]' < "$m/VERSION" 2>/dev/null || echo '?')"
-            [ "$cell" = "$v" ] || { fail "matrix $m: row says '$cell', VERSION says '$v'"; bad=1; }
+            if [ "$cell" = "$v" ]; then
+                :
+            # Same rule as the pins (check 3): outside a release, a module
+            # released ahead of the suite is pending the next suite recut.
+            elif [ "$STRICT" != 1 ] && [[ "$cell" =~ $SEMVER ]] && [[ "$v" =~ $SEMVER ]] \
+                 && [ "$(printf '%s\n%s\n' "$cell" "$v" | sort -V | head -1)" = "$cell" ]; then
+                ok "matrix $m: row says $cell, VERSION $v ahead (module released, suite not recut yet)"
+            else
+                fail "matrix $m: row says '$cell', VERSION says '$v'"; bad=1
+            fi
         done
         [ $bad -eq 0 ] && ok "matrix row consistent for $SUITE_V"
     fi

@@ -39,9 +39,9 @@ jobs:
     # The composition is a manifest: every tag it pins must exist on the
     # module's repository and as a multi-arch image, and every image must be
     # pinned by digest. Cheap, network-only, and it is what turns a forgotten
-    # tag into a red check instead of a failed deployment. --strict (pins equal
-    # to the VERSION files) only on a release/* branch: between two suite
-    # releases a module VERSION may run ahead of its pin.
+    # tag into a red check instead of a failed deployment. --strict (pins and
+    # matrix row equal to the VERSION files) only on a release/* branch: between
+    # two suite releases a module VERSION may run ahead of its pin and its row.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
