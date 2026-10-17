@@ -803,6 +803,61 @@ def test_ai_requests_carry_no_precomposed_prompt() -> list[str]:
     return problems
 
 
+# ── Login pages: each one is its module's own ──────────────────────────
+#
+# Each module has its own app/login.html, with its name written in it (tab
+# title, logo, subtitle). Pages were created by copying another module's:
+# AppSec, Surface and Watch said "Access Review", Audit "Asset Management".
+
+def _login_identity(mod: Path) -> dict | None:
+    login = mod / "app" / "login.html"
+    if not login.exists():
+        return None
+    html = login.read_text(encoding="utf-8")
+    index = (mod / "app" / "index.html").read_text(encoding="utf-8")
+
+    def first(pattern, text):
+        m = re.search(pattern, text, re.S)
+        return m.group(1).strip() if m else ""
+
+    return {
+        "title": first(r"<title>(.*?)</title>", html),
+        "logo": first(r'class="login-logo">(.*?)</div>', html),
+        "subtitle": first(r'class="login-subtitle">(.*?)</div>', html),
+        "app": first(r"<title>(.*?) - CISO Toolbox</title>", index),
+    }
+
+
+def test_every_login_page_names_its_own_module() -> list[str]:
+    """No login page carries another module's identity: its logo and
+    subtitle are its own (no two modules share one), the tab title starts
+    with the logo, and the logo is not another module's application name."""
+    problems, pages = [], {}
+    for mod in _modules():
+        page = _login_identity(mod)
+        if page is None:
+            problems.append(f"{mod.name}: no app/login.html")
+        else:
+            pages[mod.name] = page
+    for name, page in pages.items():
+        if not page["logo"] or not page["subtitle"] or not page["app"]:
+            problems.append(f"{name}: login logo, login subtitle or the index.html title not found")
+            continue
+        if page["title"] != f"{page['logo']} — Sign in":
+            problems.append(f"{name}/app/login.html: tab title {page['title']!r} is not "
+                            f"'{page['logo']} — Sign in'")
+        for other, theirs in pages.items():
+            if other == name:
+                continue
+            if page["logo"] == theirs["logo"]:
+                problems.append(f"{name}/app/login.html: same logo as {other} ({page['logo']!r})")
+            if page["subtitle"] == theirs["subtitle"]:
+                problems.append(f"{name}/app/login.html: same subtitle as {other}")
+            if theirs["app"] and page["logo"].lower() == theirs["app"].lower() != page["app"].lower():
+                problems.append(f"{name}/app/login.html: logo {page['logo']!r} is {other}'s name")
+    return problems
+
+
 CHECKS = (
     ("canonical field names", test_every_receiver_uses_the_canonical_fields),
     ("no pre-composed prompt", test_ai_requests_carry_no_precomposed_prompt),
@@ -823,6 +878,7 @@ CHECKS = (
     ("login redirect validated", test_login_redirect_is_validated),
     ("custom-LLM branch guarded", test_every_custom_llm_branch_has_ssrf_guard),
     ("proxy validator delegates", test_every_proxy_validator_delegates_to_the_guard),
+    ("each login page is its module's", test_every_login_page_names_its_own_module),
     ("bundled add-on tiers copied", test_every_bundled_addon_tier_is_copied),
     ("every image installs its lock", test_every_image_installs_its_lock),
     ("bundled add-ons get their deps", test_bundled_addons_get_their_dependencies),
