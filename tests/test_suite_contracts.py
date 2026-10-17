@@ -858,6 +858,97 @@ def test_every_login_page_names_its_own_module() -> list[str]:
     return problems
 
 
+# ── Module roles: one ladder per module, the same in Pilot and the module ─
+#
+# Pilot's user screen offers, per module, the roles of that module's ladder;
+# a standalone module offers the same ones (auth_common.MODULE_ROLES). The two
+# tables must agree, and every role of a ladder must be one the module's own
+# routes know.
+
+def _pilot_role_ladders() -> dict[str, list[str]]:
+    ts = (REPO_ROOT / "pilot" / "app" / "ts" / "Pilot_app.ts").read_text(encoding="utf-8")
+    block = re.search(r"var _MODULE_ROLES[^=]*=\s*\{(.*?)\};", ts, re.S)
+    if not block:
+        return {}
+    return {m: [r for r in re.findall(r'"([a-z]*)"', roles) if r]
+            for m, roles in re.findall(r"(\w+):\s*\[([^\]]*)\]", block.group(1))}
+
+
+def _module_role_ladders(mod: Path) -> dict | None:
+    common = mod / "src" / "auth_common.py"
+    if not common.exists():
+        return None
+    for node in ast.walk(ast.parse(common.read_text(encoding="utf-8"))):
+        target = node.targets[0] if isinstance(node, ast.Assign) and len(node.targets) == 1 else (
+            node.target if isinstance(node, ast.AnnAssign) else None)
+        if isinstance(target, ast.Name) and target.id == "MODULE_ROLES" and node.value is not None:
+            return {k: list(v) for k, v in ast.literal_eval(node.value).items()}
+    return None
+
+
+def test_module_role_ladders_agree() -> list[str]:
+    problems = []
+    pilot = _pilot_role_ladders()
+    if not pilot:
+        return ["pilot/app/ts/Pilot_app.ts: _MODULE_ROLES not found"]
+    for mod in _modules():
+        if not (mod / "src" / "auth_common.py").exists():
+            continue  # Pilot: its own src/auth.py, the table lives in its frontend
+        ladders = _module_role_ladders(mod)
+        if ladders is None:
+            problems.append(f"{mod.name}/src/auth_common.py: no MODULE_ROLES")
+            continue
+        if ladders != pilot:
+            problems.append(f"{mod.name}/src/auth_common.py: MODULE_ROLES differs from Pilot's _MODULE_ROLES")
+    for mod in _modules():
+        if mod.name == "pilot":
+            continue  # the orchestrator: no ladder of its own
+        ladder = pilot.get(mod.name)
+        if ladder is None:
+            problems.append(f"{mod.name}: no role ladder in Pilot's _MODULE_ROLES")
+            continue
+        for path in sorted((mod / "src").rglob("*.py")):
+            if path.name == "auth_common.py":
+                continue
+            for name, roles in re.findall(r"^(_?[A-Z_]*ROLES[A-Z_]*)\s*=\s*\[([^\]]*)\]",
+                                          path.read_text(encoding="utf-8"), re.M):
+                known = re.findall(r'"([a-z]+)"', roles)
+                missing = [r for r in ladder if r not in known]
+                if missing:
+                    problems.append(f"{mod.name}/{path.relative_to(mod).as_posix()}: {name} lacks {missing}")
+    return problems
+
+
+# ── Write journal: one implementation ─────────────────────────────────
+#
+# Some modules keep the shared write journal as src/audit.py, a copy the
+# propagation does not refresh (it refreshes src/audit_common.py where a
+# module has one). A change to the shared journal then reached three modules
+# out of nine. Every src/audit.py must stay the shared one.
+
+def _without_header(text: str) -> str:
+    lines = text.splitlines()
+    while lines and lines[0].startswith("#"):
+        lines.pop(0)
+    return "\n".join(lines).strip()
+
+
+def test_every_write_journal_is_the_shared_one() -> list[str]:
+    reference = next((m / "src" / "audit_common.py" for m in _modules()
+                      if (m / "src" / "audit_common.py").exists()), None)
+    if reference is None:
+        return ["no module has src/audit_common.py — has the shared journal been renamed?"]
+    shared = _without_header(reference.read_text(encoding="utf-8"))
+    problems = []
+    for mod in _modules():
+        copy = mod / "src" / "audit.py"
+        if copy.exists() and "def install_write_journal_middleware" in copy.read_text(encoding="utf-8"):
+            if _without_header(copy.read_text(encoding="utf-8")) != shared:
+                problems.append(f"{mod.name}/src/audit.py differs from the shared write journal "
+                                f"({reference.relative_to(REPO_ROOT).as_posix()})")
+    return problems
+
+
 CHECKS = (
     ("canonical field names", test_every_receiver_uses_the_canonical_fields),
     ("no pre-composed prompt", test_ai_requests_carry_no_precomposed_prompt),
@@ -879,6 +970,8 @@ CHECKS = (
     ("custom-LLM branch guarded", test_every_custom_llm_branch_has_ssrf_guard),
     ("proxy validator delegates", test_every_proxy_validator_delegates_to_the_guard),
     ("each login page is its module's", test_every_login_page_names_its_own_module),
+    ("one role ladder per module", test_module_role_ladders_agree),
+    ("one write journal", test_every_write_journal_is_the_shared_one),
     ("bundled add-on tiers copied", test_every_bundled_addon_tier_is_copied),
     ("every image installs its lock", test_every_image_installs_its_lock),
     ("bundled add-ons get their deps", test_bundled_addons_get_their_dependencies),

@@ -26,11 +26,6 @@ class UserResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class UserUpdate(BaseModel):
-    role: str | None = None
-    ai_enabled: str | None = None
-
-
 # ── AI proxy schemas (used by src/routes/ai.py) ──────────────────
 class AICompleteRequest(BaseModel):
     system: str

@@ -195,9 +195,13 @@ class TestRouteProtection:
                         )
 
     def test_user_management_requires_admin(self):
-        admin_routes = _find_routes_with("require_admin")
-        assert ("users.py", "list_users") in admin_routes
-        assert ("users.py", "update_user") in admin_routes
+        # The user routes are the shared router that routes/users.py mounts.
+        fpath = os.path.join(MODULE_DIR, "src", "users_admin_common.py")
+        with open(fpath) as f:
+            tree = ast.parse(f.read(), filename=fpath)
+        admin = {n.name for n in ast.walk(tree)
+                 if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and "require_admin" in ast.dump(n)}
+        assert {"list_users", "update_user"} <= admin
 
     def test_directory_proxy_set_source_requires_admin(self):
         admin_routes = _find_routes_with("require_admin")

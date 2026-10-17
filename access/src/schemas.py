@@ -22,11 +22,6 @@ class UserResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class UserUpdate(BaseModel):
-    role: str | None = None
-    ai_enabled: str | None = None
-
-
 class ShareRequest(BaseModel):
     email: str
     permissions: list[str] = ["read"]
