@@ -2315,9 +2315,10 @@ window._bulkAppsecMeasuresDelete = function (scope) {
 // ═══════════════════════════════════════════════════════════════
 window.AI_APP_CONFIG = {
     storagePrefix: "appsec",
-    settingsExtraHTML: function () { return window._ctSmtpSettingsHTML ? window._ctSmtpSettingsHTML() : ""; },
+    settingsExtraHTML: function () { return (window._ctSmtpSettingsHTML ? window._ctSmtpSettingsHTML() : "") + (window._ctProxySettingsHTML ? window._ctProxySettingsHTML() : ""); },
     onSettingsRendered: function () { if (window._ctSmtpSettingsLoad)
-        window._ctSmtpSettingsLoad(); }
+        window._ctSmtpSettingsLoad(); if (window._ctProxySettingsLoad)
+        window._ctProxySettingsLoad(); }
 };
 // Placeholder File-menu actions (wired in toolbar; real impl coming later)
 window.importApps = function () { showStatus(t("feature.coming_soon")); };

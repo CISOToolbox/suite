@@ -70,6 +70,8 @@ app.include_router(ai_router)
 app.include_router(users_router)
 app.include_router(directory_router)
 app.include_router(internal_router)
+from src.proxy_settings_common import router as proxy_settings_router  # noqa: E402 — FEAT-58
+app.include_router(proxy_settings_router)
 
 
 @app.get("/api/health")

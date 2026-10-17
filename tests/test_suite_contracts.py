@@ -497,18 +497,81 @@ def test_every_custom_llm_branch_has_ssrf_guard() -> list[str]:
     return problems
 
 
+def _function(path, name):
+    """The (async) function ``name`` defined in ``path``, as an AST node, or None."""
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    return next((n for n in ast.walk(tree)
+                 if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name == name), None)
+
+
+def _calls(fn, name):
+    """The calls to ``name`` (a plain or attribute name) inside ``fn``."""
+    return [n for n in ast.walk(fn) if isinstance(n, ast.Call)
+            and (getattr(n.func, "id", None) == name or getattr(n.func, "attr", None) == name)]
+
+
+def _swallows(fn) -> bool:
+    """An ``except`` in ``fn`` that does not raise again."""
+    return any(not any(isinstance(x, ast.Raise) for x in ast.walk(h))
+               for h in ast.walk(fn) if isinstance(h, ast.ExceptHandler))
+
+
+def _allow_private(call):
+    """The ``allow_private`` keyword of ``call``: None if absent, else its literal value
+    (True for anything that is not a literal)."""
+    for kw in call.keywords:
+        if kw.arg == "allow_private":
+            return kw.value.value if isinstance(kw.value, ast.Constant) else True
+    return None
+
+
+def _proxy_common_delegates(mod) -> bool:
+    """The module's proxy_common.check_proxy_url calls the shared guard and
+    lets its refusal through."""
+    common = mod / "src" / "proxy_common.py"
+    fn = _function(common, "check_proxy_url") if common.exists() else None
+    if fn is None or _swallows(fn):
+        return False
+    calls = _calls(fn, "validate_public_url")
+    # allow_private passed on from the caller as a keyword (not forced to a
+    # literal, not through **kwargs): the Pilot push relies on its default.
+    return bool(calls) and all(
+        any(kw.arg == "allow_private" and isinstance(kw.value, ast.Name) and kw.value.id == "allow_private"
+            for kw in c.keywords) and not any(kw.arg is None for kw in c.keywords)
+        for c in calls)
+
+
 def test_every_proxy_validator_delegates_to_the_guard() -> list[str]:
+    """Every proxy URL the module exports is checked by ssrf_guard, directly
+    or through proxy_common.check_proxy_url, and a refusal is never
+    swallowed: the Pilot push (internal.py), which refuses private
+    addresses, and the standalone settings (proxy_settings_common.py)."""
     problems, checked = [], 0
     for mod in _modules():
         internal = mod / "src" / "routes" / "internal.py"
+        settings = mod / "src" / "proxy_settings_common.py"
+        # Every copy, Pilot's included: it relies on the default (refused).
+        if (mod / "src" / "proxy_common.py").exists() and not _proxy_common_delegates(mod):
+            problems.append(f"{mod.name}/proxy_common.py check_proxy_url does not call ssrf_guard "
+                            "with the caller's allow_private, or swallows its refusal")
+        if settings.exists():
+            fn = _function(settings, "_clean_url")
+            if fn is None or not _calls(fn, "check_proxy_url") or _swallows(fn) or not _proxy_common_delegates(mod):
+                problems.append(f"{mod.name}/proxy_settings_common.py does not check the proxy with ssrf_guard")
         if not internal.exists():
             continue
-        src = internal.read_text(encoding="utf-8")
-        if "def _validate_proxy_url" not in src:
+        fn = _function(internal, "_validate_proxy_url")
+        if fn is None:
             continue
         checked += 1
-        if "from src.ssrf_guard import" not in src:
+        direct = _calls(fn, "validate_public_url")
+        via_common = _calls(fn, "check_proxy_url") if _proxy_common_delegates(mod) else []
+        if not (direct or via_common):
             problems.append(f"{mod.name}/internal.py _validate_proxy_url does not delegate to ssrf_guard")
+        if any(_allow_private(c) for c in direct + via_common):
+            problems.append(f"{mod.name}/internal.py _validate_proxy_url widens the guard (allow_private)")
+        if _swallows(fn) or not any(isinstance(x, ast.Raise) for x in ast.walk(fn)):
+            problems.append(f"{mod.name}/internal.py _validate_proxy_url swallows a refusal")
     if not checked:
         problems.append("no module defines _validate_proxy_url — has it been renamed?")
     return problems

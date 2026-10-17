@@ -21,9 +21,10 @@ const DOMAINS = window.ISO_AUDIT_DOMAINS || [];
 const QUESTIONS = window.ISO_AUDIT_QUESTIONS || {};
 window.AI_APP_CONFIG = {
     storagePrefix: "isoaudit",
-    settingsExtraHTML: function () { return typeof _demoSettingsHTML === "function" ? _demoSettingsHTML() : ""; },
+    settingsExtraHTML: function () { return (typeof _demoSettingsHTML === "function" ? _demoSettingsHTML() : "") + (window._ctProxySettingsHTML ? window._ctProxySettingsHTML() : ""); },
     onSettingsRendered: function () { if (typeof _wireDemoSettings === "function")
-        _wireDemoSettings(); }
+        _wireDemoSettings(); if (window._ctProxySettingsLoad)
+        window._ctProxySettingsLoad(); }
 };
 let _currentPanel = "dashboard";
 // ═══════════════════════════════════════════════════════════════════════

@@ -2212,8 +2212,8 @@ window._bulkAppsecMeasuresDelete = function(scope: string) {
 
 window.AI_APP_CONFIG = {
     storagePrefix: "appsec",
-    settingsExtraHTML: function() { return window._ctSmtpSettingsHTML ? window._ctSmtpSettingsHTML() : ""; },
-    onSettingsRendered: function() { if (window._ctSmtpSettingsLoad) window._ctSmtpSettingsLoad(); }
+    settingsExtraHTML: function() { return (window._ctSmtpSettingsHTML ? window._ctSmtpSettingsHTML() : "") + (window._ctProxySettingsHTML ? window._ctProxySettingsHTML() : ""); },
+    onSettingsRendered: function() { if (window._ctSmtpSettingsLoad) window._ctSmtpSettingsLoad(); if (window._ctProxySettingsLoad) window._ctProxySettingsLoad(); }
 };
 
 // Placeholder File-menu actions (wired in toolbar; real impl coming later)

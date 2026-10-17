@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.proxy_common import apply_proxy
+from src.proxy_common import apply_proxy, check_proxy_url
 from src.database import get_db
 from src.models import Measure, Project, User
 
@@ -189,26 +189,10 @@ async def set_proxy(request: Request, db: AsyncSession = Depends(get_db)):
 
 
 def _validate_proxy_url(url: str) -> None:
-    """Reject a proxy URL that points at an internal target.
-
-    Aligned with the other modules (audit finding H4, which had missed this
-    one). The scheme/hostname check this replaces accepted 169.254.169.254
-    outright, and any public name resolving to a private address.
-
-    It matters more here than at a normal call site: the route above exports
-    this value into the process-wide HTTP_PROXY, and httpx runs trust_env=True,
-    so it redirects EVERY outbound request the module makes afterwards.
-    """
-    if not url:
-        return
-    parsed = urlparse(url)
-    if parsed.scheme not in ("http", "https") or not parsed.hostname:
-        raise HTTPException(status_code=422, detail="Invalid proxy URL")
-
-    from src.ssrf_guard import validate_public_url
-
+    """Reject a proxy URL that points at an internal target (see
+    ``proxy_common.check_proxy_url``)."""
     try:
-        validate_public_url(url)
+        check_proxy_url(url)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=f"Proxy endpoint not allowed: {e}")
 

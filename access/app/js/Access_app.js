@@ -23,9 +23,10 @@ var _reviewReturn = null;
 var _reviewListFilter = null;
 window.AI_APP_CONFIG = {
     storagePrefix: "access",
-    settingsExtraHTML: function () { return window._ctSmtpSettingsHTML ? window._ctSmtpSettingsHTML() : ""; },
+    settingsExtraHTML: function () { return (window._ctSmtpSettingsHTML ? window._ctSmtpSettingsHTML() : "") + (window._ctProxySettingsHTML ? window._ctProxySettingsHTML() : ""); },
     onSettingsRendered: function () { if (window._ctSmtpSettingsLoad)
-        window._ctSmtpSettingsLoad(); }
+        window._ctSmtpSettingsLoad(); if (window._ctProxySettingsLoad)
+        window._ctProxySettingsLoad(); }
 };
 function renderAll() {
     var tr = document.getElementById("toolbar-right");

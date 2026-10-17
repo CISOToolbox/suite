@@ -248,13 +248,12 @@ def check_proxy_setting(field: str, value: str) -> str:
     never towards an internal or metadata address (Pilot follows it, and the
     modules refuse those too); exceptions normalized. Saves and restored
     backups both go through it."""
-    from src.proxy_common import _check_single_url, normalize_no_proxy
-    from src.ssrf_guard import validate_public_url
+    from src.proxy_common import _check_single_url, check_proxy_url, normalize_no_proxy
     if field == "no_proxy":
         return normalize_no_proxy(value)
     if value:
         _check_single_url(field, value)
-        validate_public_url(value)
+        check_proxy_url(value)
     return value
 
 
