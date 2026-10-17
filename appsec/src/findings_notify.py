@@ -221,24 +221,32 @@ def render_weekly_html(sections: list[dict], lang: str) -> str:
 # ── delivery ─────────────────────────────────────────────────────────────
 
 def _send_email(cfg: dict, recipient: str, subject: str, html: str) -> None:
+    """``cfg`` is the resolved shape returned by :func:`_smtp_cfg` (int port,
+    bool tls, sender always set)."""
     from src.mailer_common import smtp_deliver
     msg = MIMEMultipart("alternative")
     msg["Subject"] = Header(subject, "utf-8")
-    sender = cfg.get("from_addr") or cfg.get("user") or ""
+    sender = cfg["from_addr"]
     msg["From"] = formataddr(("CISO Toolbox AppSec", sender))
     msg["To"] = recipient
     msg.attach(MIMEText(html, "html", "utf-8"))
     smtp_deliver(
-        cfg.get("host", ""), int(cfg.get("port") or 587),
-        use_tls=str(cfg.get("tls") or "true").lower() in ("1", "true", "yes"),
-        username=cfg.get("user") or "", password=cfg.get("password") or "",
+        cfg["host"], cfg["port"], use_tls=cfg["tls"],
+        username=cfg["user"], password=cfg["password"],
         sender=sender, recipients=[recipient], raw_message=msg.as_string(),
     )
 
 
+_DEFAULT_FROM = "appsec@cisotoolbox.local"
+
+
 def _smtp_cfg() -> dict:
+    """What Pilot pushed or the module's own settings wrote (the in-memory
+    dict), then the ``SMTP_*`` environment — the resolution the other
+    modules that send mail already use."""
+    from src.mailer_common import resolve_pushed_config
     from src.routes.internal import _smtp_config
-    return dict(_smtp_config)
+    return resolve_pushed_config(_smtp_config, _DEFAULT_FROM)
 
 
 async def _journal_and_send(db: AsyncSession, recipient: str, kind: str,
@@ -247,7 +255,7 @@ async def _journal_and_send(db: AsyncSession, recipient: str, kind: str,
     cfg = _smtp_cfg()
     status, err = "sent", ""
     if not cfg.get("host"):
-        status, err = "failed", "SMTP not configured (push it from Pilot settings)"
+        status, err = "failed", "SMTP not configured"
     else:
         try:
             await asyncio.to_thread(_send_email, cfg, recipient, subject, html)

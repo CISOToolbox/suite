@@ -30,7 +30,9 @@ var _selectedGroupe: number | null = null;
 var _groupeTab = "info";
 
 window.AI_APP_CONFIG = {
-    storagePrefix: "asset"
+    storagePrefix: "asset",
+    settingsExtraHTML: function() { return window._ctSmtpSettingsHTML ? window._ctSmtpSettingsHTML() : ""; },
+    onSettingsRendered: function() { if (window._ctSmtpSettingsLoad) window._ctSmtpSettingsLoad(); }
 };
 
 function renderAll(): void {
