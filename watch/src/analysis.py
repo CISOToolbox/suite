@@ -178,7 +178,6 @@ async def generate_or_get(
         provider=provider,
         model=model,
         max_tokens=2000,
-        timeout=120.0,
     )
     sections = _parse_sections(text)
 

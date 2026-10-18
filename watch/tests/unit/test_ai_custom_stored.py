@@ -28,6 +28,7 @@ from sqlalchemy.pool import StaticPool  # noqa: E402
 
 from src.database import get_db  # noqa: E402
 from src.models import AppSettings, AuditLog  # noqa: E402
+from src import ai_proxy_common  # noqa: E402
 from src.routes import ai  # noqa: E402
 
 _TOKEN = "svc-token-for-tests-0123456789abcdef"
@@ -60,7 +61,7 @@ async def test_the_stored_custom_llm_survives_a_restart(db, monkeypatch):
             "ai_custom_model": _MISTRAL["model"], "ai_custom_label": _MISTRAL["label"]})
     assert resp.status_code == 200
     monkeypatch.setattr(internal, "_custom_llm", {})  # what a restart leaves in memory
-    assert await ai._get_custom_llm(db) == _MISTRAL
+    assert await ai_proxy_common._get_custom_llm(db) == _MISTRAL
 
 @pytest.mark.asyncio
 async def test_settings_cleared_in_pilot_are_cleared_in_the_module(db, monkeypatch):
@@ -82,8 +83,8 @@ async def test_settings_cleared_in_pilot_are_cleared_in_the_module(db, monkeypat
         assert (await c.put("/api/internal/ai-custom", headers=headers,
                             json={"endpoint": "", "model": "", "key": "", "label": ""})).status_code == 200
         for _ in range(2):  # as pushed, then after a restart (memory empty)
-            custom = await ai._get_custom_llm(db)
+            custom = await ai_proxy_common._get_custom_llm(db)
             assert (custom.get("endpoint", ""), custom.get("key", "")) == ("", "")
-            assert not await ai._get_api_key("openai", db)
+            assert not await ai_proxy_common._get_api_key("openai", db)
             monkeypatch.setattr(internal, "_custom_llm", {})
 
