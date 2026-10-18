@@ -53,6 +53,10 @@ def test_missing_returned_state_is_rejected():
 
 
 def test_all_modules_guard_every_callback():
-    for m in ("pilot", "surface", "appsec", "watch"):
-        src = (REPO / m / "src" / "routes" / "auth.py").read_text()
-        assert src.count("_verify_oauth_state(request)") >= 3, f"{m}/auth.py under-guarded"
+    # Pilot's own sign-in, and the one every backend module mounts.
+    sources = {"pilot": REPO / "pilot" / "src" / "routes" / "auth.py"}
+    for m in sorted(p.parent.parent.name for p in REPO.glob("*/src/auth_routes_common.py")):
+        sources[m] = REPO / m / "src" / "auth_routes_common.py"
+    assert len(sources) >= 10, sources
+    for m, path in sources.items():
+        assert path.read_text().count("_verify_oauth_state(request)") >= 3, f"{m}: {path.name} under-guarded"

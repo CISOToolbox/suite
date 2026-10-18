@@ -949,6 +949,26 @@ def test_every_write_journal_is_the_shared_one() -> list[str]:
     return problems
 
 
+# ── Sign-in routes: one implementation ──────────────────────────────
+#
+# Every backend module signs in the same way (its key, identity providers,
+# Pilot in the suite): its routes/auth.py only mounts the shared router.
+
+def test_every_module_mounts_the_shared_sign_in() -> list[str]:
+    problems = []
+    for mod in _modules():
+        if mod.name == "pilot":
+            continue  # the suite's own sign-in
+        wrapper = mod / "src" / "routes" / "auth.py"
+        if not (mod / "src" / "auth_routes_common.py").exists():
+            problems.append(f"{mod.name}: no src/auth_routes_common.py")
+        elif not wrapper.exists() or "from src.auth_routes_common import router" not in wrapper.read_text(encoding="utf-8") \
+                or any(isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+                       for n in ast.walk(ast.parse(wrapper.read_text(encoding="utf-8")))):
+            problems.append(f"{mod.name}/src/routes/auth.py is not the shared sign-in's wrapper")
+    return problems
+
+
 CHECKS = (
     ("canonical field names", test_every_receiver_uses_the_canonical_fields),
     ("no pre-composed prompt", test_ai_requests_carry_no_precomposed_prompt),
@@ -972,6 +992,7 @@ CHECKS = (
     ("each login page is its module's", test_every_login_page_names_its_own_module),
     ("one role ladder per module", test_module_role_ladders_agree),
     ("one write journal", test_every_write_journal_is_the_shared_one),
+    ("one sign-in", test_every_module_mounts_the_shared_sign_in),
     ("bundled add-on tiers copied", test_every_bundled_addon_tier_is_copied),
     ("every image installs its lock", test_every_image_installs_its_lock),
     ("bundled add-ons get their deps", test_bundled_addons_get_their_dependencies),

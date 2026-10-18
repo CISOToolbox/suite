@@ -214,6 +214,8 @@ class TestRouteProtection:
 PUBLIC_ROUTES = {
     ("POST", "/auth/login/token"), ("POST", "/auth/logout"), ("GET", "/auth/providers"),
     ("GET", "/api/plugins/available"), ("GET", "/api/health"), ("GET", "/api/version"),
+    # The identity-provider sign-in: start of the flow and its callback.
+    *{("GET", f"/auth/{step}/{idp}") for step in ("login", "callback") for idp in ("entra", "google", "oidc")},
 }
 # Everything mounted outside FastAPI's APIRoute: the docs and the static front.
 NON_API_ROUTES = {
