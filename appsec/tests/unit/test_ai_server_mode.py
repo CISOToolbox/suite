@@ -231,3 +231,71 @@ async def test_settings_are_stored_as_they_were_checked(make_client):
                                                "ai_custom_endpoint": "  https://llm.medsecure.example/v1  "})
         assert r.status_code == 200, r.text
         assert (await c.get("/api/ai/keys")).json()["ai_custom_endpoint"] == "https://llm.medsecure.example/v1"
+
+
+# ── BUG-107: the operator's http opt-out reaches the modules ─────────────
+
+async def _store_custom(sessions, endpoint):
+    async with sessions() as s:
+        s.add(AppSettings(key="ai_custom_endpoint", value=endpoint))
+        s.add(AppSettings(key="ai_custom_model", value="medsecure-llm"))
+        await s.commit()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("opt_out, ok", [("true", True), ("false", False), (None, False)])
+async def test_an_http_custom_llm_works_when_the_operator_allows_it(sessions, monkeypatch, opt_out, ok):
+    from fastapi import HTTPException
+    if opt_out is None:
+        monkeypatch.delenv("ALLOW_INSECURE_CUSTOM_LLM_ENDPOINT", raising=False)
+    else:
+        monkeypatch.setenv("ALLOW_INSECURE_CUSTOM_LLM_ENDPOINT", opt_out)
+    await _store_custom(sessions, "http://llm.medsecure.example/v1")
+    seen = []
+
+    def handler(request):
+        seen.append(str(request.url))
+        return httpx.Response(200, json={"choices": [{"message": {"content": "brief: patch now"}}]})
+    monkeypatch.setattr(httpx, "AsyncHTTPTransport", lambda *a, **k: httpx.MockTransport(handler))
+    async with sessions() as db:
+        if ok:
+            assert await ai_proxy_common.call_llm(db, "system", "a CVE", "custom", "medsecure-llm") == "brief: patch now"
+            assert seen and seen[0].startswith("http://")
+        else:
+            with pytest.raises(HTTPException) as exc:
+                await ai_proxy_common.call_llm(db, "system", "a CVE", "custom", "medsecure-llm")
+            assert exc.value.status_code == 400 and not seen
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("opt_out, endpoint, status", [
+    ("true", "http://llm.medsecure.example/v1", 200),
+    ("false", "http://llm.medsecure.example/v1", 400),
+    ("true", "http://127.0.0.1/v1", 400),          # the opt-out is about the scheme, never the address
+    ("true", "http://169.254.169.254/latest", 400),
+    ("true", "http://10.0.0.25/v1", 400),
+    ("true", "http://192.168.1.20:11434/v1", 400),
+    ("1", "http://llm.medsecure.example/v1", 200),   # the values Pilot accepts
+    ("yes", "http://llm.medsecure.example/v1", 200),
+])
+async def test_the_admin_s_http_endpoint_follows_the_same_opt_out(make_client, monkeypatch, opt_out, endpoint, status):
+    make, _ = make_client
+    monkeypatch.setenv("ALLOW_INSECURE_CUSTOM_LLM_ENDPOINT", opt_out)
+    async with make() as c:
+        r = await c.put("/api/ai/keys", json={"provider": "custom", "ai_custom_endpoint": endpoint})
+    assert r.status_code == status, r.text
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("endpoint", ["http://10.0.0.25/v1", "http://127.0.0.1/v1", "http://169.254.169.254/v1"])
+async def test_the_opt_out_never_lets_a_call_reach_an_internal_address(sessions, monkeypatch, endpoint):
+    from fastapi import HTTPException
+    monkeypatch.setenv("ALLOW_INSECURE_CUSTOM_LLM_ENDPOINT", "true")
+    await _store_custom(sessions, endpoint)
+    seen = []
+    monkeypatch.setattr(httpx, "AsyncHTTPTransport",
+                        lambda *a, **k: httpx.MockTransport(lambda r: seen.append(r) or httpx.Response(200, json={})))
+    async with sessions() as db:
+        with pytest.raises(HTTPException) as exc:
+            await ai_proxy_common.call_llm(db, "system", "a CVE", "custom", "medsecure-llm")
+    assert exc.value.status_code == 400 and not seen
