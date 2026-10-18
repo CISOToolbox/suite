@@ -112,11 +112,6 @@ class UserResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class UserUpdate(BaseModel):
-    role: str | None = None
-    ai_enabled: str | None = None
-
-
 # ── Applications ──────────────────────────────────────────────
 
 def _validate_notification_emails(v: list[str] | None) -> list[str] | None:

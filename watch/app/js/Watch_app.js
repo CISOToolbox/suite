@@ -911,10 +911,11 @@ function _closeModal() {
 window.AI_APP_CONFIG = {
     storagePrefix: "watch",
     hideAI: true,
-    settingsExtraHTML: function () { return (window._ctSmtpSettingsHTML ? window._ctSmtpSettingsHTML() : "") + (window._ctProxySettingsHTML ? window._ctProxySettingsHTML() : ""); },
+    settingsExtraHTML: function () { return (window._ctSmtpSettingsHTML ? window._ctSmtpSettingsHTML() : "") + (window._ctProxySettingsHTML ? window._ctProxySettingsHTML() : "") + (window._ctUsersSettingsHTML ? window._ctUsersSettingsHTML() : ""); },
     onSettingsRendered: function () { if (window._ctSmtpSettingsLoad)
         window._ctSmtpSettingsLoad(); if (window._ctProxySettingsLoad)
-        window._ctProxySettingsLoad(); }
+        window._ctProxySettingsLoad(); if (window._ctUsersSettingsLoad)
+        window._ctUsersSettingsLoad(); }
 };
 function _boot() {
     var tr = document.getElementById("toolbar-right");
