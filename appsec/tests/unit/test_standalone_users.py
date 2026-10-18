@@ -14,7 +14,10 @@ Locks:
   - the router: admin only, the module's ladder plus pending/disabled, the
     last active admin cannot be demoted nor disabled, 409 in the suite;
   - the suite path is unchanged: the role comes from Pilot's session and is
-    mirrored into the table.
+    mirrored into the table;
+  - the module's key opens one local account, its admin, whatever address is
+    typed; it never takes over a provider account; that account's role is
+    fixed; the shared token rules with an identity provider.
 """
 from __future__ import annotations
 
@@ -91,7 +94,8 @@ def setup(monkeypatch, sessions):
 
     async def sign_in(email: str):
         async with sessions() as db:
-            user = await auth_common.standalone_sign_in(db, email, provider="token", provider_id="token")
+            # Several accounts: an identity provider's (the key opens one only).
+            user = await auth_common.standalone_sign_in(db, email, provider="google", provider_id="g-" + email)
         return auth_common.create_jwt(str(user.id), user.email, user.role,
                                       auth_common.standalone_permissions(user))
 
@@ -296,7 +300,7 @@ async def test_suite_mode_users_are_pilots(setup):
     ("anything else", "access_denied"),
 ])
 def test_a_refused_oauth_sign_in_goes_back_to_the_login_page(detail, code):
-    from src.routes.auth import _refused_sign_in
+    from src.auth_routes_common import _refused_sign_in
     r = _refused_sign_in(HTTPException(status_code=403, detail=detail))
     assert r.status_code in (302, 303, 307) and r.headers["location"] == f"/login.html?error={code}"
 
@@ -304,7 +308,7 @@ def test_a_refused_oauth_sign_in_goes_back_to_the_login_page(detail, code):
 @pytest.fixture
 def token_login(setup, monkeypatch):
     """The module's own /auth routes, standalone, with or without an identity provider."""
-    from src.routes import auth as routes_auth
+    from src import auth_routes_common as routes_auth
     monkeypatch.setattr(routes_auth, "AUTH_MODE", "standalone")
     monkeypatch.setattr(routes_auth, "AUTH_TOKEN", "a-standalone-token")
 
@@ -394,15 +398,6 @@ async def test_an_admin_from_elsewhere_does_not_close_the_token(token_login, set
 
 
 @pytest.mark.asyncio
-async def test_without_an_identity_provider_the_token_stays_the_way_in(token_login):
-    async with token_login(provider=False) as c:
-        assert (await _token(c, "ciso@medsecure.example")).status_code == 200
-        r = await _token(c, "analyst@medsecure.example")
-        assert r.status_code == 403 and "approval" in r.json()["detail"]
-        assert (await c.get("/auth/providers")).json()["token"] is True
-
-
-@pytest.mark.asyncio
 async def test_the_last_admin_guard_locks_the_admin_rows(setup):
     """Two demotions at the same time: the count runs on locked rows, so the
     second waits for the first and sees what it left. SQLite cannot run the
@@ -456,3 +451,193 @@ async def test_a_role_change_says_what_changed_to_the_journal(setup, monkeypatch
                                  cookies={auth_common.COOKIE_NAME: admin}) as c:
         assert (await c.put(f"/api/users/{target.id}", json={"role": "triager"})).status_code == 200
     assert entries and entries[-1][1] == {"role": "pending -> triager"}, entries
+
+
+# ── The key is the module's local account ─────────────────────────────
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("provider", [False, True])
+async def test_the_key_always_opens_the_same_local_account(token_login, setup, provider):
+    async with token_login(provider=provider) as c:
+        assert (await c.get("/auth/providers")).json()["token_setup"] is True
+        first = await _token(c, "ciso@medsecure.example")
+        assert first.status_code == 200 and first.json()["role"] == "admin"
+        assert (await c.get("/auth/providers")).json()["token_setup"] is False
+        for email in ("someone@else.example", "", "ciso@medsecure.example"):
+            r = await _token(c, email)
+            assert r.status_code == 200, (email, r.text)
+            assert r.json()["email"] == "ciso@medsecure.example"
+    async with setup["sessions"]() as db:
+        assert (await db.execute(select(User))).scalars().all().__len__() == 1
+
+
+@pytest.mark.asyncio
+async def test_the_local_account_ignores_the_domain_filter(token_login, monkeypatch):
+    from src import auth_routes_common as routes_auth
+    monkeypatch.setattr(routes_auth, "_ALLOWED_EMAIL_DOMAINS", {"medsecure.example"})
+    async with token_login(provider=False) as c:
+        r = await _token(c, "")
+    assert r.status_code == 200 and r.json()["email"] == "admin@local"
+
+
+@pytest.mark.asyncio
+async def test_the_key_never_takes_over_a_provider_account(token_login, setup):
+    async with token_login(provider=True) as c:
+        await _google(setup, "ciso@medsecure.example")          # first account: admin, closes the key
+        async with setup["sessions"]() as db:                    # the provider admin is disabled
+            u = (await db.execute(select(User).where(User.email == "ciso@medsecure.example"))).scalar_one()
+            u.role = "disabled"
+            await db.commit()
+        assert (await c.get("/auth/providers")).json()["token"] is True   # the way back in
+        r = await _token(c, "ciso@medsecure.example")                    # not the provider account
+        assert r.status_code == 409, r.text
+        r = await _token(c, "")                                          # a local account instead
+        assert r.status_code == 200 and r.json()["role"] == "admin" and r.json()["email"] == "admin@local"
+
+
+@pytest.mark.asyncio
+async def test_the_local_account_role_is_fixed(token_login, setup):
+    async with token_login(provider=True) as c:
+        local = await _token(c, "admin@local")
+        admin = local.cookies.get(auth_common.COOKIE_NAME)
+        with pytest.raises(HTTPException):
+            await _google(setup, "deputy@medsecure.example")
+        await _approve(setup, admin, "deputy@medsecure.example", "admin")
+        deputy_session = auth_common.create_jwt(str((await setup["row"]("deputy@medsecure.example")).id),
+                                                "deputy@medsecure.example", "admin", {"appsec": "admin"})
+        for role in ("viewer", "disabled", "pending"):
+            r = await _approve(setup, deputy_session, "admin@local", role)
+            assert r.status_code == 409, (role, r.text)
+        async with setup["client"](admin) as c2:
+            body = (await c2.get("/api/users")).json()
+        local_row = next(u for u in body["users"] if u["email"] == "admin@local")
+        assert local_row["local"] is True and body["identity_provider"] is True
+
+
+@pytest.mark.asyncio
+async def test_without_a_provider_the_users_section_knows_it(token_login, setup):
+    async with token_login(provider=False) as c:
+        admin = (await _token(c, "ciso@medsecure.example")).cookies.get(auth_common.COOKIE_NAME)
+    async with setup["client"](admin) as c2:
+        body = (await c2.get("/api/users")).json()
+    assert body["identity_provider"] is False and [u["local"] for u in body["users"]] == [True]
+
+
+@pytest.mark.asyncio
+async def test_only_the_key_s_account_is_fixed(token_login, setup):
+    """Other admins created with the key (an older instance) stay ordinary
+    accounts: an admin can demote or disable them."""
+    async with token_login(provider=False) as c:
+        local = (await _token(c, "first@medsecure.example")).cookies.get(auth_common.COOKIE_NAME)
+    async with setup["sessions"]() as db:
+        db.add(User(email="second@medsecure.example", name="second", provider="token",
+                    provider_id="token", role="admin"))
+        await db.commit()
+    async with setup["client"](local) as c2:
+        body = (await c2.get("/api/users")).json()
+    assert {u["email"]: u["local"] for u in body["users"]} == {
+        "first@medsecure.example": True, "second@medsecure.example": False}
+    assert (await _approve(setup, local, "second@medsecure.example", "disabled")).status_code == 200
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("role", ["disabled", "pending", "viewer"])
+async def test_the_key_never_brings_back_another_account(token_login, setup, role):
+    """No local account (its owner moved to a provider): the key names a new
+    one, but never revives or promotes an existing account."""
+    async with token_login(provider=False) as c:
+        async with setup["sessions"]() as db:
+            db.add(User(email="boss@medsecure.example", name="boss", provider="pilot",
+                        provider_id="", role="admin"))
+            db.add(User(email="bob@medsecure.example", name="bob", provider="token",
+                        provider_id="token", role=role))
+            await db.commit()
+        r = await _token(c, "bob@medsecure.example")
+        assert r.status_code == 409, r.text
+        assert (await setup["row"]("bob@medsecure.example")).role == role
+        r = await _token(c, "   ")
+        assert r.status_code == 200 and r.json()["email"] == "admin@local"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("idp, verified, ok", [
+    ("google", True, True), ("google", "true", True), ("google", False, False), ("google", None, False),
+    ("oidc", True, True), ("oidc", "true", True), ("oidc", False, False), ("oidc", "false", False),
+    ("oidc", None, True),  # an OIDC server that does not say is trusted for its own users
+])
+async def test_an_unverified_provider_address_is_refused(setup, monkeypatch, idp, verified, ok):
+    from src import auth_routes_common as routes_auth
+    info = {"email": "ciso@medsecure.example", "sub": "s-1", "name": "ciso"}
+    if verified is not None:
+        info["email_verified"] = verified
+
+    class Resp:
+        is_success = True
+        def json(self):
+            return info
+
+    class Client:
+        token = None
+        def __init__(self, *a, **k): pass
+        async def __aenter__(self): return self
+        async def __aexit__(self, *a): return False
+        async def fetch_token(self, *a, **k): return {"access_token": "x"}
+        async def get(self, *a, **k): return Resp()
+
+    async def endpoints():
+        return {"token_endpoint": "https://idp.example/token", "userinfo_endpoint": "https://idp.example/userinfo"}
+    monkeypatch.setattr(routes_auth, "AsyncOAuth2Client", Client)
+    monkeypatch.setattr(routes_auth, "_verify_oauth_state", lambda request: None)
+    monkeypatch.setattr(routes_auth, "_get_oidc_endpoints", endpoints)
+    monkeypatch.setattr(routes_auth, "AUTH_MODE", "standalone")
+    for name in ("GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET"):
+        monkeypatch.setattr(routes_auth, name, "x")
+    monkeypatch.setattr(routes_auth, "OIDC_ISSUER", "https://idp.example")
+    app = FastAPI()
+    app.include_router(routes_auth.router)
+
+    async def _db():
+        async with setup["sessions"]() as db:
+            yield db
+    app.dependency_overrides[get_db] = _db
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t") as c:
+        r = await c.get(f"/auth/callback/{idp}?code=c&state=s")
+    assert r.status_code in (302, 303, 307), r.text
+    if ok:
+        assert "error=" not in r.headers["location"], r.headers
+    else:
+        assert r.headers["location"].endswith("error=email_not_verified")
+
+
+@pytest.mark.asyncio
+async def test_the_account_creation_lock_comes_before_the_lookup(token_login, monkeypatch):
+    """Two first sign-ins at the same time: the lock is taken before the
+    module looks for an existing account (SQLite cannot run the race)."""
+    order = []
+    real_lock, real_local = auth_common._serialize_account_creation, auth_common.local_account
+
+    async def lock(db):
+        order.append("lock")
+        await real_lock(db)
+
+    async def local(db):
+        order.append("lookup")
+        return await real_local(db)
+    monkeypatch.setattr(auth_common, "_serialize_account_creation", lock)
+    monkeypatch.setattr(auth_common, "local_account", local)
+    async with token_login(provider=False) as c:
+        assert (await _token(c, "ciso@medsecure.example")).status_code == 200
+    assert "lock" in order and order[order.index("lock"):][:2] == ["lock", "lookup"], order
+
+
+@pytest.mark.asyncio
+async def test_the_account_creation_lock_is_a_postgresql_advisory_lock():
+    from types import SimpleNamespace as NS
+    sent = []
+
+    class Db:
+        bind = NS(dialect=NS(name="postgresql"))
+        async def execute(self, stmt):
+            sent.append(str(stmt))
+    await auth_common._serialize_account_creation(Db())
+    assert sent and "pg_advisory_xact_lock" in sent[0]
