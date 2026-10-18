@@ -31,8 +31,8 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine  # no
 from sqlalchemy.pool import StaticPool  # noqa: E402
 
 from src.models import AppSettings  # noqa: E402
+from src import ai_proxy_common  # noqa: E402
 from src.routes import ai  # noqa: E402
-from src.schemas import AICompleteRequest  # noqa: E402
 
 _HOST = "llm.medsecure.example"
 _PROXY = "http://ops:s3cret@proxy.medsecure.example:3128"
@@ -99,9 +99,8 @@ async def _text(db):
 
 
 async def _complete(db):
-    resp = await ai.ai_complete(AICompleteRequest(system="system", user="a CVE", provider="custom",
-                                                  model="medsecure-llm"), user=None, db=db)
-    return resp["text"] if isinstance(resp, dict) else resp.text
+    # What POST /api/ai/complete runs once the caller is let in.
+    return await ai_proxy_common.call_llm(db, "system", "a CVE", "custom", "medsecure-llm")
 
 
 _CALLS = [_text, _complete]
