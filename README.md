@@ -317,7 +317,7 @@ a button on the login page:
 
 | Option | When to use | `.env` variables |
 |---|---|---|
-| **Microsoft Entra ID** (Azure AD) | Your users live in a Microsoft 365 / Azure tenant | `ENTRA_CLIENT_ID`, `ENTRA_CLIENT_SECRET`, `ENTRA_TENANT_ID` — create an *App registration* in the Azure portal. Set `ENTRA_TENANT_ID` to **your tenant id** to restrict sign-in to your organization (`common` accepts any Microsoft account) |
+| **Microsoft Entra ID** (Azure AD) | Your users live in a Microsoft 365 / Azure tenant | `ENTRA_CLIENT_ID`, `ENTRA_CLIENT_SECRET`, `ENTRA_TENANT_ID` — create an *App registration* in the Azure portal. `ENTRA_TENANT_ID` is required: **your tenant id** (GUID), so only your organization signs in. Left empty or set to `common`, `organizations` or `consumers`, Entra ID stays off |
 | **Google OAuth** | Google Workspace organizations | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` — create an *OAuth client ID* (web application) in the Google Cloud console |
 | **Generic OIDC** | Any OpenID Connect IdP: Keycloak, Authentik, Okta, Ping, ADFS… | `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_ISSUER` (the issuer URL, discovery is automatic), `OIDC_LABEL` (text of the login button, default "SSO") |
 | **No auth — dev/test ONLY** | Local evaluation without an IdP | `AUTH_MODE=none` — every request is served as admin. Never expose such an instance |
