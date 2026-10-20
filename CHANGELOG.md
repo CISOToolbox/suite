@@ -3,6 +3,63 @@
 Every release has its section here, written at release time from the
 changes since the previous one and published as the GitHub release notes.
 
+## 0.14.0 — 2026-10-20
+
+### Modules
+
+- pilot: 1.3.0 → **1.4.0**
+- risk: 1.1.2 → **1.2.0**
+- compliance: 1.1.2 → **1.2.0**
+- audit: 1.1.2 → **1.2.0**
+- vendor: 1.3.2 → **1.4.0**
+- asset: 1.2.2 → **1.3.0**
+- access: 1.3.2 → **1.4.0**
+- surface: 1.5.2 → **1.7.0**
+- appsec: 1.3.0 → **1.4.0**
+- watch: 1.1.2 → **1.2.0**
+
+### Added
+
+- One shared sign-in router for the nine backend modules — identity providers everywhere (auth)
+- Distinguish "not assessed" from 0 in the criticality formula
+
+### Fixed
+
+- No multi-tenant Entra default — an unset tenant is empty, and the README says it is required (auth)
+- Every module's write journal records what a route says changed; one journal implementation
+- Exact masking docstring; contract checks proxy_common never forces allow_private (proxy)
+- Mask a token user name with an empty password, redact credentials in any case, contract reads the validator's AST (proxy)
+- Mask a token-only proxy userinfo, keep credentials out of refusals, leave omitted fields as they are (proxy)
+- A module released ahead of the suite passes the matrix check outside a release (release-check)
+- The AI agent reaches a custom LLM through the outbound proxy
+
+### Changed
+
+- One proxy URL validator in proxy_common, shared by the internal routes and Pilot (proxy)
+
+### Documentation
+
+- --strict also requires the matrix row to equal the VERSION files
+- The page scanners' redirect policy and how each hop is checked
+- A refused origin is reported even when another origin answered
+- Only the checks that pin the validated address send the name as SNI
+- The JavaScript check reaches each script host as its own exceptions say
+- The scripts the JavaScript check finds are fetched by name
+- Through the egress proxy the name is resolved by the proxy, which must refuse internal destinations
+- The egress proxy as it now works, Surface's scanners included (suite)
+
+### Tests
+
+- One role ladder per module, the same in Pilot and in the module (contracts)
+- The login tab title is exactly the logo, a missing page or index title is reported (contracts)
+- Each login page carries its own module's name (contracts)
+- Every proxy_common copy, Pilot's included, passes allow_private on to ssrf_guard (contracts)
+- The backup contract reads the filters, not a string (suite)
+- Backups leave out the proxy Pilot pushes (suite)
+- Every module that receives the proxy restores it at start-up (suite)
+- Every module declares the routes Pilot pushes its settings to (suite)
+- Stop collecting the contract checks as no-op tests (suite)
+
 ## 0.13.0 — 2026-10-05
 
 ### Modules
