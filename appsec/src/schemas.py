@@ -22,13 +22,43 @@ _REPO_SCHEMES = ("https://", "http://", "git@", "ssh://")
 _IMAGE_REF_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._:/@-]{0,255}$")
 
 
-def _repo_host(url: str) -> str:
-    """Host of a repo URL, in either the URL or the scp-like form."""
+# Characters that make URL parsers disagree on where the authority ends:
+# urllib stops at '?' or '#', while git (and _inject_token) stop at '/' only,
+# so "https://github.com?@evil.example/x" is github.com to one and
+# evil.example to the other — which is where the token would go.
+_AMBIGUOUS_AUTHORITY = set("?#\\ \t\r\n")
+
+
+def repo_host(url: str) -> str:
+    """Host of a repo URL, in either the URL or the scp-like form.
+
+    Returns "" for an authority that parsers could read differently, so a
+    caller vetting the host never vets one host while git contacts another.
+    """
+    url = url or ""
     if "://" in url:
-        return (urllib.parse.urlparse(url).hostname or "").lower()
+        scheme, rest = url.split("://", 1)
+        authority = rest.split("/", 1)[0]
+        if _AMBIGUOUS_AUTHORITY & set(authority) or authority.count("@") > 1:
+            return ""
+        userinfo, _, hostport = authority.rpartition("@")
+        # git percent-decodes an ssh:// URL before splitting its host, so a
+        # '%' there can move the host; curl splits first, then decodes the
+        # user name only (an encoded e-mail login stays usable over http).
+        if "%" in hostport or ("%" in userinfo and scheme.lower() not in ("http", "https")):
+            return ""
+        try:
+            parts = urllib.parse.urlsplit("//" + authority)
+            parts.port  # a non-numeric port is not a port git agrees on
+        except ValueError:  # also unbalanced or invalid brackets
+            return ""
+        return (parts.hostname or "").lower()
     if "@" in url:  # git@host:owner/repo.git
-        rest = url.split("@", 1)[1]
-        return rest.split(":", 1)[0].split("/", 1)[0].lower()
+        authority = url.split(":", 1)[0]
+        if (_AMBIGUOUS_AUTHORITY & set(authority) or "/" in authority
+                or authority.count("@") != 1):
+            return ""
+        return authority.split("@", 1)[1].lower()
     return ""
 
 
@@ -53,9 +83,9 @@ def _check_repo_url(v: str) -> str:
     if "ext::" in low or "--upload-pack" in low:
         # git remote helpers / transport options run arbitrary commands.
         raise ValueError("Unsupported repo URL scheme")
-    host = _repo_host(v)
+    host = repo_host(v)
     if not host:
-        raise ValueError("Missing host in repo URL")
+        raise ValueError("Missing or ambiguous host in repo URL")
     try:
         resolve_safe_target(host)
     except ValueError as e:
@@ -76,6 +106,58 @@ def _image_registry_host(ref: str) -> str:
     if head != "localhost" and "." not in head and ":" not in head:
         return ""
     return head.split(":", 1)[0] if ":" in head else head
+
+
+_DEFAULT_PORTS = {"https": 443, "http": 80, "ssh": 22}
+
+
+def _repo_origin(url: str) -> tuple:
+    """Where a repo token would actually be sent: scheme, host and port.
+
+    The scheme counts (https → http would hand the PAT over in clear text)
+    and so does the port (another service on the same host); an explicit
+    default port is the same origin as none.
+    """
+    host = repo_host(url)
+    if not host or "://" not in url:
+        return ("scp", host, None)
+    scheme = url.split("://", 1)[0].lower()
+    try:
+        port = urllib.parse.urlsplit("//" + url.split("://", 1)[1].split("/", 1)[0]).port
+    except ValueError:
+        return (scheme, "", None)
+    return (scheme, host, port or _DEFAULT_PORTS.get(scheme))
+
+
+def _image_registry(ref: str) -> str:
+    """Registry of an image ref with its port, lowercased; Docker Hub named."""
+    host = _image_registry_host(ref)
+    if not host:
+        return "docker.io"
+    return ref.split("/", 1)[0].lower()
+
+
+def tokens_to_clear(old_repo_url: str, old_images: list[str], updates: dict) -> list[str]:
+    """Stored tokens that must not follow an application to a new destination.
+
+    A token is sent to whatever the app points at: git answers a `401 Basic`
+    challenge with the PAT, trivy answers a registry challenge with
+    TRIVY_PASSWORD. Without this, anyone allowed to edit an app could repoint
+    it at a server they own and collect the token an admin stored. So a token
+    survives an update only if its destination (scheme, host, port) stays
+    the same, or if the same update supplies a new one.
+    """
+    cleared = []
+    if "repo_url" in updates and "repo_token" not in updates:
+        new, old = _repo_origin(updates["repo_url"] or ""), _repo_origin(old_repo_url or "")
+        if not new[1] or new != old:
+            cleared.append("repo_token")
+    if "docker_images" in updates and "image_token" not in updates:
+        def registries(images):
+            return {_image_registry(i) for i in images or []}
+        if not registries(updates["docker_images"]) <= registries(old_images):
+            cleared.append("image_token")
+    return cleared
 
 
 def _clean_image_refs(v: list[str]) -> list[str]:
