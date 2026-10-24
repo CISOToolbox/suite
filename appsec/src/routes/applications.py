@@ -16,7 +16,7 @@ _APPSEC_ROLES = ["viewer", "triager", "admin"]
 from src.audit import log_action
 from src.database import get_db
 from src.models import Application, Finding, User
-from src.schemas import ApplicationCreate, ApplicationUpdate
+from src.schemas import ApplicationCreate, ApplicationUpdate, tokens_to_clear
 from src.crypto import encrypt_token
 
 router = APIRouter(prefix="/api/applications", tags=["applications"])
@@ -138,6 +138,11 @@ async def update_application(
         raise HTTPException(status_code=404, detail="Application not found")
 
     updates = body.model_dump(exclude_none=True)
+    cleared = tokens_to_clear(app.repo_url, app.docker_images, updates)
+    if "repo_token" in cleared:
+        app.repo_token_encrypted = ""
+    if "image_token" in cleared:
+        app.image_token_encrypted = ""
     if "repo_token" in updates:
         app.repo_token_encrypted = encrypt_token(updates.pop("repo_token"))
     if "image_token" in updates:
@@ -145,7 +150,10 @@ async def update_application(
     changed = list(updates.keys())
     for k, v in updates.items():
         setattr(app, k, v)
-    await log_action(db, user, request, "app.update", target=app.name, details={"fields": changed})
+    details = {"fields": changed}
+    if cleared:
+        details["tokens_cleared"] = cleared
+    await log_action(db, user, request, "app.update", target=app.name, details=details)
     await db.commit()
     await db.refresh(app)
     return _app_response(app)

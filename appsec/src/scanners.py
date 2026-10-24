@@ -130,6 +130,15 @@ def _inject_token(repo_url: str, token: str) -> str:
     """
     if not token or "://" not in repo_url:
         return repo_url
+    if repo_url.split("://", 1)[0].lower() not in ("http", "https"):
+        # A PAT authenticates over HTTP only; in an ssh:// URL it would be
+        # sent as the ssh user name.
+        return repo_url
+    from src.schemas import repo_host
+
+    if not repo_host(repo_url):
+        # The authority below would not be the host that was vetted.
+        raise RuntimeError("Ambiguous host in repo URL")
     proto, rest = repo_url.split("://", 1)
     # Strip existing userinfo: everything before the first '@' in the
     # authority component (before the first '/').
@@ -152,17 +161,12 @@ def _revalidate_repo_host(repo_url: str) -> None:
     window cannot be closed entirely; re-checking here shrinks it from the
     whole scan queue delay to the microseconds before exec.
     """
-    from urllib.parse import urlparse
-
+    from src.schemas import repo_host
     from src.ssrf_guard import resolve_safe_target
 
-    url = (repo_url or "").strip()
-    if "://" in url:
-        host = (urlparse(url).hostname or "").lower()
-    elif "@" in url:  # git@host:owner/repo.git
-        host = url.split("@", 1)[1].split(":", 1)[0].split("/", 1)[0].lower()
-    else:
-        host = ""
+    # The exact string git will get: stripping here would vet a URL other
+    # than the one the token is injected into.
+    host = repo_host(repo_url or "")
     if not host:
         raise RuntimeError("Missing host in repo URL")
     try:
@@ -260,9 +264,13 @@ def fetch_file_window(repo_url: str, branch: str, commit: str, token_encrypted: 
     token = decrypt_token(token_encrypted)
     if token_encrypted and not token:
         return {"ok": False, "note": "token"}
-    url = _inject_token(repo_url, token)
-    if "://" not in url:
+    if "://" not in repo_url:
         return {"ok": False, "note": "no_repo"}
+    try:
+        _revalidate_repo_host(repo_url)
+        url = _inject_token(repo_url, token)
+    except RuntimeError:
+        return {"ok": False, "note": "repo_host"}
 
     tmp_dir = tempfile.mkdtemp(prefix="appsec-file-")
     env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
