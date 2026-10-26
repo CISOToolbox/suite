@@ -97,8 +97,10 @@ backup/recovery agent (`backup-agent/`) and the setup tooling (`setup.sh`,
 ## Hardening checklist for operators
 
 1. Run `bash setup.sh` — it generates every secret (`JWT_SECRET`,
-   `SERVICE_TOKEN`, `ENCRYPTION_KEY`, `DB_PASSWORD`, `BACKUP_CIPHER_PASS`,
-   `BACKUP_AGENT_TOKEN`) with `openssl rand -hex 32`, one dedicated value each.
+   `SERVICE_TOKEN`, `ENCRYPTION_KEY`, `BACKUP_CIPHER_PASS`,
+   `BACKUP_AGENT_TOKEN` with `openssl rand -hex 32`; `DB_PASSWORD` and one
+   `DB_PASSWORD_<MODULE>` per module database with `openssl rand -hex 16`),
+   one dedicated value each.
 2. Keep `.env` out of version control and `chmod 600` (setup.sh does this);
    store `BACKUP_CIPHER_PASS` in your vault — losing it makes backups
    unreadable.

@@ -16,25 +16,6 @@
 #   https://ciso.example.com/risk/
 #   etc.
 
-# ─────────────────────────────────────────────────────────────
-# Shared env block — injected via YAML anchor into every module.
-# Keeps the 8 backend services in sync without hand-maintained copies.
-# ─────────────────────────────────────────────────────────────
-x-module-env: &module-env
-  JWT_SECRET: ${JWT_SECRET:?JWT_SECRET est obligatoire (openssl rand -hex 32)}
-  SERVICE_TOKEN: ${SERVICE_TOKEN:?SERVICE_TOKEN is required}
-  AUTH_MODE: ${AUTH_MODE:-pilot}
-  PILOT_URL: http://pilot-app:8080
-  ENTRA_CLIENT_ID: ${ENTRA_CLIENT_ID:-}
-  ENTRA_CLIENT_SECRET: ${ENTRA_CLIENT_SECRET:-}
-  ENTRA_TENANT_ID: ${ENTRA_TENANT_ID:-}
-  GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
-  GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
-  OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
-  OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
-  OIDC_ISSUER: ${OIDC_ISSUER:-}
-  OIDC_LABEL: ${OIDC_LABEL:-SSO}
-
 # Shared healthcheck block for app containers
 x-app-healthcheck: &app-healthcheck
   test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/api/health')"]
@@ -152,9 +133,8 @@ services:
     tmpfs:
       - /tmp:noexec,nosuid,size=128m
       - /home/appuser:size=32m,mode=1777
-    env_file: .env
     environment:
-      - DATABASE_URL=postgresql+asyncpg://pilot:${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}@pilot-db:5432/pilot
+      - DATABASE_URL=postgresql+asyncpg://pilot:${DB_PASSWORD_PILOT:-${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}}@pilot-db:5432/pilot
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET est obligatoire (openssl rand -hex 32)}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY is required (openssl rand -hex 32) — see .env.example}
       - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-}
@@ -198,6 +178,54 @@ services:
       - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET:-}
       - OIDC_ISSUER=${OIDC_ISSUER:-}
       - OIDC_LABEL=${OIDC_LABEL:-SSO}
+      # Optional settings, passed by name only: a variable absent from
+      # .env stays absent here. Secrets this module does not use are
+      # never handed to it (no env_file).
+      - AI_MAX_TOKENS
+      - ALLOW_INSECURE_CUSTOM_LLM_ENDPOINT
+      - ALL_PROXY
+      - all_proxy
+      - ANTHROPIC_API_KEY
+      - AUTH_MODE
+      - BACKUP_MANUAL_RETENTION
+      - CONNECTORS_MANAGED_BY_PILOT
+      - CONNECTOR_AWS_ACCESS_KEY_ID
+      - CONNECTOR_AWS_REGION
+      - CONNECTOR_AWS_SECRET_ACCESS_KEY
+      - CONNECTOR_M365_CLIENT_ID
+      - CONNECTOR_M365_CLIENT_SECRET
+      - CONNECTOR_M365_TENANT_ID
+      - CONNECTOR_PROOFPOINT_PSAT_API_KEY
+      - CONNECTOR_PROOFPOINT_PSAT_CAMPAIGN_FILTER
+      - CONNECTOR_PROOFPOINT_PSAT_EMAIL_DOMAINS
+      - CONNECTOR_PROOFPOINT_PSAT_LOOKBACK_DAYS
+      - CONNECTOR_PROOFPOINT_PSAT_REGION
+      - CONNECTOR_PROOFPOINT_PSAT_RETENTION_MONTHS
+      - DASHBOARD_CACHE_TTL
+      - HTTPS_PROXY
+      - https_proxy
+      - HTTP_PROXY
+      - http_proxy
+      - JWT_EXPIRY_HOURS
+      - KPI_AUTO_INITIAL_DELAY
+      - KPI_AUTO_INTERVAL_SECONDS
+      - M365_CLIENT_ID
+      - M365_CLIENT_SECRET
+      - M365_TENANT_ID
+      - NO_PROXY
+      - no_proxy
+      - OPENAI_API_KEY
+      - PILOT_EXTERNAL_URL
+      - REQUESTS_CA_BUNDLE
+      - SMTP_FROM
+      - SMTP_HOST
+      - SMTP_PASSWORD
+      - SMTP_PORT
+      - SMTP_TLS
+      - SMTP_USER
+      - SSL_CERT_FILE
+      - WATCH_EXTERNAL_URL
+      - WATCH_URL
     depends_on:
       pilot-db:
         condition: service_healthy
@@ -225,6 +253,8 @@ services:
       start_period: 180s
     networks:
       - ciso-net
+      - pilot-data
+      - ciso-recovery
 
   pilot-db:
     # ciso-postgres = same postgres:16-alpine base + pgBackRest (FEAT-30).
@@ -256,7 +286,7 @@ services:
       PGDATA: /pg/pilot
       PGBACKREST_PG1_PATH: /pg/pilot
       POSTGRES_USER: pilot
-      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}
+      POSTGRES_PASSWORD: ${DB_PASSWORD_PILOT:-${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}}
       PGBACKREST_REPO1_PATH: /var/lib/pgbackrest
       PGBACKREST_REPO1_CIPHER_TYPE: aes-256-cbc
       PGBACKREST_REPO1_CIPHER_PASS: ${BACKUP_CIPHER_PASS:?BACKUP_CIPHER_PASS is required (pgBackRest repo encryption), see .env.example}
@@ -271,7 +301,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - ciso-net
+      - pilot-data
 
   # ════════════════════════════════════════════════════════════
   # RISK — EBIOS RM
@@ -289,9 +319,8 @@ services:
     tmpfs:
       - /tmp:noexec,nosuid,size=128m
       - /home/appuser:size=32m,mode=1777
-    env_file: .env
     environment:
-      - DATABASE_URL=postgresql+asyncpg://risk:${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}@risk-db:5432/risk
+      - DATABASE_URL=postgresql+asyncpg://risk:${DB_PASSWORD_RISK:-${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}}@risk-db:5432/risk
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET est obligatoire (openssl rand -hex 32)}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY is required (openssl rand -hex 32) — see .env.example}
       - SERVICE_TOKEN=${SERVICE_TOKEN:?SERVICE_TOKEN est obligatoire (openssl rand -hex 32)}
@@ -304,16 +333,28 @@ services:
       - MODULE_NAME=risk
       - PILOT_URL=http://pilot-app:8080
       - AI_MANAGED_BY_PILOT=true
-      - ENTRA_CLIENT_ID=${ENTRA_CLIENT_ID:-}
-      - ENTRA_CLIENT_SECRET=${ENTRA_CLIENT_SECRET:-}
-      - ENTRA_TENANT_ID=${ENTRA_TENANT_ID:-}
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
-      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
-      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID:-}
-      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET:-}
-      - OIDC_ISSUER=${OIDC_ISSUER:-}
-      - OIDC_LABEL=${OIDC_LABEL:-SSO}
       - VENDOR_URL=http://vendor-app:8080
+      # Optional settings, passed by name only: a variable absent from
+      # .env stays absent here. Secrets this module does not use are
+      # never handed to it (no env_file).
+      - AI_MAX_TOKENS
+      - ALLOWED_EMAIL_DOMAINS
+      - ALLOW_INSECURE_CUSTOM_LLM_ENDPOINT
+      - ALL_PROXY
+      - all_proxy
+      - ANTHROPIC_API_KEY
+      - GEMINI_API_KEY
+      - HTTPS_PROXY
+      - https_proxy
+      - HTTP_PROXY
+      - http_proxy
+      - JWT_EXPIRY_HOURS
+      - NO_PROXY
+      - no_proxy
+      - OPENAI_API_KEY
+      - REQUESTS_CA_BUNDLE
+      - REVOCATION_CHECK_TTL_SECONDS
+      - SSL_CERT_FILE
     depends_on:
       risk-db:
         condition: service_healthy
@@ -331,6 +372,8 @@ services:
       start_period: 180s
     networks:
       - ciso-net
+      - risk-data
+      - ciso-recovery
 
   risk-db:
     # ciso-postgres = same postgres:16-alpine base + pgBackRest (FEAT-30).
@@ -362,7 +405,7 @@ services:
       PGDATA: /pg/risk
       PGBACKREST_PG1_PATH: /pg/risk
       POSTGRES_USER: risk
-      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}
+      POSTGRES_PASSWORD: ${DB_PASSWORD_RISK:-${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}}
       PGBACKREST_REPO1_PATH: /var/lib/pgbackrest
       PGBACKREST_REPO1_CIPHER_TYPE: aes-256-cbc
       PGBACKREST_REPO1_CIPHER_PASS: ${BACKUP_CIPHER_PASS:?BACKUP_CIPHER_PASS is required (pgBackRest repo encryption), see .env.example}
@@ -377,7 +420,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - ciso-net
+      - risk-data
 
   # ════════════════════════════════════════════════════════════
   # VENDOR — TPRM
@@ -395,9 +438,8 @@ services:
     tmpfs:
       - /tmp:noexec,nosuid,size=128m
       - /home/appuser:size=32m,mode=1777
-    env_file: .env
     environment:
-      - DATABASE_URL=postgresql+asyncpg://vendor:${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}@vendor-db:5432/vendor
+      - DATABASE_URL=postgresql+asyncpg://vendor:${DB_PASSWORD_VENDOR:-${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}}@vendor-db:5432/vendor
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET est obligatoire (openssl rand -hex 32)}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY is required (openssl rand -hex 32) — see .env.example}
       - SERVICE_TOKEN=${SERVICE_TOKEN:?SERVICE_TOKEN est obligatoire (openssl rand -hex 32)}
@@ -410,15 +452,28 @@ services:
       - MODULE_NAME=vendor
       - AI_MANAGED_BY_PILOT=true
       - PILOT_URL=http://pilot-app:8080
-      - ENTRA_CLIENT_ID=${ENTRA_CLIENT_ID:-}
-      - ENTRA_CLIENT_SECRET=${ENTRA_CLIENT_SECRET:-}
-      - ENTRA_TENANT_ID=${ENTRA_TENANT_ID:-}
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
-      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
-      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID:-}
-      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET:-}
-      - OIDC_ISSUER=${OIDC_ISSUER:-}
-      - OIDC_LABEL=${OIDC_LABEL:-SSO}
+      # Optional settings, passed by name only: a variable absent from
+      # .env stays absent here. Secrets this module does not use are
+      # never handed to it (no env_file).
+      - AI_MAX_TOKENS
+      - ALLOWED_EMAIL_DOMAINS
+      - ALLOW_INSECURE_CUSTOM_LLM_ENDPOINT
+      - ALL_PROXY
+      - all_proxy
+      - ANTHROPIC_API_KEY
+      - GEMINI_API_KEY
+      - HTTPS_PROXY
+      - https_proxy
+      - HTTP_PROXY
+      - http_proxy
+      - JWT_EXPIRY_HOURS
+      - NO_PROXY
+      - no_proxy
+      - OPENAI_API_KEY
+      - REQUESTS_CA_BUNDLE
+      - REVOCATION_CHECK_TTL_SECONDS
+      - SSL_CERT_FILE
+      - VENDOR_PORTAL_URL
     depends_on:
       vendor-db:
         condition: service_healthy
@@ -436,6 +491,8 @@ services:
       start_period: 180s
     networks:
       - ciso-net
+      - vendor-data
+      - ciso-recovery
 
   vendor-db:
     # ciso-postgres = same postgres:16-alpine base + pgBackRest (FEAT-30).
@@ -467,7 +524,7 @@ services:
       PGDATA: /pg/vendor
       PGBACKREST_PG1_PATH: /pg/vendor
       POSTGRES_USER: vendor
-      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}
+      POSTGRES_PASSWORD: ${DB_PASSWORD_VENDOR:-${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}}
       PGBACKREST_REPO1_PATH: /var/lib/pgbackrest
       PGBACKREST_REPO1_CIPHER_TYPE: aes-256-cbc
       PGBACKREST_REPO1_CIPHER_PASS: ${BACKUP_CIPHER_PASS:?BACKUP_CIPHER_PASS is required (pgBackRest repo encryption), see .env.example}
@@ -482,7 +539,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - ciso-net
+      - vendor-data
 
   # ════════════════════════════════════════════════════════════
   # COMPLIANCE
@@ -500,9 +557,8 @@ services:
     tmpfs:
       - /tmp:noexec,nosuid,size=128m
       - /home/appuser:size=32m,mode=1777
-    env_file: .env
     environment:
-      - DATABASE_URL=postgresql+asyncpg://compliance:${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}@compliance-db:5432/compliance
+      - DATABASE_URL=postgresql+asyncpg://compliance:${DB_PASSWORD_COMPLIANCE:-${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}}@compliance-db:5432/compliance
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET est obligatoire (openssl rand -hex 32)}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY is required (openssl rand -hex 32) — see .env.example}
       - SERVICE_TOKEN=${SERVICE_TOKEN:?SERVICE_TOKEN est obligatoire (openssl rand -hex 32)}
@@ -515,15 +571,38 @@ services:
       - MODULE_NAME=compliance
       - AI_MANAGED_BY_PILOT=true
       - PILOT_URL=http://pilot-app:8080
-      - ENTRA_CLIENT_ID=${ENTRA_CLIENT_ID:-}
-      - ENTRA_CLIENT_SECRET=${ENTRA_CLIENT_SECRET:-}
-      - ENTRA_TENANT_ID=${ENTRA_TENANT_ID:-}
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
-      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
-      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID:-}
-      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET:-}
-      - OIDC_ISSUER=${OIDC_ISSUER:-}
-      - OIDC_LABEL=${OIDC_LABEL:-SSO}
+      # Optional settings, passed by name only: a variable absent from
+      # .env stays absent here. Secrets this module does not use are
+      # never handed to it (no env_file).
+      - AI_MAX_TOKENS
+      - ALLOWED_EMAIL_DOMAINS
+      - ALLOW_INSECURE_CUSTOM_LLM_ENDPOINT
+      - ALL_PROXY
+      - all_proxy
+      - ANTHROPIC_API_KEY
+      - COMPLIANCE_PROOF_INTERVAL_HOURS
+      - COMPLIANCE_PROOF_LEAD_DAYS
+      - COMPLIANCE_PROOF_RECIPIENTS
+      - COMPLIANCE_PROOF_REMIND_DAYS
+      - COMPLIANCE_PROOF_TICK_SECONDS
+      - GEMINI_API_KEY
+      - HTTPS_PROXY
+      - https_proxy
+      - HTTP_PROXY
+      - http_proxy
+      - JWT_EXPIRY_HOURS
+      - NO_PROXY
+      - no_proxy
+      - OPENAI_API_KEY
+      - REQUESTS_CA_BUNDLE
+      - REVOCATION_CHECK_TTL_SECONDS
+      - SMTP_FROM
+      - SMTP_HOST
+      - SMTP_PASSWORD
+      - SMTP_PORT
+      - SMTP_TLS
+      - SMTP_USER
+      - SSL_CERT_FILE
     depends_on:
       compliance-db:
         condition: service_healthy
@@ -541,6 +620,8 @@ services:
       start_period: 180s
     networks:
       - ciso-net
+      - compliance-data
+      - ciso-recovery
 
   compliance-db:
     # ciso-postgres = same postgres:16-alpine base + pgBackRest (FEAT-30).
@@ -572,7 +653,7 @@ services:
       PGDATA: /pg/compliance
       PGBACKREST_PG1_PATH: /pg/compliance
       POSTGRES_USER: compliance
-      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}
+      POSTGRES_PASSWORD: ${DB_PASSWORD_COMPLIANCE:-${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}}
       PGBACKREST_REPO1_PATH: /var/lib/pgbackrest
       PGBACKREST_REPO1_CIPHER_TYPE: aes-256-cbc
       PGBACKREST_REPO1_CIPHER_PASS: ${BACKUP_CIPHER_PASS:?BACKUP_CIPHER_PASS is required (pgBackRest repo encryption), see .env.example}
@@ -587,7 +668,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - ciso-net
+      - compliance-data
 
   # ════════════════════════════════════════════════════════════
   # ASSET — Asset Management
@@ -605,9 +686,8 @@ services:
     tmpfs:
       - /tmp:noexec,nosuid,size=128m
       - /home/appuser:size=32m,mode=1777
-    env_file: .env
     environment:
-      - DATABASE_URL=postgresql+asyncpg://asset:${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}@asset-db:5432/asset
+      - DATABASE_URL=postgresql+asyncpg://asset:${DB_PASSWORD_ASSET:-${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}}@asset-db:5432/asset
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET est obligatoire (openssl rand -hex 32)}
       - SERVICE_TOKEN=${SERVICE_TOKEN:?SERVICE_TOKEN est obligatoire (openssl rand -hex 32)}
       # FEAT-30 phase 2 — static DSN target for /internal/export-recovery
@@ -620,15 +700,37 @@ services:
       - AI_MANAGED_BY_PILOT=true
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY is required (openssl rand -hex 32) — see .env.example}
       - PILOT_URL=http://pilot-app:8080
-      - ENTRA_CLIENT_ID=${ENTRA_CLIENT_ID:-}
-      - ENTRA_CLIENT_SECRET=${ENTRA_CLIENT_SECRET:-}
-      - ENTRA_TENANT_ID=${ENTRA_TENANT_ID:-}
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
-      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
-      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID:-}
-      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET:-}
-      - OIDC_ISSUER=${OIDC_ISSUER:-}
-      - OIDC_LABEL=${OIDC_LABEL:-SSO}
+      # Optional settings, passed by name only: a variable absent from
+      # .env stays absent here. Secrets this module does not use are
+      # never handed to it (no env_file).
+      - AI_MAX_TOKENS
+      - ALLOWED_EMAIL_DOMAINS
+      - ALLOW_INSECURE_CUSTOM_LLM_ENDPOINT
+      - ALL_PROXY
+      - all_proxy
+      - ANTHROPIC_API_KEY
+      - ASSET_RENEWAL_INTERVAL_HOURS
+      - ASSET_RENEWAL_RECIPIENTS
+      - ASSET_RENEWAL_TICK_SECONDS
+      - CONNECTORS_MANAGED_BY_PILOT
+      - GEMINI_API_KEY
+      - HTTPS_PROXY
+      - https_proxy
+      - HTTP_PROXY
+      - http_proxy
+      - JWT_EXPIRY_HOURS
+      - NO_PROXY
+      - no_proxy
+      - OPENAI_API_KEY
+      - REQUESTS_CA_BUNDLE
+      - REVOCATION_CHECK_TTL_SECONDS
+      - SMTP_FROM
+      - SMTP_HOST
+      - SMTP_PASSWORD
+      - SMTP_PORT
+      - SMTP_TLS
+      - SMTP_USER
+      - SSL_CERT_FILE
     depends_on:
       asset-db:
         condition: service_healthy
@@ -646,6 +748,8 @@ services:
       start_period: 180s
     networks:
       - ciso-net
+      - asset-data
+      - ciso-recovery
 
   asset-db:
     # ciso-postgres = same postgres:16-alpine base + pgBackRest (FEAT-30).
@@ -677,7 +781,7 @@ services:
       PGDATA: /pg/asset
       PGBACKREST_PG1_PATH: /pg/asset
       POSTGRES_USER: asset
-      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}
+      POSTGRES_PASSWORD: ${DB_PASSWORD_ASSET:-${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}}
       PGBACKREST_REPO1_PATH: /var/lib/pgbackrest
       PGBACKREST_REPO1_CIPHER_TYPE: aes-256-cbc
       PGBACKREST_REPO1_CIPHER_PASS: ${BACKUP_CIPHER_PASS:?BACKUP_CIPHER_PASS is required (pgBackRest repo encryption), see .env.example}
@@ -692,7 +796,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - ciso-net
+      - asset-data
 
   # ════════════════════════════════════════════════════════════
   # AUDIT — stored audits (blob) + frontend-file import
@@ -710,9 +814,8 @@ services:
     tmpfs:
       - /tmp:noexec,nosuid,size=128m
       - /home/appuser:size=32m,mode=1777
-    env_file: .env
     environment:
-      - DATABASE_URL=postgresql+asyncpg://audit:${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}@audit-db:5432/audit
+      - DATABASE_URL=postgresql+asyncpg://audit:${DB_PASSWORD_AUDIT:-${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}}@audit-db:5432/audit
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET est obligatoire (openssl rand -hex 32)}
       - SERVICE_TOKEN=${SERVICE_TOKEN:?SERVICE_TOKEN est obligatoire (openssl rand -hex 32)}
       # FEAT-30 phase 2 — static DSN target for /internal/export-recovery
@@ -725,15 +828,27 @@ services:
       - AI_MANAGED_BY_PILOT=true
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY is required (openssl rand -hex 32) — see .env.example}
       - PILOT_URL=http://pilot-app:8080
-      - ENTRA_CLIENT_ID=${ENTRA_CLIENT_ID:-}
-      - ENTRA_CLIENT_SECRET=${ENTRA_CLIENT_SECRET:-}
-      - ENTRA_TENANT_ID=${ENTRA_TENANT_ID:-}
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
-      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
-      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID:-}
-      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET:-}
-      - OIDC_ISSUER=${OIDC_ISSUER:-}
-      - OIDC_LABEL=${OIDC_LABEL:-SSO}
+      # Optional settings, passed by name only: a variable absent from
+      # .env stays absent here. Secrets this module does not use are
+      # never handed to it (no env_file).
+      - AI_MAX_TOKENS
+      - ALLOWED_EMAIL_DOMAINS
+      - ALLOW_INSECURE_CUSTOM_LLM_ENDPOINT
+      - ALL_PROXY
+      - all_proxy
+      - ANTHROPIC_API_KEY
+      - GEMINI_API_KEY
+      - HTTPS_PROXY
+      - https_proxy
+      - HTTP_PROXY
+      - http_proxy
+      - JWT_EXPIRY_HOURS
+      - NO_PROXY
+      - no_proxy
+      - OPENAI_API_KEY
+      - REQUESTS_CA_BUNDLE
+      - REVOCATION_CHECK_TTL_SECONDS
+      - SSL_CERT_FILE
     depends_on:
       audit-db:
         condition: service_healthy
@@ -751,6 +866,8 @@ services:
       start_period: 180s
     networks:
       - ciso-net
+      - audit-data
+      - ciso-recovery
 
   audit-db:
     # ciso-postgres = same postgres:16-alpine base + pgBackRest (FEAT-30).
@@ -782,7 +899,7 @@ services:
       PGDATA: /pg/audit
       PGBACKREST_PG1_PATH: /pg/audit
       POSTGRES_USER: audit
-      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}
+      POSTGRES_PASSWORD: ${DB_PASSWORD_AUDIT:-${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}}
       PGBACKREST_REPO1_PATH: /var/lib/pgbackrest
       PGBACKREST_REPO1_CIPHER_TYPE: aes-256-cbc
       PGBACKREST_REPO1_CIPHER_PASS: ${BACKUP_CIPHER_PASS:?BACKUP_CIPHER_PASS is required (pgBackRest repo encryption), see .env.example}
@@ -797,7 +914,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - ciso-net
+      - audit-data
 
   # ════════════════════════════════════════════════════════════
   # ACCESS — Access Rights Review
@@ -815,9 +932,8 @@ services:
     tmpfs:
       - /tmp:noexec,nosuid,size=128m
       - /home/appuser:size=32m,mode=1777
-    env_file: .env
     environment:
-      - DATABASE_URL=postgresql+asyncpg://access:${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}@access-db:5432/access
+      - DATABASE_URL=postgresql+asyncpg://access:${DB_PASSWORD_ACCESS:-${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}}@access-db:5432/access
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET est obligatoire (openssl rand -hex 32)}
       - SERVICE_TOKEN=${SERVICE_TOKEN:?SERVICE_TOKEN est obligatoire (openssl rand -hex 32)}
       # FEAT-30 phase 2 — static DSN target for /internal/export-recovery
@@ -835,15 +951,39 @@ services:
       - ALLOW_PRIVATE_CONNECTOR_URLS=${ALLOW_PRIVATE_CONNECTOR_URLS:-false}
       - ASSET_URL=http://asset-app:8080
       - PILOT_URL=http://pilot-app:8080
-      - ENTRA_CLIENT_ID=${ENTRA_CLIENT_ID:-}
-      - ENTRA_CLIENT_SECRET=${ENTRA_CLIENT_SECRET:-}
-      - ENTRA_TENANT_ID=${ENTRA_TENANT_ID:-}
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
-      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
-      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID:-}
-      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET:-}
-      - OIDC_ISSUER=${OIDC_ISSUER:-}
-      - OIDC_LABEL=${OIDC_LABEL:-SSO}
+      # Optional settings, passed by name only: a variable absent from
+      # .env stays absent here. Secrets this module does not use are
+      # never handed to it (no env_file).
+      - ACCESS_ADDONS_ENABLED
+      - ACCESS_ADDON_PATHS
+      - ACCESS_EXPIRY_INTERVAL_HOURS
+      - ACCESS_EXPIRY_TICK_SECONDS
+      - ACCESS_MAIL_LANG
+      - AI_MAX_TOKENS
+      - ALLOWED_EMAIL_DOMAINS
+      - ALLOW_INSECURE_CUSTOM_LLM_ENDPOINT
+      - ALL_PROXY
+      - all_proxy
+      - ANTHROPIC_API_KEY
+      - CONNECTORS_MANAGED_BY_PILOT
+      - GEMINI_API_KEY
+      - HTTPS_PROXY
+      - https_proxy
+      - HTTP_PROXY
+      - http_proxy
+      - JWT_EXPIRY_HOURS
+      - NO_PROXY
+      - no_proxy
+      - OPENAI_API_KEY
+      - REQUESTS_CA_BUNDLE
+      - REVOCATION_CHECK_TTL_SECONDS
+      - SMTP_FROM
+      - SMTP_HOST
+      - SMTP_PASSWORD
+      - SMTP_PORT
+      - SMTP_TLS
+      - SMTP_USER
+      - SSL_CERT_FILE
     depends_on:
       access-db:
         condition: service_healthy
@@ -861,6 +1001,8 @@ services:
       start_period: 180s
     networks:
       - ciso-net
+      - access-data
+      - ciso-recovery
 
   access-db:
     # ciso-postgres = same postgres:16-alpine base + pgBackRest (FEAT-30).
@@ -892,7 +1034,7 @@ services:
       PGDATA: /pg/access
       PGBACKREST_PG1_PATH: /pg/access
       POSTGRES_USER: access
-      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}
+      POSTGRES_PASSWORD: ${DB_PASSWORD_ACCESS:-${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}}
       PGBACKREST_REPO1_PATH: /var/lib/pgbackrest
       PGBACKREST_REPO1_CIPHER_TYPE: aes-256-cbc
       PGBACKREST_REPO1_CIPHER_PASS: ${BACKUP_CIPHER_PASS:?BACKUP_CIPHER_PASS is required (pgBackRest repo encryption), see .env.example}
@@ -907,7 +1049,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - ciso-net
+      - access-data
 
   # ════════════════════════════════════════════════════════════
   # SURFACE — Attack Surface Management
@@ -927,9 +1069,8 @@ services:
     tmpfs:
       - /tmp:noexec,nosuid,size=512m
       - /home/surface:size=64m,mode=1777
-    env_file: .env
     environment:
-      - DATABASE_URL=postgresql+asyncpg://surface:${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}@surface-db:5432/surface
+      - DATABASE_URL=postgresql+asyncpg://surface:${DB_PASSWORD_SURFACE:-${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}}@surface-db:5432/surface
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET est obligatoire (openssl rand -hex 32)}
       - SERVICE_TOKEN=${SERVICE_TOKEN:?SERVICE_TOKEN est obligatoire (openssl rand -hex 32)}
       # FEAT-30 phase 2 — static DSN target for /internal/export-recovery
@@ -941,15 +1082,6 @@ services:
       - MODULE_NAME=surface
       - AI_MANAGED_BY_PILOT=true
       - PILOT_URL=http://pilot-app:8080
-      - ENTRA_CLIENT_ID=${ENTRA_CLIENT_ID:-}
-      - ENTRA_CLIENT_SECRET=${ENTRA_CLIENT_SECRET:-}
-      - ENTRA_TENANT_ID=${ENTRA_TENANT_ID:-}
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
-      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
-      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID:-}
-      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET:-}
-      - OIDC_ISSUER=${OIDC_ISSUER:-}
-      - OIDC_LABEL=${OIDC_LABEL:-SSO}
       # Nuclei tuning — override in .env if needed
       - SURFACE_NUCLEI_RATE_LIMIT=${SURFACE_NUCLEI_RATE_LIMIT:-20}
       - SURFACE_NUCLEI_CONCURRENCY=${SURFACE_NUCLEI_CONCURRENCY:-25}
@@ -969,6 +1101,37 @@ services:
       - SURFACE_SMB_USERNAME=${SURFACE_SMB_USERNAME:-}
       - SURFACE_SMB_PASSWORD=${SURFACE_SMB_PASSWORD:-}
       - SURFACE_SMB_DOMAIN=${SURFACE_SMB_DOMAIN:-}
+      # Optional settings, passed by name only: a variable absent from
+      # .env stays absent here. Secrets this module does not use are
+      # never handed to it (no env_file).
+      - AI_MAX_TOKENS
+      - ALLOWED_EMAIL_DOMAINS
+      - ALLOW_INSECURE_CUSTOM_LLM_ENDPOINT
+      - ALL_PROXY
+      - all_proxy
+      - ANTHROPIC_API_KEY
+      - GEMINI_API_KEY
+      - HTTPS_PROXY
+      - https_proxy
+      - HTTP_PROXY
+      - http_proxy
+      - JWT_EXPIRY_HOURS
+      - NO_PROXY
+      - no_proxy
+      - NUCLEI_AUTO_UPDATE_HOURS
+      - OPENAI_API_KEY
+      - PUBLIC_BASE_URL
+      - REQUESTS_CA_BUNDLE
+      - REVOCATION_CHECK_TTL_SECONDS
+      - SMTP_FROM
+      - SMTP_HOST
+      - SMTP_PASSWORD
+      - SMTP_PORT
+      - SMTP_TLS
+      - SMTP_USER
+      - SSL_CERT_FILE
+      - SURFACE_ADDON_PATHS
+      - SURFACE_SMB_RS_BATCH
     depends_on:
       surface-db:
         condition: service_healthy
@@ -986,6 +1149,8 @@ services:
       start_period: 180s
     networks:
       - ciso-net
+      - surface-data
+      - ciso-recovery
 
   surface-db:
     # ciso-postgres = same postgres:16-alpine base + pgBackRest (FEAT-30).
@@ -1017,7 +1182,7 @@ services:
       PGDATA: /pg/surface
       PGBACKREST_PG1_PATH: /pg/surface
       POSTGRES_USER: surface
-      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}
+      POSTGRES_PASSWORD: ${DB_PASSWORD_SURFACE:-${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}}
       PGBACKREST_REPO1_PATH: /var/lib/pgbackrest
       PGBACKREST_REPO1_CIPHER_TYPE: aes-256-cbc
       PGBACKREST_REPO1_CIPHER_PASS: ${BACKUP_CIPHER_PASS:?BACKUP_CIPHER_PASS is required (pgBackRest repo encryption), see .env.example}
@@ -1032,7 +1197,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - ciso-net
+      - surface-data
 
   # ════════════════════════════════════════════════════════════
   # APPSEC — Application Security Scanner
@@ -1056,9 +1221,8 @@ services:
       - /tmp:nosuid,size=2g
     volumes:
       - appsec-cache:/home/appsec
-    env_file: .env
     environment:
-      - DATABASE_URL=postgresql+asyncpg://appsec:${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}@appsec-db:5432/appsec
+      - DATABASE_URL=postgresql+asyncpg://appsec:${DB_PASSWORD_APPSEC:-${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}}@appsec-db:5432/appsec
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET est obligatoire (openssl rand -hex 32)}
       - SERVICE_TOKEN=${SERVICE_TOKEN:?SERVICE_TOKEN est obligatoire (openssl rand -hex 32)}
       # FEAT-30 phase 2 — static DSN target for /internal/export-recovery
@@ -1072,15 +1236,34 @@ services:
       - AI_MANAGED_BY_PILOT=true
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY is required (openssl rand -hex 32) — see .env.example}
       - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-}
-      - ENTRA_CLIENT_ID=${ENTRA_CLIENT_ID:-}
-      - ENTRA_CLIENT_SECRET=${ENTRA_CLIENT_SECRET:-}
-      - ENTRA_TENANT_ID=${ENTRA_TENANT_ID:-}
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
-      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
-      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID:-}
-      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET:-}
-      - OIDC_ISSUER=${OIDC_ISSUER:-}
-      - OIDC_LABEL=${OIDC_LABEL:-SSO}
+      # Optional settings, passed by name only: a variable absent from
+      # .env stays absent here. Secrets this module does not use are
+      # never handed to it (no env_file).
+      - AI_MAX_TOKENS
+      - ALLOWED_EMAIL_DOMAINS
+      - ALLOW_INSECURE_CUSTOM_LLM_ENDPOINT
+      - ALL_PROXY
+      - all_proxy
+      - ANTHROPIC_API_KEY
+      - GEMINI_API_KEY
+      - HTTPS_PROXY
+      - https_proxy
+      - HTTP_PROXY
+      - http_proxy
+      - JWT_EXPIRY_HOURS
+      - NO_PROXY
+      - no_proxy
+      - OPENAI_API_KEY
+      - REQUESTS_CA_BUNDLE
+      - REVOCATION_CHECK_TTL_SECONDS
+      - SCAN_TIMEOUT_SECONDS
+      - SMTP_FROM
+      - SMTP_HOST
+      - SMTP_PASSWORD
+      - SMTP_PORT
+      - SMTP_TLS
+      - SMTP_USER
+      - SSL_CERT_FILE
     depends_on:
       appsec-db:
         condition: service_healthy
@@ -1098,6 +1281,8 @@ services:
       start_period: 180s
     networks:
       - ciso-net
+      - appsec-data
+      - ciso-recovery
 
   appsec-db:
     # ciso-postgres = same postgres:16-alpine base + pgBackRest (FEAT-30).
@@ -1129,7 +1314,7 @@ services:
       PGDATA: /pg/appsec
       PGBACKREST_PG1_PATH: /pg/appsec
       POSTGRES_USER: appsec
-      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}
+      POSTGRES_PASSWORD: ${DB_PASSWORD_APPSEC:-${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}}
       PGBACKREST_REPO1_PATH: /var/lib/pgbackrest
       PGBACKREST_REPO1_CIPHER_TYPE: aes-256-cbc
       PGBACKREST_REPO1_CIPHER_PASS: ${BACKUP_CIPHER_PASS:?BACKUP_CIPHER_PASS is required (pgBackRest repo encryption), see .env.example}
@@ -1144,7 +1329,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - ciso-net
+      - appsec-data
 
   # ════════════════════════════════════════════════════════════
   # WATCH — CVE / advisory monitoring. Re-enabled on this stack (the block had
@@ -1162,9 +1347,8 @@ services:
       - ALL
     tmpfs:
       - /tmp:noexec,nosuid,size=64m
-    env_file: .env
     environment:
-      - DATABASE_URL=postgresql+asyncpg://watch:${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}@watch-db:5432/watch
+      - DATABASE_URL=postgresql+asyncpg://watch:${DB_PASSWORD_WATCH:-${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}}@watch-db:5432/watch
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET est obligatoire (openssl rand -hex 32)}
       - SERVICE_TOKEN=${SERVICE_TOKEN:?SERVICE_TOKEN est obligatoire (openssl rand -hex 32)}
       # FEAT-30 phase 2 — static DSN target for /internal/export-recovery
@@ -1178,15 +1362,39 @@ services:
       - APPSEC_URL=http://appsec-app:8080
       - AI_MANAGED_BY_PILOT=true
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY is required (openssl rand -hex 32) — see .env.example}
-      - ENTRA_CLIENT_ID=${ENTRA_CLIENT_ID:-}
-      - ENTRA_CLIENT_SECRET=${ENTRA_CLIENT_SECRET:-}
-      - ENTRA_TENANT_ID=${ENTRA_TENANT_ID:-}
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
-      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
-      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID:-}
-      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET:-}
-      - OIDC_ISSUER=${OIDC_ISSUER:-}
-      - OIDC_LABEL=${OIDC_LABEL:-SSO}
+      # Optional settings, passed by name only: a variable absent from
+      # .env stays absent here. Secrets this module does not use are
+      # never handed to it (no env_file).
+      - AI_MAX_TOKENS
+      - ALLOWED_EMAIL_DOMAINS
+      - ALLOW_INSECURE_CUSTOM_LLM_ENDPOINT
+      - ALL_PROXY
+      - all_proxy
+      - ANTHROPIC_API_KEY
+      - GEMINI_API_KEY
+      - HTTPS_PROXY
+      - https_proxy
+      - HTTP_PROXY
+      - http_proxy
+      - JWT_EXPIRY_HOURS
+      - NO_PROXY
+      - no_proxy
+      - NVD_API_KEY
+      - OPENAI_API_KEY
+      - PUBLIC_BASE_URL
+      - PUBLIC_URL
+      - REQUESTS_CA_BUNDLE
+      - REVOCATION_CHECK_TTL_SECONDS
+      - SMTP_FROM
+      - SMTP_HOST
+      - SMTP_PASSWORD
+      - SMTP_PORT
+      - SMTP_TLS
+      - SMTP_USER
+      - SSL_CERT_FILE
+      - WATCH_ANALYSIS_CONCURRENCY
+      - WATCH_FIRST_RUN_LOOKBACK_DAYS
+      - WATCH_TICK_SECONDS
     depends_on:
       watch-db:
         condition: service_healthy
@@ -1204,6 +1412,8 @@ services:
       start_period: 180s
     networks:
       - ciso-net
+      - watch-data
+      - ciso-recovery
 
   watch-db:
     # ciso-postgres = same postgres:16-alpine base + pgBackRest (FEAT-30).
@@ -1232,7 +1442,7 @@ services:
       PGDATA: /pg/watch
       PGBACKREST_PG1_PATH: /pg/watch
       POSTGRES_USER: watch
-      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}
+      POSTGRES_PASSWORD: ${DB_PASSWORD_WATCH:-${DB_PASSWORD:?DB_PASSWORD is required, see .env.example}}
       PGBACKREST_REPO1_PATH: /var/lib/pgbackrest
       PGBACKREST_REPO1_CIPHER_TYPE: aes-256-cbc
       PGBACKREST_REPO1_CIPHER_PASS: ${BACKUP_CIPHER_PASS:?BACKUP_CIPHER_PASS is required (pgBackRest repo encryption), see .env.example}
@@ -1247,7 +1457,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - ciso-net
+      - watch-data
 
   # ════════════════════════════════════════════════════════════
   # BACKUP-AGENT — pgBackRest scheduler (FEAT-30 stage 1)
@@ -1271,6 +1481,10 @@ services:
       PGBACKREST_REPO1_RETENTION_FULL: "2"
       # Recovery API (FEAT-30 phase 2): token shared with Pilot only.
       BACKUP_AGENT_TOKEN: ${BACKUP_AGENT_TOKEN:?BACKUP_AGENT_TOKEN is required (recovery API), see .env.example}
+      # Optional schedule and recovery settings, passed by name only.
+      BACKUP_HOUR:
+      BACKUP_MODULES:
+      RECOVERY_TTL_SECONDS:
     volumes:
       - backups-repo:/var/lib/pgbackrest
       - pilot-pgdata:/pg/pilot:ro
@@ -1294,11 +1508,40 @@ services:
       - watch-pgdata:/pg/watch:ro
       - watch-pgsock:/sock/watch
     networks:
-      - ciso-net
+      - ciso-recovery
 
+# Segmented: a compromised container reaches only what it talks to.
 networks:
+  # Proxy and apps: the edge, app-to-app calls (Pilot and every module,
+  # risk -> vendor, access -> asset, watch -> appsec) and outbound access.
   ciso-net:
     driver: bridge
+  # One per module, no outbound access: only its app reaches its database.
+  pilot-data:
+    internal: true
+  risk-data:
+    internal: true
+  vendor-data:
+    internal: true
+  compliance-data:
+    internal: true
+  asset-data:
+    internal: true
+  audit-data:
+    internal: true
+  access-data:
+    internal: true
+  surface-data:
+    internal: true
+  appsec-data:
+    internal: true
+  watch-data:
+    internal: true
+  # Backup agent, no outbound access: Pilot drives its recovery API (9090),
+  # each app reads its restored instance (5433). The databases are not on
+  # it: the agent reaches them through their socket volumes.
+  ciso-recovery:
+    internal: true
 
 volumes:
   backups-repo:   # pgBackRest repository (FEAT-30) — encrypted at rest

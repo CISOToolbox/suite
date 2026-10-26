@@ -15,6 +15,7 @@
 # What the override adds:
 #   · to the 10 databases — repo2 on S3 + async WAL archiving (see below)
 #   · to backup-agent — repo2, for the base backups and the restore
+#   · to both — a network of its own each, to reach the object storage
 #
 # Base backups require an explicit call per repository (the agent takes care
 # of it); WAL archiving, on the other hand, is broadcast to all of them.
@@ -22,6 +23,8 @@
 services:
 
   pilot-db:
+    networks:
+      - pilot-egress
     environment:
       PGBACKREST_REPO2_TYPE: s3
       PGBACKREST_REPO2_PATH: ${BACKUP_S3_PATH:-/pgbackrest}
@@ -54,6 +57,8 @@ services:
       - pilot-spool:/var/spool/pgbackrest
 
   risk-db:
+    networks:
+      - risk-egress
     environment:
       PGBACKREST_REPO2_TYPE: s3
       PGBACKREST_REPO2_PATH: ${BACKUP_S3_PATH:-/pgbackrest}
@@ -86,6 +91,8 @@ services:
       - risk-spool:/var/spool/pgbackrest
 
   vendor-db:
+    networks:
+      - vendor-egress
     environment:
       PGBACKREST_REPO2_TYPE: s3
       PGBACKREST_REPO2_PATH: ${BACKUP_S3_PATH:-/pgbackrest}
@@ -118,6 +125,8 @@ services:
       - vendor-spool:/var/spool/pgbackrest
 
   compliance-db:
+    networks:
+      - compliance-egress
     environment:
       PGBACKREST_REPO2_TYPE: s3
       PGBACKREST_REPO2_PATH: ${BACKUP_S3_PATH:-/pgbackrest}
@@ -150,6 +159,8 @@ services:
       - compliance-spool:/var/spool/pgbackrest
 
   asset-db:
+    networks:
+      - asset-egress
     environment:
       PGBACKREST_REPO2_TYPE: s3
       PGBACKREST_REPO2_PATH: ${BACKUP_S3_PATH:-/pgbackrest}
@@ -182,6 +193,8 @@ services:
       - asset-spool:/var/spool/pgbackrest
 
   audit-db:
+    networks:
+      - audit-egress
     environment:
       PGBACKREST_REPO2_TYPE: s3
       PGBACKREST_REPO2_PATH: ${BACKUP_S3_PATH:-/pgbackrest}
@@ -214,6 +227,8 @@ services:
       - audit-spool:/var/spool/pgbackrest
 
   access-db:
+    networks:
+      - access-egress
     environment:
       PGBACKREST_REPO2_TYPE: s3
       PGBACKREST_REPO2_PATH: ${BACKUP_S3_PATH:-/pgbackrest}
@@ -246,6 +261,8 @@ services:
       - access-spool:/var/spool/pgbackrest
 
   surface-db:
+    networks:
+      - surface-egress
     environment:
       PGBACKREST_REPO2_TYPE: s3
       PGBACKREST_REPO2_PATH: ${BACKUP_S3_PATH:-/pgbackrest}
@@ -278,6 +295,8 @@ services:
       - surface-spool:/var/spool/pgbackrest
 
   appsec-db:
+    networks:
+      - appsec-egress
     environment:
       PGBACKREST_REPO2_TYPE: s3
       PGBACKREST_REPO2_PATH: ${BACKUP_S3_PATH:-/pgbackrest}
@@ -310,6 +329,8 @@ services:
       - appsec-spool:/var/spool/pgbackrest
 
   watch-db:
+    networks:
+      - watch-egress
     environment:
       PGBACKREST_REPO2_TYPE: s3
       PGBACKREST_REPO2_PATH: ${BACKUP_S3_PATH:-/pgbackrest}
@@ -342,6 +363,8 @@ services:
       - watch-spool:/var/spool/pgbackrest
 
   backup-agent:
+    networks:
+      - agent-egress
     environment:
       PGBACKREST_REPO2_TYPE: s3
       PGBACKREST_REPO2_PATH: ${BACKUP_S3_PATH:-/pgbackrest}
@@ -360,6 +383,37 @@ services:
       # Triggers the base backup to repo2 and the off-site restore test
       # in agent.sh.
       BACKUP_S3_ENABLED: "1"
+      # Day of the off-site restore test, passed by name only.
+      BACKUP_S3_TEST_DAY:
+
+# The base stack keeps the databases and the agent off any network with
+# outbound access. Off-site backup needs it — WAL archiving runs inside each
+# database, base backups in the agent — so this override, and only it,
+# gives them a way out.
+# One per container: a shared one would let the databases reach each other.
+networks:
+  pilot-egress:
+    driver: bridge
+  risk-egress:
+    driver: bridge
+  vendor-egress:
+    driver: bridge
+  compliance-egress:
+    driver: bridge
+  asset-egress:
+    driver: bridge
+  audit-egress:
+    driver: bridge
+  access-egress:
+    driver: bridge
+  surface-egress:
+    driver: bridge
+  appsec-egress:
+    driver: bridge
+  watch-egress:
+    driver: bridge
+  agent-egress:
+    driver: bridge
 
 volumes:
   pilot-spool:
