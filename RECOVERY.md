@@ -21,13 +21,57 @@ It holds **database contents**. It does not hold, and cannot hold:
 | Database contents | the repository | yes |
 | Settings Pilot stores encrypted (SMTP, AI keys, connector tokens) | the databases | yes — provided `ENCRYPTION_KEY` is unchanged |
 | `ENCRYPTION_KEY` itself | the `.env` | **no** — and without it the row above is unreadable |
-| `DB_PASSWORD`, `JWT_SECRET`, identity-provider secrets | the `.env` | **no** |
+| `DB_PASSWORD`, `DB_PASSWORD_<MODULE>`, `JWT_SECRET`, identity-provider secrets | the `.env` | **no** |
 | Repository passphrase and S3 credentials | the `.env` | **no**, obviously |
 
 The last three lines are the point: the secrets needed to *open* a backup
 cannot be inside it. They must survive independently of the machine they
 protect — a password manager, a corporate vault, offline media. A repository
 whose passphrase is lost is not a backup.
+
+## Database passwords and older backups
+
+A database password lives in the database, not in the `.env`. A restore
+brings back the password the database had **at the point in time restored**:
+a password change is written to the WAL like any other change, so a point
+after the change opens with the new password, a point before it with the
+previous one.
+
+**Changing a password.** Give the module its own password: set
+`DB_PASSWORD_<MODULE>` in the `.env`, then run
+`bash tools/rotate-db-passwords.sh <module>`. It changes the password in the
+running database, recreates the module and its database, and takes a full
+backup as a precaution. Do not change `DB_PASSWORD` itself on a running
+installation: every module still on that fallback would be given a password
+its database does not hold, and stop. Move those modules to their own
+`DB_PASSWORD_<MODULE>` instead.
+
+The previous password is not needed afterwards, not even to restore a point
+before the change:
+
+- **Restore session from Pilot** (export, or replacing the live database).
+  Pilot keeps showing the session as *preparing*: the module cannot open the
+  restored instance with its current password. Run
+  `bash tools/rotate-db-passwords.sh --recovery-session <module>`. It waits
+  for the restored instance to reach the chosen point in time, then sets the
+  module's current password on it through the backup agent's local socket,
+  touching nothing else. Pilot then shows the session ready; export or replace
+  as usual. Replacing copies the data only, not the database roles: the live
+  database keeps its current password.
+- **Restore in place**, straight into the live database (rebuilding a lost
+  host): once the database is started again, run
+  `bash tools/rotate-db-passwords.sh --after-restore <module>` (add
+  `--project-dir <dir>` if the directory holding `docker-compose.yml` is not
+  the parent of `tools/`). It waits for the database to finish replaying its
+  WAL, however long that takes, then sets the password the module is given
+  through the database container's local socket, without needing the old one.
+  It takes no backup: a new full backup would expire the oldest one, and with
+  it the chance to restore again to the same point if the first target was
+  wrong. The Ansible restore playbook runs it for you.
+
+`DB_PASSWORD` is the fallback for every module whose `DB_PASSWORD_<MODULE>`
+is unset: an installation upgraded from a single shared password keeps
+working unchanged until you move it, module by module, with the same script.
 
 ## Schema and migrations
 

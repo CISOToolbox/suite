@@ -27,7 +27,11 @@ if [ ! -f .env ]; then
     sed -i.bak "s/JWT_SECRET=change-me.*/JWT_SECRET=$JWT/" .env
     sed -i.bak "s/SERVICE_TOKEN=change-me.*/SERVICE_TOKEN=$SVC/" .env
     sed -i.bak "s/ENCRYPTION_KEY=change-me.*/ENCRYPTION_KEY=$ENC/" .env
-    sed -i.bak "s/DB_PASSWORD=change-me.*/DB_PASSWORD=$DBP/" .env
+    sed -i.bak "s/^DB_PASSWORD=change-me.*/DB_PASSWORD=$DBP/" .env
+    # One password per module database: a leaked one opens a single database.
+    for m in PILOT RISK VENDOR COMPLIANCE ASSET AUDIT ACCESS SURFACE APPSEC WATCH; do
+        sed -i.bak "s/^# *DB_PASSWORD_$m=change-me.*/DB_PASSWORD_$m=$(openssl rand -hex 16)/" .env
+    done
     sed -i.bak "s/BACKUP_CIPHER_PASS=change-me.*/BACKUP_CIPHER_PASS=$BCP/" .env
     sed -i.bak "s/BACKUP_AGENT_TOKEN=change-me.*/BACKUP_AGENT_TOKEN=$BAT/" .env
     rm -f .env.bak

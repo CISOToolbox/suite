@@ -22,7 +22,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: tooling
-        run: pip install --quiet "ruff==0.6.9" pytest pytest-asyncio pydantic fastapi httpx
+        run: pip install --quiet "ruff==0.6.9" pytest pytest-asyncio pydantic fastapi httpx pyyaml
       - name: undefined names (F821) — the “missing import → 500” class
         run: ruff check --select F821 */src
       - name: auth sentinel (user is None means auth disabled)
@@ -33,6 +33,8 @@ jobs:
         run: python3 tests/test_schema_migrations.py
       - name: suite contracts (prompts, add-ons, secrets, SSRF…)
         run: pytest tests/test_suite_contracts.py -q
+      - name: compose isolation (what each container is handed)
+        run: pytest tests/test_compose_isolation.py -q
 
   release:
     name: release gates
