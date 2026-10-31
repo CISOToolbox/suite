@@ -16,6 +16,7 @@ authenticated with BACKUP_AGENT_TOKEN.
 from __future__ import annotations
 
 import json
+import logging
 import os
 from typing import Any
 
@@ -30,6 +31,7 @@ from src.auth import get_current_user, require_admin
 from src.database import get_db
 from src.models import ModuleRegistry, User
 
+logger = logging.getLogger("pilot.restore")
 router = APIRouter(prefix="/api/restore", tags=["restore"])
 
 AGENT_URL = os.getenv("BACKUP_AGENT_URL", "http://backup-agent:9090")
@@ -51,11 +53,11 @@ class PromoteBody(BaseModel):
     confirm: str              # must equal the module name (typed confirmation)
 
 
-async def _agent(method: str, path: str, body: dict | None = None) -> dict:
+async def _agent(method: str, path: str, body: dict | None = None, timeout: float = 30) -> dict:
     if not AGENT_TOKEN:
         raise HTTPException(status_code=503, detail="Recovery agent not configured")
     try:
-        async with httpx.AsyncClient(timeout=30) as client:
+        async with httpx.AsyncClient(timeout=timeout) as client:
             resp = await client.request(
                 method, AGENT_URL.rstrip("/") + path,
                 headers={"X-Agent-Token": AGENT_TOKEN},
@@ -217,6 +219,12 @@ async def create_session(body: SessionCreate, user: User = Depends(get_current_u
     return result
 
 
+def _unreadable(status: dict, module: str, detail: str) -> dict:
+    logger.warning("restore session %s: module cannot read the restored instance: %s",
+                   module, detail)
+    return {**status, "status": "unreadable", "error": detail[-300:]}
+
+
 @router.get("/sessions/{module}")
 async def session_status(module: str, user: User = Depends(get_current_user),
                          db: AsyncSession = Depends(get_db)):
@@ -227,8 +235,30 @@ async def session_status(module: str, user: User = Depends(get_current_user),
     if status.get("status") != "ready":
         return status
 
+    # The agent has the instance ready; the module must still be able to read
+    # it. When it cannot (typically: a point in time before a database
+    # password change), say so instead of failing the poll, so the screen can
+    # explain what to do — and keep the session, which the operator can fix.
+    # Only a failure of the module itself counts: an unreachable or unknown
+    # module is a different problem and surfaces as an error, as before.
     if module == "pilot":
-        items_t = await _pilot_recovery_export()
+        try:
+            items_t = await _pilot_recovery_export()
+        except Exception as e:  # noqa: BLE001 — reported to the admin, not swallowed
+            return _unreadable(status, module, str(e))
+    else:
+        base = await _module_url(db, module)
+        async with httpx.AsyncClient(timeout=120) as client:
+            resp = await client.get(base + "/api/internal/export-recovery",
+                                    headers={"X-Service-Token": SERVICE_TOKEN})
+        if resp.status_code >= 500:
+            return _unreadable(status, module, f"{resp.status_code}: {resp.text[:200]}")
+        if resp.status_code >= 400:
+            raise HTTPException(status_code=502, detail=f"{module}/api/internal/export-recovery"
+                                                         f" → {resp.status_code}: {resp.text[:200]}")
+        list_t = resp.json()
+
+    if module == "pilot":
         from src.routes.backups import _pilot_self_export
         items_live = await _pilot_self_export(db)
         list_t = [{"id": i["id"], "name": i["name"], "organization": i.get("organization", "")}
@@ -236,7 +266,6 @@ async def session_status(module: str, user: User = Depends(get_current_user),
         list_live = [{"id": i["id"], "name": i["name"], "organization": i.get("organization", "")}
                      for i in items_live]
     else:
-        list_t = await _module_get(db, module, "/api/internal/export-recovery")
         list_live = await _module_get(db, module, "/api/internal/export")
 
     live_by_id = {str(i["id"]): i for i in list_live}
@@ -360,7 +389,10 @@ async def promote_module(module: str, body: PromoteBody,
                             detail=f"Schema upgrade on the recovered state failed — promote refused: {e.detail}")
     from src.routes.backups import run_backup
     await run_backup(module_id=module, user=user, db=db)
-    result = await _agent("POST", f"/recover/{module}/promote")
+    # A promotion dumps and reloads the whole database: far longer than a
+    # status call on a large one. Timing out here would not stop the agent,
+    # only invite the admin to promote again while it runs.
+    result = await _agent("POST", f"/recover/{module}/promote", timeout=3600)
     from src.routes.measures import sync_measures
     try:
         await sync_measures(user=user, db=db)

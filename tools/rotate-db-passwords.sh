@@ -18,7 +18,7 @@
 #  Restoring a point in time later than the rotation brings the new password
 #  back with it: the change is in the WAL. A point earlier than the rotation
 #  comes back with the previous password, and the module cannot read it:
-#  Pilot then keeps showing the restore session as preparing. Run
+#  Pilot then says so, with this command to run:
 #      bash tools/rotate-db-passwords.sh --recovery-session <module>
 #  to set the module's current password on the restored instance (it waits for
 #  the WAL replay to finish); Pilot then shows it ready, and export and
