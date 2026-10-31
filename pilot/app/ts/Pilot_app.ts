@@ -3370,6 +3370,8 @@ var _rstWindow: any = null;
 var _rstModule = "";
 var _rstSession: any = null;
 var _rstPollTimer: number | null = null;
+// Last failure of the session poll, shown until the next successful one.
+var _rstPollError = "";
 var _rstDiffs: Record<string, any> = {};
 var _rstJournal: any[] | null = null;
 
@@ -3448,14 +3450,21 @@ function _rstRender(c: HTMLElement) {
         var s = _rstSession;
         if (s.status === "preparing") {
             h += '<div class="ct-bordered ct-r-lg ct-p-5 ct-ta-c ct-muted">' + t("pilot.restore.preparing") + '</div>';
+        } else if (s.status === "unreadable") {
+            h += '<div class="ct-bordered ct-r-lg ct-p-4"><p><span class="ct-badge" data-tone="medium">' + t("pilot.restore.action_needed") + '</span> ' + esc(t("pilot.restore.unreadable", { module: _rstModule })) + '</p>'
+                + '<p><code>bash tools/rotate-db-passwords.sh --recovery-session ' + esc(_rstModule) + '</code></p>'
+                + '<p class="ct-muted">' + esc(s.error || "") + '</p></div>';
         } else if (s.status === "error") {
             h += '<div class="ct-bordered ct-r-lg ct-p-4" data-tone="critical">' + t("pilot.restore.error") + ' : ' + esc(s.error || "?") + '</div>';
         } else if (s.status === "ready") {
             h += _rstObjectsTable(s);
         }
     }
+    if (_rstPollError && _rstSession && (_rstSession.status === "preparing" || _rstSession.status === "unreadable")) {
+        h += '<p class="ct-muted">' + esc(t("pilot.restore.poll_error", { error: _rstPollError })) + '</p>';
+    }
     c.innerHTML = h;
-    if (_rstSession && _rstSession.status === "preparing") _rstSchedulePoll();
+    if (_rstSession && (_rstSession.status === "preparing" || _rstSession.status === "unreadable")) _rstSchedulePoll();
 }
 
 function _rstFmtDT(iso: string | null): string {
@@ -3539,8 +3548,14 @@ function _rstRefreshJournal() {
 }
 
 function _rstModuleChanged(val: string) {
+    // The agent keeps one session at a time: switching module abandons the
+    // previous exploration, so close it rather than leave it open, unseen.
+    if (_rstSession && _rstModule && _rstModule !== val) {
+        _fetch("/restore/sessions/" + encodeURIComponent(_rstModule), { method: "DELETE" }).catch(function() {});
+    }
     _rstModule = val;
     _rstSession = null;
+    _rstPollError = "";
     _rstDiffs = {};
     _rstJournal = null;
     _renderPanel();
@@ -3554,10 +3569,7 @@ function _rstExploreBefore(loggedAt: string) {
     var mod = (document.getElementById("restore-module") as HTMLSelectElement).value;
     _rstModule = mod;
     _rstDiffs = {};
-    _fetch("/restore/sessions", { method: "POST", body: { module: mod, time: time } }).then(function() {
-        _rstSession = { status: "preparing", module: mod, time: time };
-        _renderPanel();
-    }).catch(function(e: any) { showStatus(e.message || String(e), true); });
+    _rstStart(mod, time);
 }
 
 function _rstExplore() {
@@ -3573,21 +3585,52 @@ function _rstExplore() {
     }
     _rstModule = mod;
     _rstDiffs = {};
+    _rstStart(mod, time);
+}
+
+// Open a restore session. The agent keeps one at a time: when another one is
+// still open (a reload, another admin), offer to close it rather than leave
+// the operator facing a refusal the screen cannot act on.
+function _rstStart(mod: string, time: string | null) {
+    _rstPollError = "";
     _fetch("/restore/sessions", { method: "POST", body: { module: mod, time: time } }).then(function() {
         _rstSession = { status: "preparing", module: mod, time: time };
         _renderPanel();
-    }).catch(function(e: any) { showStatus(e.message || String(e), true); });
+    }).catch(function(e: any) {
+        var msg = e.message || String(e);
+        var other = /already open for '([a-z]+)'/.exec(msg);
+        if (!other) { showStatus(msg, true); return; }
+        var otherMod = other[1];
+        _confirmDialog(t("pilot.restore.close_other", { module: otherMod })).then(function(yes: boolean) {
+            if (!yes) return;
+            _fetch("/restore/sessions/" + encodeURIComponent(otherMod), { method: "DELETE" })
+                .then(function() { _rstStart(mod, time); })
+                .catch(function(e2: any) { showStatus(e2.message || String(e2), true); });
+        });
+    });
 }
 
 function _rstSchedulePoll() {
     if (_rstPollTimer) window.clearTimeout(_rstPollTimer);
+    var delay = _rstSession && _rstSession.status === "unreadable" ? 10000 : 3000;
     _rstPollTimer = window.setTimeout(function() {
         if (!_rstSession || _panel !== "backups" || _bkTab !== "restore") return;
         _fetch("/restore/sessions/" + encodeURIComponent(_rstModule)).then(function(d: any) {
             _rstSession = d;
+            _rstPollError = "";
             _renderPanel();
-        }).catch(function() { _rstSchedulePoll(); });
-    }, 3000);
+        }).catch(function(e: any) {
+            // Keep trying, but never silently: the operator sees why it stalls.
+            // A session the agent no longer knows (expired, agent restarted)
+            // will not come back: stop.
+            _rstPollError = e.message || String(e);
+            if (/no session/.test(_rstPollError)) {
+                _rstSession = null;
+                showStatus(t("pilot.restore.session_gone"), true);
+            }
+            _renderPanel();
+        });
+    }, delay);
 }
 
 function _rstObjDiff(id: string) {
@@ -3625,7 +3668,7 @@ function _rstPromote() {
 
 function _rstCloseSession() {
     _fetch("/restore/sessions/" + encodeURIComponent(_rstModule), { method: "DELETE" })
-        .then(function() { _rstSession = null; _rstDiffs = {}; _renderPanel(); })
+        .then(function() { _rstSession = null; _rstDiffs = {}; _rstPollError = ""; _renderPanel(); })
         .catch(function(e: any) { showStatus(e.message || String(e), true); });
 }
 

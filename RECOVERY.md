@@ -50,14 +50,17 @@ The previous password is not needed afterwards, not even to restore a point
 before the change:
 
 - **Restore session from Pilot** (export, or replacing the live database).
-  Pilot keeps showing the session as *preparing*: the module cannot open the
-  restored instance with its current password. Run
+  Pilot reports that the module cannot read the restored instance, and shows
+  the command to run:
   `bash tools/rotate-db-passwords.sh --recovery-session <module>`. It waits
   for the restored instance to reach the chosen point in time, then sets the
   module's current password on it through the backup agent's local socket,
   touching nothing else. Pilot then shows the session ready; export or replace
   as usual. Replacing copies the data only, not the database roles: the live
-  database keeps its current password.
+  database keeps its current password. Replacing is all or nothing: the
+  restored data is loaded beside the live database first, and the live one is
+  only swapped once that has succeeded. Should the swap itself be interrupted,
+  the error says so and gives the one command that finishes it.
 - **Restore in place**, straight into the live database (rebuilding a lost
   host): once the database is started again, run
   `bash tools/rotate-db-passwords.sh --after-restore <module>` (add

@@ -35,6 +35,8 @@ jobs:
         run: pytest tests/test_suite_contracts.py -q
       - name: compose isolation (what each container is handed)
         run: pytest tests/test_compose_isolation.py -q
+      - name: backup agent (recovery API)
+        run: pytest backup-agent/tests -q
 
   release:
     name: release gates

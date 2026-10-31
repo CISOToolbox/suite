@@ -72,6 +72,13 @@ def _reject_placeholder(name: str, value: str, min_len: int) -> str | None:
     return None
 
 _sessions: dict = {}          # module -> {status, time, error, started_at, touched_at}
+# Modules with a restore worker still running, even when its session was
+# closed: a new restore of the module must wait for it (pgBackRest locks the
+# stanza, and both would use the same scratch directory).
+_workers: set = set()
+# Modules being promoted: a second promote of the same module while one runs
+# would drop the database the first has just swapped in.
+_promoting: set = set()
 _lock = threading.Lock()
 
 # Audit trail + rate limit for the destructive operations. This API can drop and
@@ -125,7 +132,22 @@ def _cleanup(module: str) -> None:
     shutil.rmtree(_sockdir(module), ignore_errors=True)
 
 
-def _do_recover(module: str, target_time: str | None, repo: int = 1) -> None:
+def _current(module: str, session_id: object) -> dict | None:
+    """The session this worker belongs to, unless it was closed or replaced."""
+    s = _sessions.get(module)
+    return s if s is not None and s.get("id") is session_id else None
+
+
+def _do_recover(module: str, target_time: str | None, repo: int = 1,
+                session_id: object = None) -> None:
+    try:
+        _recover(module, target_time, repo, session_id)
+    finally:
+        with _lock:
+            _workers.discard(module)
+
+
+def _recover(module: str, target_time: str | None, repo: int, session_id: object) -> None:
     """Worker thread: pgbackrest restore into scratch + start on :5433.
 
     `repo` selects the repository (FEAT-29): 1 = local, 2 = off-site S3.
@@ -162,58 +184,135 @@ def _do_recover(module: str, target_time: str | None, repo: int = 1) -> None:
             except OSError:
                 pass
             raise RuntimeError(f"scratch start failed: {(r.stderr or r.stdout).strip()[-200:]} LOG: {tail}")
-        # Wait for recovery to replay up to the target and promote.
+        # Wait for recovery to replay up to the target and promote. Stop as
+        # soon as this session is no longer the module's (closed or replaced:
+        # whatever answers on the socket then belongs to another session), and
+        # fail as soon as the instance dies — pg_ctl was started without -w,
+        # so a recovery that aborts (target beyond the archived WAL, …) would
+        # otherwise look like a slow one for the whole deadline.
         deadline = _time.time() + 900
+        down = 0
         while _time.time() < deadline:
+            with _lock:
+                if _current(module, session_id) is None:
+                    break
             q = subprocess.run(
                 ["psql", "-h", _sockdir(module), "-p", "5433", "-U", module,
                  "-d", module, "-tAc", "SELECT NOT pg_is_in_recovery()"],
                 capture_output=True, text=True)
             if q.returncode == 0 and q.stdout.strip() == "t":
                 break
+            down = down + 1 if _pg_ctl(module, "status").returncode != 0 else 0
+            if down >= 3:
+                raise RuntimeError(f"the restored instance stopped during recovery. {_startup_tail(module)}")
             _time.sleep(2)
         else:
-            tail = ""
-            try:
-                with open(f"{_scratch(module)}/startup.log") as f:
-                    tail = f.read()[-300:]
-            except OSError:
-                pass
-            raise RuntimeError(f"scratch did not finish recovery in time. {tail}")
+            raise RuntimeError(f"scratch did not finish recovery in time. {_startup_tail(module)}")
         with _lock:
-            _sessions[module]["status"] = "ready"
-            _sessions[module]["touched_at"] = _time.time()
+            s = _current(module, session_id)
+            if s is not None:
+                s["status"] = "ready"
+                s["touched_at"] = _time.time()
+            else:
+                _release_if_unclaimed(module)
     except Exception as e:  # noqa: BLE001 — surfaced through the session status
-        _cleanup(module)
         with _lock:
-            _sessions[module]["status"] = "error"
-            _sessions[module]["error"] = str(e)
+            s = _current(module, session_id)
+            if s is not None:
+                s["status"] = "error"
+                s["error"] = str(e)
+                _cleanup(module)
+            else:
+                _release_if_unclaimed(module)
+
+
+def _startup_tail(module: str) -> str:
+    """Why the instance stopped: its FATAL/ERROR lines first, else the tail."""
+    try:
+        with open(f"{_scratch(module)}/startup.log") as f:
+            log = f.read()
+    except OSError:
+        return ""
+    reasons = [ln for ln in log.splitlines() if "FATAL:" in ln or "ERROR:" in ln or "PANIC:" in ln]
+    return ("\n".join(reasons[-3:]) or log)[-500:]
+
+
+def _release_if_unclaimed(module: str) -> None:
+    """Called under _lock by a worker whose session was closed or replaced.
+
+    The scratch directory, socket and port belong to the module, not to a
+    session: if a newer session for the module exists, they are its own, and
+    must be left alone. Only with no session at all does the late worker
+    remove what it may have left running.
+    """
+    if module not in _sessions:
+        _cleanup(module)
 
 
 def _do_promote(module: str) -> dict:
     """N2: replace the live database with the scratch state.
-    Postgres protocol only: pg_dump (scratch) → drop/create → psql (live
-    socket). The caller (Pilot) is responsible for the safety backup and
-    the double confirmation."""
+
+    Postgres protocol only. The restored data is loaded into a side database
+    first, in a single transaction; the live database is only dropped once
+    that has fully succeeded, and the side one then takes its name. A failure
+    before the swap leaves the live database untouched; a failure during it
+    leaves the restored data in <module>_restore and says so, and promoting
+    again finishes the swap. The caller (Pilot) is responsible for the safety
+    backup and the double confirmation."""
     live_sock = f"/sock/{module}"
+    side = f"{module}_restore"
+
+    def sql(statement: str) -> subprocess.CompletedProcess:
+        # One statement per call: DROP/CREATE DATABASE refuse to run inside a
+        # transaction, which several statements in a single -c amount to.
+        return subprocess.run(
+            ["psql", "-h", live_sock, "-U", module, "-d", "postgres", "-v", "ON_ERROR_STOP=1",
+             "-tAc", statement], capture_output=True, text=True)
+
+    def exists(db: str) -> bool:
+        r = sql(f"SELECT 1 FROM pg_database WHERE datname = '{db}'")
+        return r.returncode == 0 and r.stdout.strip() == "1"
+
+    # A previous attempt that dropped the live database but did not rename the
+    # side one: finish it rather than start over.
+    if not exists(module) and exists(side):
+        r = sql(f"ALTER DATABASE {side} RENAME TO {module}")
+        if r.returncode != 0:
+            raise RuntimeError(f"live database missing; the restored data is in '{side}' "
+                               f"but could not be renamed: {r.stderr.strip()[-300:]}")
+        return {"ok": True, "resumed": True}
+
     dump = subprocess.run(
         ["pg_dump", "-h", _sockdir(module), "-p", "5433", "-U", module, module],
         capture_output=True, text=True)
     if dump.returncode != 0:
         raise RuntimeError(f"pg_dump failed: {dump.stderr.strip()[-400:]}")
-    drop = subprocess.run(
-        ["psql", "-h", live_sock, "-U", module, "-d", "postgres", "-c",
-         f'DROP DATABASE {module} WITH (FORCE); CREATE DATABASE {module} OWNER {module}'],
-        capture_output=True, text=True)
-    if drop.returncode != 0:
-        raise RuntimeError(f"drop/create failed: {drop.stderr.strip()[-400:]}")
+    for step in (f"DROP DATABASE IF EXISTS {side} WITH (FORCE)",
+                 f"CREATE DATABASE {side} OWNER {module}"):
+        r = sql(step)
+        if r.returncode != 0:
+            raise RuntimeError(f"live database untouched — preparing '{side}' failed: "
+                               f"{r.stderr.strip()[-300:]}")
     load = subprocess.run(
-        ["psql", "-h", live_sock, "-U", module, "-d", module, "-v", "ON_ERROR_STOP=1"],
+        ["psql", "-h", live_sock, "-U", module, "-d", side, "-v", "ON_ERROR_STOP=1",
+         "--single-transaction"],
         input=dump.stdout, capture_output=True, text=True)
     if load.returncode != 0:
-        raise RuntimeError(f"reload failed: {load.stderr.strip()[-400:]}")
+        sql(f"DROP DATABASE IF EXISTS {side} WITH (FORCE)")
+        raise RuntimeError(f"live database untouched — loading the restored data failed: "
+                           f"{load.stderr.strip()[-300:]}")
+    r = sql(f"DROP DATABASE {module} WITH (FORCE)")
+    if r.returncode != 0:
+        raise RuntimeError(f"live database untouched — it could not be dropped: "
+                           f"{r.stderr.strip()[-300:]}; the restored data is in '{side}'")
+    r = sql(f"ALTER DATABASE {side} RENAME TO {module}")
+    if r.returncode != 0:
+        raise RuntimeError(f"LIVE DATABASE DROPPED, the restored data is in '{side}' but could "
+                           f"not be renamed: {r.stderr.strip()[-300:]} — finish by hand: docker "
+                           f"compose exec {module}-db psql -U {module} -d postgres -c "
+                           f"'ALTER DATABASE {side} RENAME TO {module}' (or promote again from "
+                           f"the agent API; Pilot cannot, its safety backup needs the live database)")
     return {"ok": True, "dumped_bytes": len(dump.stdout)}
-
 
 S3_ENABLED = os.environ.get("BACKUP_S3_ENABLED", "0") == "1"
 
@@ -378,29 +477,54 @@ class Handler(BaseHTTPRequestHandler):
                 target_time = str(target_time).replace("T", " ").replace("Z", "+00")
                 if re.fullmatch(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}", target_time):
                     target_time += ":00"
+                # No offset given: UTC, as everywhere else in the suite. Left
+                # naive, it could not be compared with the window below.
+                if not re.search(r"[+-]\d{2}(:?\d{2})?$", target_time):
+                    target_time += "+00"
+                # A real date and time, with its offset in the +HH:MM form
+                # Python reads (+00, +0000 and +00:00 all mean the same).
+                iso = re.sub(r"([+-]\d{2})(\d{2})$", r"\1:\2", target_time)
+                iso = re.sub(r"([+-]\d{2})$", r"\1:00", iso)
+                try:
+                    tgt = datetime.fromisoformat(iso)
+                except ValueError:
+                    return self._send(400, {"detail": "invalid time"})
                 # Clear refusal when T predates the PITR window (first full
                 # backup) — pgBackRest's own error is cryptic here.
                 win = _window(repo).get(mod) or {}
                 if win.get("from"):
                     try:
-                        tgt = datetime.fromisoformat(target_time.replace("+00", "+00:00"))
-                        start = datetime.fromisoformat(win["from"])
-                        if tgt < start:
+                        if tgt < datetime.fromisoformat(win["from"]):
                             return self._send(400, {"detail":
                                 f"target predates the PITR window (first backup: {win['from']})"})
-                    except ValueError:
+                    except (ValueError, TypeError):
                         pass
             with _lock:
                 cur = _sessions.get(mod)
                 if cur and cur["status"] == "preparing":
                     return self._send(409, {"detail": "session already preparing"})
+                if mod in _workers:
+                    return self._send(409, {"detail":
+                        f"the previous restore of '{mod}' is still stopping — retry in a moment"})
+                # Every restored instance listens on the same port: a second
+                # module's session could not start. Refuse it plainly.
+                busy = sorted(m for m in set(_sessions) | _workers if m != mod and (
+                    m in _workers or _sessions[m]["status"] in ("preparing", "ready")))
+                if busy and busy[0] not in _sessions:
+                    return self._send(409, {"detail":
+                        f"the restore of '{busy[0]}' is still stopping — retry in a moment"})
+                if busy:
+                    return self._send(409, {"detail":
+                        f"a restore session is already open for '{busy[0]}' — close it first"})
                 _sessions[mod] = {"status": "preparing", "time": target_time,
-                                  "repo": repo,
+                                  "repo": repo, "id": object(),
                                   "error": None, "started_at": _time.time(),
                                   "touched_at": _time.time()}
+                session_id = _sessions[mod]["id"]
+                _workers.add(mod)
             _audit("recover", mod, self.client_address[0],
                    f"target={target_time or 'latest'} repo={repo}")
-            threading.Thread(target=_do_recover, args=(mod, target_time, repo),
+            threading.Thread(target=_do_recover, args=(mod, target_time, repo, session_id),
                              daemon=True).start()
             return self._send(202, {"module": mod, "status": "preparing", "repo": repo})
         m = re.fullmatch(r"/recover/([a-z]+)/promote", self.path)
@@ -410,16 +534,25 @@ class Handler(BaseHTTPRequestHandler):
                 s = _sessions.get(mod)
             if not s or s["status"] != "ready":
                 return self._send(409, {"detail": "no ready session for this module"})
-            # Destructive: replaces the live DB. Throttle before touching it.
-            if _promote_rate_limited():
-                _audit("promote-throttled", mod, self.client_address[0])
-                return self._send(429, {"detail": "promote rate limit exceeded — too many in a short window"})
-            _audit("promote", mod, self.client_address[0])
+            with _lock:
+                if mod in _promoting:
+                    return self._send(409, {"detail":
+                        f"'{mod}' is already being promoted — wait for it to finish"})
+                _promoting.add(mod)
             try:
-                result = _do_promote(mod)
-            except Exception as e:  # noqa: BLE001
-                _audit("promote-failed", mod, self.client_address[0], f"error={str(e)[:120]}")
-                return self._send(500, {"detail": str(e)})
+                # Destructive: replaces the live DB. Throttle before touching it.
+                if _promote_rate_limited():
+                    _audit("promote-throttled", mod, self.client_address[0])
+                    return self._send(429, {"detail": "promote rate limit exceeded — too many in a short window"})
+                _audit("promote", mod, self.client_address[0])
+                try:
+                    result = _do_promote(mod)
+                except Exception as e:  # noqa: BLE001
+                    _audit("promote-failed", mod, self.client_address[0], f"error={str(e)[:120]}")
+                    return self._send(500, {"detail": str(e)})
+            finally:
+                with _lock:
+                    _promoting.discard(mod)
             _audit("promote-ok", mod, self.client_address[0], f"dumped_bytes={result.get('dumped_bytes')}")
             return self._send(200, result)
         self._send(404, {"detail": "not found"})
