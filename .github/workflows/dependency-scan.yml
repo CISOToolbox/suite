@@ -38,21 +38,8 @@ env:
   # see reports/fix-deps-2.md §4. Keep this list SHORT; it is the only thing
   # standing between a real HIGH and a red build.
   #
-  #   RUSTSEC-2026-0194 / -0195  (quick-xml, smb_scan_rs)
-  #     Only fixed in quick-xml 0.41, which removes BytesText::unescape() and
-  #     therefore needs a one-line source change in smb_scan_rs/rust/src/main.rs.
-  #     Tracked as a follow-up.
-  #
-  #   RUSTSEC-2026-0367 / -0368 / -0369  (zip 2.4.2, smb_scan_rs)
-  #     All three concern extracting an archive to disk (Unix permissions,
-  #     SUID/SGID bits, symlinks applied by ZipArchive/ZipStreamReader
-  #     ::extract()). smb_scan_rs only reads document entries into memory
-  #     (by_name / by_index + read_to_end, and calamine for xlsx); it never
-  #     extracts. Fixed only in zip 9.0.0, a major release: to be taken with the
-  #     next Surface patch release, then these three ids removed.
-  ALLOWLIST: >-
-    RUSTSEC-2026-0194 RUSTSEC-2026-0195
-    RUSTSEC-2026-0367 RUSTSEC-2026-0368 RUSTSEC-2026-0369
+  #   (none)
+  ALLOWLIST: ""
 
 jobs:
   # ── Dependency drift: the 9 modules must stay on one set of versions ───────

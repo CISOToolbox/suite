@@ -3,7 +3,7 @@
 #   pip install --require-hashes -r requirements-build-lock.txt
 # Resolved for Python 3.13, any platform, with the repository's
 # constraints.txt and no release after 2026-09-17 (14-day cooldown), except:
-# pyjwt=2026-09-24 certifi=2026-10-21. Regenerate with tests/lock-deps.sh after changing an
+# pyjwt=2026-09-24 certifi=2026-10-21 dnspython=2026-10-09 authlib=2026-10-14 pyasn1=2026-10-27 joserfc=2026-10-18. Regenerate with tests/lock-deps.sh after changing an
 # input below.
 # input: requirements-build.txt sha256:0241c5b353ba48be1703c9f02cc182dee1e11e4505d0c06d416b24e382946d07
 setuptools==83.0.0 \
