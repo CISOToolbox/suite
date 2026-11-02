@@ -7,6 +7,12 @@ owner AND to any user whose email is in the recipients list.
 Mutations are owner-only. Recipients can read the scope and its target
 list (phase 2+) but cannot edit anything.
 
+A scope makes the organisation's SMTP send mail, and its threat prompt makes
+the LLM run on every send. So creating or editing one needs a module role
+that can edit; a non-empty threat prompt needs AI access; and a recipient
+must be in the directory, a Watch account, or an `ALLOWED_EMAIL_DOMAINS`
+domain — unless the caller is an admin.
+
 AUTH_MODE=none: `user is None` means auth is disabled, not "anonymous"
 (see THE `None` CONTRACT in src/auth_common.py). There is then no identity
 to filter or attribute ownership on, and the caller is admin by contract:
@@ -25,7 +31,11 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select, or_, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.auth import get_current_user, require_identity
+from src.ai_proxy_common import _check_ai_access
+from src.auth import (
+    ADMIN_MODULE_ROLES, get_current_user, get_module_role, require_edit_role, require_identity,
+)
+from src.auth_routes_common import _ALLOWED_EMAIL_DOMAINS
 from src.database import get_db
 from src.models import Scope, ScopeRecipient, User
 from src.schemas import (
@@ -33,6 +43,8 @@ from src.schemas import (
     ScopeRecipientAdd, ScopeRecipientResponse,
 )
 from src.audit import log_action
+from src.directory_common import list_local_personnel
+from src.routes.directory_proxy import _fetch_pilot_directory, _get_directory_source
 
 router = APIRouter(prefix="/api/scopes", tags=["scopes"])
 
@@ -62,6 +74,25 @@ async def _scope_visible(db: AsyncSession, scope: Scope, user: Optional[User]) -
         )
     )
     return r.scalar_one_or_none() is not None
+
+
+async def _require_known_recipient(db: AsyncSession, email: str, user: Optional[User]) -> None:
+    """403 unless `email` is in the directory, is a Watch account, or has an
+    allowed domain. Admins may address anyone. `email` is already normalised
+    by the schema."""
+    if user is None or user.role == "admin" or get_module_role(user) in ADMIN_MODULE_ROLES:
+        return
+    if email.rpartition("@")[2] in _ALLOWED_EMAIL_DOMAINS:
+        return
+    if (await db.execute(select(User.id).where(User.email == email))).first():
+        return
+    if await _get_directory_source(db) == "pilot":
+        people = await _fetch_pilot_directory()
+    else:
+        people = await list_local_personnel(db)
+    if any((p.get("email") or "").strip().lower() == email for p in people):
+        return
+    raise HTTPException(status_code=403, detail="recipient must be in the directory or an allowed domain")
 
 
 def _scope_to_response(scope: Scope, owner_email: str, recipients: list[ScopeRecipient], user: Optional[User]) -> ScopeResponse:
@@ -131,9 +162,12 @@ async def list_scopes(user: Optional[User] = Depends(get_current_user), db: Asyn
 
 @router.post("", response_model=ScopeResponse, status_code=201)
 async def create_scope(body: ScopeCreate, request: Request, user: Optional[User] = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    require_edit_role(user)
     # `scopes.owner_id` is a NOT NULL FK: a scope cannot exist without a real
     # owner, so this is one of the rare routes that needs an actual identity.
     owner = require_identity(user)
+    if (body.threat_prompt or "").strip():
+        _check_ai_access(user)
     now = datetime.now(timezone.utc)
     s = Scope(
         id=uuid.uuid4(),
@@ -181,6 +215,7 @@ async def get_scope(scope_id: uuid.UUID, user: Optional[User] = Depends(get_curr
 
 @router.patch("/{scope_id}", response_model=ScopeResponse)
 async def update_scope(scope_id: uuid.UUID, body: ScopeUpdate, request: Request, user: Optional[User] = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    require_edit_role(user)
     scope = (await db.execute(select(Scope).where(Scope.id == scope_id))).scalar_one_or_none()
     if not scope:
         raise HTTPException(status_code=404, detail="scope not found")
@@ -223,7 +258,10 @@ async def update_scope(scope_id: uuid.UUID, body: ScopeUpdate, request: Request,
     if body.threat_digest_timezone is not None:
         scope.threat_digest_timezone = body.threat_digest_timezone.strip() or "Europe/Paris"
     if body.threat_prompt is not None:
-        scope.threat_prompt = body.threat_prompt.strip()
+        prompt = body.threat_prompt.strip()
+        if prompt and prompt != (scope.threat_prompt or ""):
+            _check_ai_access(user)
+        scope.threat_prompt = prompt
     if body.threat_search_window_days is not None:
         scope.threat_search_window_days = int(body.threat_search_window_days)
     scope.updated_at = datetime.now(timezone.utc)
@@ -253,11 +291,13 @@ async def delete_scope(scope_id: uuid.UUID, request: Request, user: Optional[Use
 
 @router.post("/{scope_id}/recipients", response_model=ScopeRecipientResponse, status_code=201)
 async def add_recipient(scope_id: uuid.UUID, body: ScopeRecipientAdd, request: Request, user: Optional[User] = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    require_edit_role(user)
     scope = (await db.execute(select(Scope).where(Scope.id == scope_id))).scalar_one_or_none()
     if not scope:
         raise HTTPException(status_code=404, detail="scope not found")
     if user is not None and scope.owner_id != user.id:
         raise HTTPException(status_code=403, detail="only the owner can add recipients")
+    await _require_known_recipient(db, body.email, user)
     # Upsert: if already present, refresh the name snapshot.
     existing = (await db.execute(
         select(ScopeRecipient).where(

@@ -856,7 +856,11 @@ function onRecipientInputChange(scopeId, val) {
     }
     else {
         label = t("scopes.modal.recipient_add_external");
-        hint = '<span class="ct-journal-sep ct-text-label ct-ml-2">' + esc(t("scopes.modal.external_hint")) + '</span>';
+        // The server accepts an address outside the directory only from an
+        // admin (global or module role; everyone with auth disabled, where no
+        // user is loaded), or when its domain is allowed.
+        var isAdmin = !window._currentUser || document.body.classList.contains("ct-role-admin");
+        hint = '<span class="ct-journal-sep ct-text-label ct-ml-2">' + esc(t(isAdmin ? "scopes.modal.external_hint" : "scopes.modal.external_hint_restricted")) + '</span>';
     }
     box.innerHTML = '<button class="ct-btn" data-variant="primary" data-size="xs" data-click="addRecipientToScope" data-args=\'' + _da(scopeId) + '\'>+ ' + esc(label) + '</button>' + hint;
 }

@@ -58,6 +58,7 @@ _registerTranslations("en", {
     "scopes.modal.recipient_add_known": "Add {name}",
     "scopes.modal.recipient_add_external": "Add (external)",
     "scopes.modal.external_hint": "User outside the directory — will only receive the email digest.",
+    "scopes.modal.external_hint_restricted": "Outside the directory: accepted only if its domain is allowed by your organisation.",
     "scopes.modal.invalid_email": "Invalid email address.",
     "scopes.modal.recipient_remove": "Remove",
     "scopes.modal.delete": "Delete scope",

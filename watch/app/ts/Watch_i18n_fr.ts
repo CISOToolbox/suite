@@ -63,6 +63,7 @@ _registerTranslations("fr", {
     "scopes.modal.recipient_add_known": "Ajouter {name}",
     "scopes.modal.recipient_add_external": "Ajouter (externe)",
     "scopes.modal.external_hint": "Utilisateur hors annuaire — recevra uniquement le digest par email.",
+    "scopes.modal.external_hint_restricted": "Hors annuaire : acceptée seulement si son domaine est autorisé par l'organisation.",
     "scopes.modal.invalid_email": "Adresse email invalide.",
     "scopes.modal.recipient_remove": "Retirer",
     "scopes.modal.delete": "Supprimer le périmètre",
