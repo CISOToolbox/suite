@@ -325,6 +325,32 @@ a button on the login page:
 Whichever provider you pick, register the matching **redirect URI** in the
 IdP: `https://<your-domain>/auth/callback/entra` (or `/google`, `/oidc`).
 
+> **Sign-in is matched on the email address: the IdP must own it.** Pilot
+> links every sign-in, whatever the provider, to the existing account with
+> the same email address. Only connect an IdP where users cannot choose or
+> change their own address: no self-registration, no email editing in the
+> user's account or profile page, no brokering to social or external IdPs
+> that let users bring their own address. Otherwise anyone able to get an
+> IdP account carrying an existing user's address, including an
+> administrator's, would sign in as that user. This mostly concerns generic
+> OIDC. Entra ID (Pilot only accepts your own tenant) assigns addresses
+> centrally; so does Google, but only for addresses in a domain your Google
+> Workspace manages: the Google button accepts any Google account,
+> including a personal one created with your domain's address (for
+> instance before the domain joined Workspace).
+>
+> For the same reason, before reassigning a former user's address to
+> someone else, delete their account in **Pilot > Permissions** and check
+> that every module confirmed the deletion. If some modules did not answer,
+> the account is already gone from Pilot but those modules still hold it:
+> once they are back, let the address sign in once (it lands in `pending`)
+> and delete that account again before approving anyone. Setting the
+> account back to `pending` is not enough: approving it later would hand
+> the new person the old account. Shares made by email address, such as
+> Watch scope recipients, and the person's entry in **Pilot > Users** (the
+> directory) are not removed with the account and must be cleaned up
+> separately.
+
 **Trying the suite without any IdP** — set a single line in `.env`:
 
 ```bash
@@ -342,7 +368,7 @@ is just configuring a provider and removing the line.
 
 Sign-in flow: the **first user to log in is auto-promoted admin**; every
 later signup lands in the `pending` role (no access) until an admin assigns
-their per-module roles in **Pilot → Users**. Details — token derivation, role
+their per-module roles in **Pilot > Permissions**. Details — token derivation, role
 model, per-module tiers — in [Authentication](#authentication).
 
 ```bash
@@ -401,7 +427,7 @@ https://<your-domain>/auth/callback/oidc
 ### Role model
 
 Access control has **two levels**: a suite-level role on the Pilot account,
-and one role per module, assigned in **Pilot > Users**.
+and one role per module, assigned in **Pilot > Permissions**.
 
 **Suite-level roles** (the Pilot account itself):
 
@@ -423,7 +449,7 @@ they all map onto the same three permission tiers (enforced in
 | **write** | read + create/edit the module's objects | `editor`, `contributor`, `manager` |
 | **admin** | write + delete/share projects + module settings (scan config, directory source, AI) | `admin`, `control` |
 
-What Pilot > Users offers per module, and what each role is for:
+What Pilot > Permissions offers per module, and what each role is for:
 
 | Module | Roles (increasing rights) | The intermediate role allows |
 |--------|---------------------------|------------------------------|
