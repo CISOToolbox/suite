@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.auth import ADMIN_MODULE_ROLES, VIEWER_MODULE_ROLES, auth_enabled, get_current_user
+from src.auth import ADMIN_MODULE_ROLES, VIEWER_MODULE_ROLES, auth_enabled, get_current_user, require_edit_role
 from src.database import get_db
 from src.models import (
     Application, Measure, Project, ProjectMetadata,
@@ -358,12 +358,18 @@ async def _decompose_data(db: AsyncSession, project_id: uuid.UUID, data: dict):
 
 # ── Routes ─────────────────────────────────────────────────────────
 
-@router.post("", response_model=ProjectResponse, status_code=201)
-async def create_project(body: ProjectCreate, user: Optional[User] = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    # Access uses a single shared project — block creation if one already exists.
+async def _refuse_second_project(db: AsyncSession) -> None:
+    """Access uses a single shared project: creating, duplicating or importing
+    a second one is refused."""
     existing = await db.execute(select(func.count()).select_from(Project))
     if (existing.scalar() or 0) > 0:
         raise HTTPException(status_code=409, detail="A project already exists. Access uses a single shared project.")
+
+
+@router.post("", response_model=ProjectResponse, status_code=201)
+async def create_project(body: ProjectCreate, user: Optional[User] = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    require_edit_role(user)
+    await _refuse_second_project(db)
     project = Project(name=body.name, organization=body.organization, owner_id=user.id if user else None)
     db.add(project)
     await db.flush()
@@ -444,11 +450,13 @@ async def delete_project(project_id: uuid.UUID, user: Optional[User] = Depends(g
 
 @router.post("/{project_id}/duplicate", response_model=ProjectResponse, status_code=201)
 async def duplicate_project(project_id: uuid.UUID, user: Optional[User] = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    require_edit_role(user)
     original = await db.get(Project, project_id)
     if not original:
         raise HTTPException(status_code=404, detail="Project not found")
     if not _can("read", original, user):
         raise HTTPException(status_code=403, detail="Access denied")
+    await _refuse_second_project(db)
     original_data = await _reconstruct_data(db, original.id)
     duplicate = Project(name=original.name + " (copy)", organization=original.organization, owner_id=user.id if user else None)
     db.add(duplicate)
@@ -462,6 +470,8 @@ async def duplicate_project(project_id: uuid.UUID, user: Optional[User] = Depend
 
 @router.post("/import", response_model=ProjectResponse, status_code=201)
 async def import_project(file: UploadFile, user: Optional[User] = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    require_edit_role(user)
+    await _refuse_second_project(db)
     import json
     content = await read_json_upload(file, 10 * 1024 * 1024)
     try:
