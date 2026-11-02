@@ -21,6 +21,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.ai_proxy_common import _check_ai_access
 from src.auth import get_current_user, require_admin
 from src.database import get_db
 from src.digest import (
@@ -33,8 +34,16 @@ from src.digest import (
 )
 from src.digest_grouping import group_alerts
 from src.models import DigestRun, Scope, User
+from src.rate_limit import RateLimiter
 
 router = APIRouter(prefix="/api/digest", tags=["digest"])
+
+# A preview of a scope with a threat prompt runs the LLM with web search:
+# it needs AI access, and a reload loop must not run up the provider bill.
+# The limit counts briefs (LLM calls), not requests.
+_preview_limiter = RateLimiter()
+PREVIEW_LLM_LIMIT = 5
+PREVIEW_LLM_WINDOW_S = 600
 
 
 class DigestRunResponse(BaseModel):
@@ -69,17 +78,38 @@ async def preview_digest(
             raise HTTPException(status_code=404, detail="scope not found or not visible")
     if not scopes:
         return HTMLResponse("<p>No scopes — nothing to preview.</p>")
+    # The threat brief is the LLM part: without AI access the preview still
+    # renders, without it.
+    wants_brief = [s for s in scopes if (getattr(s, "threat_prompt", "") or "").strip()]
+    skipped: dict[uuid.UUID, str] = {}
+    with_brief = wants_brief
+    if wants_brief:
+        try:
+            _check_ai_access(user)
+        except HTTPException:
+            with_brief = []
+            skipped = {s.id: "no_ai" for s in wants_brief}
+    # Each brief is one LLM call and counts against the caller's budget; past
+    # it, the remaining scopes render without their brief.
+    key = str(user.id) if user else "auth-disabled"
+    allowed = []
+    for s in with_brief:
+        if _preview_limiter.check(key, PREVIEW_LLM_LIMIT, PREVIEW_LLM_WINDOW_S):
+            allowed.append(s)
+        else:
+            skipped[s.id] = "rate_limited"
+    with_brief = allowed
     since = datetime.now(timezone.utc) - timedelta(days=1)
     parts: list[str] = []
     for scope in scopes:
         alerts = await _alerts_for_scope(db, user, scope, since)
         groups = group_alerts(alerts)
         # Threat brief: only call Claude+web_search when the scope has an
-        # explicit prompt; otherwise the preview renders a friendly
-        # placeholder. Generating the brief on preview matches the actual
+        # explicit prompt and the caller has AI access; otherwise the preview
+        # renders a friendly placeholder. Generating the brief on preview matches the actual
         # send behaviour so a CISO can validate the prompt without waiting
         # for the scheduled cadence.
-        if (getattr(scope, "threat_prompt", "") or "").strip():
+        if scope in with_brief:
             brief_html, citations = await _render_threat_brief(
                 db, scope, since, language="fr",
             )
@@ -93,7 +123,7 @@ async def preview_digest(
             threat_brief_html=brief_html,
             threat_citations=citations,
             user_name=(user.name or "") if user else "", since=since,
-            language="fr",
+            language="fr", threat_skipped=skipped.get(scope.id, ""),
         ))
     return HTMLResponse("<hr/>".join(parts))
 

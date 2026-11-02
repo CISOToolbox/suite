@@ -805,7 +805,8 @@ async def _render_threat_brief(
 
 
 def _render_threat_section(
-    brief_html: str, citations: list[dict], language: str = "fr"
+    brief_html: str, citations: list[dict], language: str = "fr",
+    skipped: str = "",
 ) -> str:
     """Wrap the Claude HTML brief into the digest section.
 
@@ -817,7 +818,23 @@ def _render_threat_section(
     """
     is_fr = (language or "fr").lower().startswith("fr")
     title = "Veille menaces" if is_fr else "Threat watch"
-    no_brief = (
+    # `skipped`: the preview chose not to run the LLM — say why, rather than
+    # blame the AI configuration.
+    skipped_txt = {
+        "no_ai": (
+            "Veille menaces non générée dans l'aperçu : votre compte n'a pas "
+            "accès à l'IA." if is_fr else
+            "Threat brief not generated in the preview: your account has no "
+            "AI access."
+        ),
+        "rate_limited": (
+            "Veille menaces non générée dans l'aperçu : limite d'aperçus "
+            "atteinte, réessayez dans quelques minutes." if is_fr else
+            "Threat brief not generated in the preview: preview limit "
+            "reached, retry in a few minutes."
+        ),
+    }
+    no_brief = skipped_txt.get(skipped) or (
         "La veille menaces n'a pas pu être générée (clé Anthropic absente "
         "ou erreur API). Le contexte de veille reste enregistré pour le "
         "prochain envoi."
@@ -882,6 +899,7 @@ def render_html(
     user_name: str = "",
     since: datetime | None = None,
     language: str = "fr",
+    threat_skipped: str = "",
 ) -> str:
     """Combined vuln + threat preview body.
 
@@ -916,7 +934,7 @@ def render_html(
         )
 
     threat_section = _render_threat_section(
-        threat_brief_html, threat_citations or [], language
+        threat_brief_html, threat_citations or [], language, skipped=threat_skipped,
     )
 
     return _wrap_html(_greeting(user_name), intro, vuln_section + threat_section)

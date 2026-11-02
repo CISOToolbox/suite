@@ -3,6 +3,7 @@
 Routes nest under /api/scopes/{scope_id}/targets so the scope visibility
 rule (owner OR recipient) is enforced before any target call. Only the
 scope owner can mutate targets; recipients can list them (digest preview).
+Adding or editing a target also needs a module role that can edit.
 """
 
 from __future__ import annotations
@@ -16,7 +17,7 @@ from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.audit import log_action
-from src.auth import get_current_user
+from src.auth import get_current_user, require_edit_role
 from src.database import get_db
 from src.models import Scope, ScopeRecipient, User, WatchTarget
 from src.schemas import (
@@ -72,6 +73,7 @@ async def create_target(
     user: Optional[User] = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    require_edit_role(user)
     scope = await _load_scope_for(user, db, scope_id, owner_only=True)
     try:
         norm_value = validate_target(body.kind, body.value)
@@ -128,6 +130,7 @@ async def update_target(
     user: Optional[User] = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    require_edit_role(user)
     scope = await _load_scope_for(user, db, scope_id, owner_only=True)
     target = (await db.execute(
         select(WatchTarget).where(WatchTarget.id == target_id, WatchTarget.scope_id == scope_id)
