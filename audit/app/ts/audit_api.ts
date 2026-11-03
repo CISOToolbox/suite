@@ -38,21 +38,16 @@ async function _fetch(url: string, opts?: AuditFetchOpts): Promise<any> {
         window.location.href = "/login.html?redirect=" + encodeURIComponent(_rp);
         throw new Error("Not authenticated");
     }
-    if (resp.status === 403) {
-        var errBody = "";
-        try { errBody = await resp.text(); } catch(e) {}
-        if (errBody.indexOf("pending") >= 0) {
-            window.location.href = "/login.html?error=pending";
-            throw new Error("Account pending");
-        }
-        throw new Error("API 403: " + errBody.substring(0, 200));
+    // The body is read once: a second read throws and loses the server's reason.
+    var errBody = "";
+    if (!resp.ok) { try { errBody = await resp.text(); } catch(e) {} }
+    if (resp.status === 403 && errBody.indexOf("pending") >= 0) {
+        window.location.href = "/login.html?error=pending";
+        throw new Error("Account pending");
     }
     if (resp.status === 204) return null;
-    if (!resp.ok) {
-        var errText = "";
-        try { errText = await resp.text(); } catch(e) {}
-        throw new Error("API " + resp.status + ": " + errText.substring(0, 200));
-    }
+    // Status, server's reason and the FEAT-33 marker travel with the error.
+    if (!resp.ok) throw ct_apiError(resp, errBody);
     return resp.json();
 }
 
@@ -98,11 +93,12 @@ window._setDataReady = function() { _dataReady = true; };
 // server-initiated write happened since: reload instead of overwrite).
 var _serverRev = 0;
 
-// FEAT-33 — a stale blob PUT was refused: warn (blocking) then reload the
-// authoritative server state. The stale bulk change is lost by design.
-function _staleConflict(): void {
-    alert(t("chrome.stale_conflict"));
-    window.location.reload();
+// FEAT-33 — a stale blob PUT is refused (reload: the stale bulk change is
+// lost by design); any other refusal says the server's reason. Both are told
+// by ct_projectSaveFailed (shared).
+function _onSaveError(err: any): void {
+    if (ct_projectSaveFailed(err)) return;
+    console.error("Autosave failed:", err);
 }
 
 window._autoSave = function() {
@@ -114,10 +110,7 @@ window._autoSave = function() {
         if (!saveId || String(saveId) !== String(_activeId)) return;
         AuditAPI.update(saveId, { data: JSON.parse(JSON.stringify(D)),
                               expected_server_rev: _serverRev } as any)
-            .catch(function(err: any) {
-                if (err && String(err.message || "").indexOf("API 409") === 0) { _staleConflict(); return; }
-                console.error("Autosave failed:", err);
-            });
+            .catch(_onSaveError);
     }, 800);
 };
 
@@ -456,7 +449,7 @@ window._editAuditMeasure = function(measureId: string) {
         AuditAPI.patchMeasure(_activeId!, m.id, result).then(function() {
             showStatus(t("auditapi.m.updated"));
             _reloadMeasures().then(_refreshAfterMeasureChange);
-        }).catch(function(err: any) { showStatus(err.message, true); });
+        }).catch(ct_changeFailed);
     });
 };
 

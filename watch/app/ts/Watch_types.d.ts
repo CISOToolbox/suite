@@ -15,6 +15,7 @@ interface WatchScope {
     name: string;
     description?: string;
     is_owner?: boolean;
+    owner_id?: string | null;
     owner_email?: string;
     updated_at?: string;
     recipients?: WatchRecipient[];

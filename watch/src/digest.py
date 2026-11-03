@@ -50,6 +50,7 @@ from src.database import async_session
 from src.digest_filter import passes_threshold, digest_suppressed
 from src.digest_grouping import AlertGroup, group_alerts
 from src.mailer_common import resolve_pushed_config, send_html_email
+from src.scope_access import managed_clause
 from src.models import (
     Alert, AlertAnalysis, AlertMatch, AlertStatus, DigestRun, Scope,
     ScopeRecipient, User,
@@ -215,7 +216,7 @@ async def _user_scopes(db: AsyncSession, user: Optional[User]) -> list[Scope]:
     """
     if user is None:
         return list((await db.execute(select(Scope))).scalars().all())
-    owned = (await db.execute(select(Scope).where(Scope.owner_id == user.id))).scalars().all()
+    owned = (await db.execute(select(Scope).where(managed_clause(user)))).scalars().all()
     shared_ids = (await db.execute(
         select(ScopeRecipient.scope_id).where(ScopeRecipient.email == (user.email or "").lower())
     )).scalars().all()

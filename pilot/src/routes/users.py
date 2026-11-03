@@ -2,21 +2,37 @@ from __future__ import annotations
 
 import os
 import uuid
+from datetime import datetime, timezone
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select, func
+from sqlalchemy import delete, select, func, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.auth import VALID_MODULES, get_current_user, require_admin
 from src.database import get_db
-from src.models import ModuleRegistry, User
+from src.models import ModuleRegistry, NotificationPrefs, User
 from src.routes.auth import _ensure_directory_entry
+from src.routes.directory import _retire_directory_entry
 from src.schemas import UserResponse, UserUpdate
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 
 SERVICE_TOKEN = os.getenv("SERVICE_TOKEN", "")
+
+# Module answers that settle a deletion. `skipped` is a module registered
+# without an internal_url: no backend, so no `users` row to hold the person.
+# `unsupported` (an image without the delete-user route) is NOT settled: the
+# module keeps its row until its image is updated and the deletion retried.
+_DELETION_CONFIRMED = ("deleted", "absent", "skipped")
+
+
+def _other_active_admins(target: User):
+    """Admins left besides `target`; one whose deletion is under way can no
+    longer sign in, so it does not count."""
+    return (select(func.count()).select_from(User)
+            .where(User.role == "admin", User.id != target.id,
+                   User.deletion_requested_at.is_(None)))
 
 
 @router.get("", response_model=list[UserResponse])
@@ -32,6 +48,8 @@ async def update_user(user_id: uuid.UUID, body: UserUpdate, user: User = Depends
     target = await db.get(User, user_id)
     if not target:
         raise HTTPException(status_code=404, detail="User not found")
+    if target.deletion_requested_at is not None:
+        raise HTTPException(status_code=409, detail="Refused: this account is being deleted.")
     if body.role is not None:
         if body.role not in ("admin", "user", "viewer", "pending"):
             raise HTTPException(status_code=400, detail="Invalid role")
@@ -40,10 +58,7 @@ async def update_user(user_id: uuid.UUID, body: UserUpdate, user: User = Depends
         # can promote anyone, and demoting yourself while sole admin is the
         # easiest way to get there by accident.
         if target.role == "admin" and body.role != "admin":
-            remaining = await db.execute(
-                select(func.count()).select_from(User)
-                .where(User.role == "admin", User.id != target.id)
-            )
+            remaining = await db.execute(_other_active_admins(target))
             if not remaining.scalar():
                 raise HTTPException(
                     status_code=409,
@@ -94,8 +109,17 @@ async def delete_user(user_id: uuid.UUID, user: User = Depends(get_current_user)
     prevent. Modules are de-provisioned first, then the local row (its
     notification_prefs and digest_runs follow by CASCADE).
 
+    The Pilot row goes only once every module has confirmed. Until then it
+    stays, flagged `deletion_requested_at`: it cannot sign in, modules see
+    it inactive, and the address cannot open a new account — otherwise the
+    next holder of the address would be matched, by email, to the row a
+    silent module kept. Calling this route again retries the modules.
+
+    The first call also detaches the person's directory entry from the
+    address (kept, inactive) and drops their digest subscription.
+
     Objects the person owned are kept everywhere: `owner_id` is ON DELETE SET
-    NULL, so an analysis or a project survives its owner.
+    NULL, so an analysis, a project or a Watch scope survives its owner.
 
     NOT a de-provisioning of the identity provider: if the account still
     exists in Entra/Google, signing in re-creates these rows.
@@ -107,10 +131,7 @@ async def delete_user(user_id: uuid.UUID, user: User = Depends(get_current_user)
     # Same guard as the role change: no path back through the UI once the
     # suite has no administrator left.
     if target.role == "admin":
-        remaining = await db.execute(
-            select(func.count()).select_from(User)
-            .where(User.role == "admin", User.id != target.id)
-        )
+        remaining = await db.execute(_other_active_admins(target))
         if not remaining.scalar():
             raise HTTPException(
                 status_code=409,
@@ -120,18 +141,35 @@ async def delete_user(user_id: uuid.UUID, user: User = Depends(get_current_user)
         raise HTTPException(status_code=409, detail="Refused: cannot delete your own account.")
 
     email = target.email
+    if target.deletion_requested_at is None:
+        # Committed before the modules are called: the account is locked out
+        # whatever they answer, and however long they take.
+        target.deletion_requested_at = datetime.now(timezone.utc)
+        await _retire_directory_entry(db, email)
+        await db.execute(delete(NotificationPrefs).where(NotificationPrefs.user_id == target.id))
+        await db.commit()
     report = await _delete_user_in_modules(email, db)
+    # A module that did not confirm keeps its row: the account stays, pending,
+    # rather than claiming a clean deletion.
+    failed = sorted(m for m, r in report.items() if r not in _DELETION_CONFIRMED)
 
     from src.audit import log_write
     await log_write(db, user, None, "user.delete",
                     entity_type="user", entity_id=str(target.id), target=email,
-                    details={"modules": report})
-    await db.delete(target)
+                    details={"modules": report, "pending": failed})
+    # By id, not through the loaded object: a concurrent retry may have
+    # removed the row meanwhile, which is the outcome asked for, not an error.
+    if failed:
+        res = await db.execute(update(User).where(User.id == target.id).values(deletion_report=report))
+        if not res.rowcount:
+            # That other retry got every module to confirm: this attempt's
+            # answers are moot.
+            failed, report = [], {}
+    else:
+        await db.execute(delete(User).where(User.id == target.id))
     await db.commit()
-    # A module that did not answer keeps its row: report it rather than
-    # claiming a clean deletion.
-    failed = sorted(m for m, r in report.items() if r not in ("deleted", "absent"))
-    return {"ok": True, "email": email, "modules": report, "failed": failed}
+    return {"ok": True, "email": email, "modules": report, "failed": failed,
+            "pending": bool(failed)}
 
 
 async def _delete_user_in_modules(email: str, db: AsyncSession) -> dict:

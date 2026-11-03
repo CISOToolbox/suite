@@ -34,9 +34,11 @@
 #      bash tools/rotate-db-passwords.sh --recovery-session risk
 #      bash tools/rotate-db-passwords.sh --after-restore risk
 #  --after-restore is for a database restored in place, straight into the live
-#  one (host rebuild): it waits as long as the replay takes, sets the password
-#  the module is given, and does nothing else — no container recreated, and no
-#  backup, which would expire the very backups the restore just used.
+#  one (host rebuild): it waits as long as the replay takes (it stops if the
+#  database restarts meanwhile, and says why), sets the password the module is
+#  given unless the database already takes it, and does nothing else — no
+#  container recreated, and no backup, which would expire the very backups the
+#  restore just used. The two modes are exclusive.
 #  The compose project is taken as the parent of tools/; where it lives
 #  elsewhere (an Ansible deployment keeps the release in a subdirectory), add
 #      --project-dir /path/to/the/directory/holding/docker-compose.yml
@@ -52,8 +54,12 @@ MODE=rotate
 PROJECT="$(dirname "${BASH_SOURCE[0]}")/.."
 while [ $# -gt 0 ]; do
     case "$1" in
-        --recovery-session) MODE=recovery; shift ;;
-        --after-restore) MODE=after; shift ;;
+        --recovery-session|--after-restore)
+            want=recovery; [ "$1" = --after-restore ] && want=after
+            if [ "$MODE" != rotate ] && [ "$MODE" != "$want" ]; then
+                echo "--recovery-session and --after-restore are exclusive: pick one" >&2; exit 2
+            fi
+            MODE="$want"; shift ;;
         --project-dir) [ $# -ge 2 ] || { echo "--project-dir needs a directory" >&2; exit 2; }
                        PROJECT="$2"; shift 2 ;;
         --*) echo "unknown option: $1" >&2; exit 2 ;;
@@ -131,24 +137,85 @@ if s.get("status") == "error":
     printf '%s' "${why:- — start one from Pilot first}"
 }
 
+# The container behind a database, as "<id> <restart count> <start time>":
+# it changes when the container restarts or is recreated. Empty when it
+# cannot be read this time.
+db_container() {   # $1 module
+    local id st
+    id="$($DC ps -a -q "$1-db" 2>/dev/null | head -1)"
+    [ -n "$id" ] || return 0
+    st="$(${DC%% *} inspect --format '{{.RestartCount}} {{.State.StartedAt}}' "$id" 2>/dev/null)" \
+        && [ -n "$st" ] || return 0
+    printf '%s %s' "$id" "$st"
+}
+
+# Why a database stopped, from its log since the wait began ($2 seconds ago):
+# the container keeps the log of earlier restore attempts, whose reasons are
+# not this one's. Every connection refused while it starts up logs a FATAL
+# line too ("the database system is starting up"): the reason is looked for
+# first, and those lines are never taken for it.
+db_stop_reason() {   # $1 module, $2 seconds since the wait began
+    local log why
+    log="$($DC logs --since "$(($2 + 2))s" "$1-db" 2>&1 || true)"
+    why="$(printf '%s\n' "$log" | grep -oE '(FATAL|PANIC):.*recovery ended before configured recovery target.*' | tail -1)"
+    [ -n "$why" ] || why="$(printf '%s\n' "$log" | grep -oE '(FATAL|PANIC):.*' \
+        | grep -vE 'starting up|not yet accepting connections|shutting down' | tail -1)"
+    [ -z "$why" ] || echo "     its log: $why" >&2
+    case "$why" in
+        *"recovery ended before configured recovery target"*)
+            echo "     The point in time is beyond the archived WAL: restore again to an" >&2
+            echo "     earlier one ('pgbackrest info' shows what the archive holds)." >&2 ;;
+        *) echo "     Check 'docker compose logs $1-db'." >&2 ;;
+    esac
+}
+
 # A restored database replays its WAL before it accepts writes, and refuses
 # connections while it starts up; its password can only be set afterwards.
+# A database that dies during the replay (a target beyond the archived WAL:
+# "recovery ended before configured recovery target was reached") is started
+# again by its restart policy and would replay forever: a restart ends the
+# wait, with the reason taken from its log.
 wait_primary() {   # $1 module, $2 "unbounded" to wait as long as the replay takes
-    local waited=0
+    local start=$SECONDS waited=0 report=60 first now why
+    first="$(db_container "$1")"
     until [ "$($DC exec -T "$1-db" psql -U "$1" -d "$1" -tAc "SELECT NOT pg_is_in_recovery()" \
                 2>/dev/null | tr -d '[:space:]')" = t ]; do
-        if [ -z "$($DC ps -q --status running "$1-db" 2>/dev/null)" ]; then
+        waited=$((SECONDS - start))
+        now="$(db_container "$1")"
+        if [ -z "$first" ]; then
+            first="$now"
+        elif [ -n "$now" ] && [ "$now" != "$first" ]; then
+            echo "  ✗  $1: $1-db restarted while replaying (after ${waited}s) — nothing changed" >&2
+            db_stop_reason "$1" "$((SECONDS - start))"
+            return 1
+        fi
+        # Asked twice: one failed call to the engine does not stop a database.
+        if [ -z "$($DC ps -q --status running "$1-db" 2>/dev/null)" ] \
+                && { sleep 1; [ -z "$($DC ps -q --status running "$1-db" 2>/dev/null)" ]; }; then
             echo "  ✗  $1: $1-db is not running — nothing changed" >&2
+            db_stop_reason "$1" "$((SECONDS - start))"
             return 1
         fi
         if [ "${2:-}" != unbounded ] && [ "$waited" -ge 900 ]; then
-            echo "  ✗  $1: the database is still starting or replaying after 900s — nothing changed" >&2
+            echo "  ✗  $1: the database is still starting or replaying after ${waited}s — nothing changed" >&2
             return 1
         fi
-        [ $((waited % 60)) -eq 0 ] && [ "$waited" -gt 0 ] \
-            && printf '     %s: still replaying (%ss)…\n' "$1" "$waited"
-        sleep 5; waited=$((waited + 5))
+        if [ "$waited" -ge "$report" ]; then
+            printf '     %s: still replaying (%ss)…\n' "$1" "$waited"
+            report=$((waited + 60))
+        fi
+        sleep 5
     done
+}
+
+# Whether the database already takes the module's password. Over TCP, to its
+# own service name: the local socket and the loopback are trusted without one.
+# The password goes in on standard input, never on a command line.
+has_password() {   # $1 module, $2 password
+    printf '%s\n' "$2" | $DC exec -T "$1-db" sh -c \
+        'IFS= read -r PGPASSWORD; export PGPASSWORD
+         exec psql "host=$1-db user=$1 dbname=$1 connect_timeout=5" -tAc "SELECT 1"' _ "$1" \
+        >/dev/null 2>&1
 }
 
 rc=0
@@ -158,7 +225,9 @@ if [ "$MODE" = after ]; then
         pw="$(module_password "$m" "$RESOLVED")"
         usable "$m" "the password of $m" "$pw" || { rc=1; continue; }
         wait_primary "$m" unbounded || { rc=1; continue; }
-        if printf "ALTER ROLE %s PASSWORD '%s';\n" "$m" "$pw" \
+        if has_password "$m" "$pw"; then
+            echo "  ✓  $m: already takes the password the module is given"
+        elif printf "ALTER ROLE %s PASSWORD '%s';\n" "$m" "$pw" \
                 | $DC exec -T "$m-db" psql -q -v ON_ERROR_STOP=1 -U "$m" -d "$m" >/dev/null; then
             echo "  ✓  $m: password set to the one the module is given"
         else
@@ -184,7 +253,7 @@ if [ "$MODE" = recovery ]; then
         # limit only counts once the instance is up: restoring the files of a
         # large database from off-site storage takes as long as it takes.
         printf '     %s: waiting for the restored instance to reach its point in time…\n' "$m"
-        waited=0
+        up_since=""; waited=0
         until [ "$($DC exec -T backup-agent psql -h "/tmp/restore-$m" -p 5433 -U "$m" -d "$m" \
                     -tAc "SELECT NOT pg_is_in_recovery()" 2>/dev/null | tr -d '[:space:]')" = t ]; do
             if ! $DC exec -T backup-agent test -d "/tmp/restore-data-$m"; then
@@ -197,7 +266,10 @@ if [ "$MODE" = recovery ]; then
                 rc=1; continue 2
             fi
             sleep 5
-            $DC exec -T backup-agent test -S "/tmp/restore-$m/.s.PGSQL.5433" && waited=$((waited + 5))
+            if [ -z "$up_since" ] && $DC exec -T backup-agent test -S "/tmp/restore-$m/.s.PGSQL.5433"; then
+                up_since=$SECONDS
+            fi
+            [ -z "$up_since" ] || waited=$((SECONDS - up_since))
         done
         if printf "ALTER ROLE %s PASSWORD '%s';\n" "$m" "$pw" \
                 | $DC exec -T backup-agent psql -q -v ON_ERROR_STOP=1 \

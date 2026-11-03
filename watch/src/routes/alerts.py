@@ -25,6 +25,7 @@ from src.audit import log_action
 from src.auth import get_current_user, require_identity
 from src.auth_common import sibling_module_role
 from src.database import get_db
+from src.scope_access import managed_clause
 from src.models import (
     Alert, AlertAnalysis, AlertMatch, AlertStatus, FeedState, Scope, ScopeRecipient,
     User, WatchTarget,
@@ -38,7 +39,8 @@ router = APIRouter(prefix="/api", tags=["alerts"])
 
 
 async def _user_scope_ids(db: AsyncSession, user: Optional[User]) -> set[uuid.UUID]:
-    """Scopes the user can see (owner OR recipient by email).
+    """Scopes the user can see (owner OR recipient by email; an administrator
+    also sees the ownerless ones, see src/scope_access.py).
 
     `user is None` means auth is disabled (see THE `None` CONTRACT in
     src/auth_common.py): there is no identity to filter on and the caller
@@ -47,7 +49,7 @@ async def _user_scope_ids(db: AsyncSession, user: Optional[User]) -> set[uuid.UU
     if user is None:
         return set((await db.execute(select(Scope.id))).scalars().all())
     owned = (await db.execute(
-        select(Scope.id).where(Scope.owner_id == user.id)
+        select(Scope.id).where(managed_clause(user))
     )).scalars().all()
     shared = (await db.execute(
         select(ScopeRecipient.scope_id).where(

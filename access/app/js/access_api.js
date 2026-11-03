@@ -20,40 +20,23 @@
             window.location.href = "/login.html?redirect=" + encodeURIComponent(_rp);
             throw new Error("Not authenticated");
         }
-        if (resp.status === 403) {
-            var errBody = "";
+        // The body is read once: a second read throws and loses the server's reason.
+        var errBody = "";
+        if (!resp.ok) {
             try {
                 errBody = await resp.text();
             }
             catch (e) { }
-            if (errBody.indexOf("pending") >= 0) {
-                window.location.href = "login.html?error=pending";
-                throw new Error("Account pending");
-            }
+        }
+        if (resp.status === 403 && errBody.indexOf("pending") >= 0) {
+            window.location.href = "login.html?error=pending";
+            throw new Error("Account pending");
         }
         if (resp.status === 204)
             return null;
-        if (!resp.ok) {
-            var errText = "";
-            try {
-                errText = await resp.text();
-            }
-            catch (e) { }
-            var detail = errText;
-            try {
-                var parsed = JSON.parse(errText);
-                if (parsed && parsed.detail)
-                    detail = typeof parsed.detail === "string" ? parsed.detail : JSON.stringify(parsed.detail);
-            }
-            catch (e) { }
-            var err = new Error("API " + resp.status + ": " + errText.substring(0, 200));
-            err.status = resp.status;
-            err.detail = detail;
-            // FEAT-33: only this marker means "data changed server-side"; any
-            // other 409 is a change the server refuses.
-            err.stale = resp.status === 409 && resp.headers.get("X-CT-Conflict") === "stale";
-            throw err;
-        }
+        // Status, server's reason and the FEAT-33 marker travel with the error.
+        if (!resp.ok)
+            throw ct_apiError(resp, errBody);
         return resp.json();
     }
     // The register belongs to the active project (the module is project-scoped).
@@ -162,39 +145,17 @@
     // FEAT-33 — server_rev seen at load; sent with the blob PUT (409 = a
     // server-initiated write happened since: reload instead of overwrite).
     var _serverRev = 0;
-    // FEAT-33 — a stale blob PUT was refused: warn (blocking) then reload the
-    // authoritative server state. The stale bulk change is lost by design.
-    function _staleConflict() {
-        alert(t("chrome.stale_conflict"));
-        window.location.reload();
-    }
-    // The project save was refused (a closed review, an invalid status…): say
-    // why, then reload what the server keeps — every later save would fail the
-    // same way. Returns false when the error is not such a refusal.
-    function _saveRefused(err) {
-        var st = err && err.status;
-        if (st !== 409 && st !== 422)
-            return false;
-        alert(t("app.save_refused", { reason: String((err && err.detail) || "") }));
-        window.location.reload();
-        return true;
-    }
+    // FEAT-33 — a stale blob PUT is refused (reload: the stale bulk change is
+    // lost by design); any other refusal says the server's reason. Both are told
+    // by ct_projectSaveFailed (shared).
     function _onSaveError(err) {
-        if (err && err.stale) {
-            _staleConflict();
-            return;
-        }
-        if (_saveRefused(err))
+        if (ct_projectSaveFailed(err))
             return;
         console.error("Autosave failed:", err);
     }
     // A loaded file is written in one go: a failure must not go unnoticed.
     function _onLoadSaveError(err) {
-        if (err && err.stale) {
-            _staleConflict();
-            return;
-        }
-        if (_saveRefused(err))
+        if (ct_projectSaveFailed(err))
             return;
         console.error("Saving the loaded file failed:", err);
         showStatus(String((err && err.message) || err), true);

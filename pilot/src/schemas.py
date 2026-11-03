@@ -19,6 +19,8 @@ class UserResponse(BaseModel):
     ai_enabled: str
     created_at: datetime
     last_login: datetime | None
+    deletion_requested_at: datetime | None = None
+    deletion_report: dict[str, str] | None = None
     model_config = {"from_attributes": True}
 
 

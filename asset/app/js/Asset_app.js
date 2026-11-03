@@ -2828,10 +2828,7 @@ function _editAssetMeasureRow(id) {
         });
         AssetAPI.patchMeasure(pid, m.id, patch).then(function () {
             _reloadMeasures();
-        }).catch(function (e) {
-            if (typeof showStatus === "function")
-                showStatus(e.message || String(e), true);
-        });
+        }).catch(ct_changeFailed);
     });
 }
 // ═══════════════════════════════════════════════════════════════

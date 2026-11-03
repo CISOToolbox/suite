@@ -66,7 +66,8 @@ async def user_status(
 
     `active` is what a module should gate on. `pending` is deliberately not
     active: Pilot parks new accounts there until an admin approves them, and a
-    module must not let one in ahead of that decision.
+    module must not let one in ahead of that decision. Neither is an account
+    whose deletion is waiting for a module to confirm.
 
     With `module`, `module_role` is the account's current role in that module
     ("" for none): the calling module lowers its session's role to it, so a
@@ -84,7 +85,7 @@ async def user_status(
         return {"exists": False, "active": False, "role": "", "modules": [], "module_role": ""}
     return {
         "exists": True,
-        "active": user.role != "pending",
+        "active": user.role != "pending" and user.deletion_requested_at is None,
         "role": user.role or "",
         "modules": list(user.modules or []),
         "module_role": str((user.permissions or {}).get(module) or "") if module else "",
@@ -121,8 +122,11 @@ async def internal_put_prefs(request: Request, db: AsyncSession = Depends(get_db
     from src.models import NotificationPrefs, User
     from src.routes.notifications import PrefsUpdate, _dict as _prefs_dict, \
         normalize_module_prefs, _VALID_SCOPES, _VALID_UPCOMING
+    # An account pending deletion is unknown here: a module may still see it
+    # active for a few minutes, and must not subscribe it to mail again.
     user = (await db.execute(
-        select(User).where(func.lower(User.email) == email.lower())
+        select(User).where(func.lower(User.email) == email.lower(),
+                           User.deletion_requested_at.is_(None))
     )).scalar_one_or_none()
     if user is None:
         raise HTTPException(status_code=404, detail="unknown user")
@@ -180,8 +184,11 @@ async def internal_notification_test(request: Request, db: AsyncSession = Depend
     body = await request.json()
     email = (body.get("email") or "").strip()
     from src.models import NotificationPrefs, User
+    # An account pending deletion is unknown here: a module may still see it
+    # active for a few minutes, and must not subscribe it to mail again.
     user = (await db.execute(
-        select(User).where(func.lower(User.email) == email.lower())
+        select(User).where(func.lower(User.email) == email.lower(),
+                           User.deletion_requested_at.is_(None))
     )).scalar_one_or_none()
     if user is None:
         raise HTTPException(status_code=404, detail="unknown user")
@@ -202,8 +209,11 @@ async def internal_notification_test_all(request: Request, db: AsyncSession = De
     body = await request.json()
     email = (body.get("email") or "").strip()
     from src.models import User
+    # An account pending deletion is unknown here: a module may still see it
+    # active for a few minutes, and must not subscribe it to mail again.
     user = (await db.execute(
-        select(User).where(func.lower(User.email) == email.lower())
+        select(User).where(func.lower(User.email) == email.lower(),
+                           User.deletion_requested_at.is_(None))
     )).scalar_one_or_none()
     if user is None:
         raise HTTPException(status_code=404, detail="unknown user")
@@ -226,6 +236,7 @@ async def internal_notification_subscribers(request: Request, db: AsyncSession =
     rows = (await db.execute(
         select(User, NotificationPrefs)
         .join(NotificationPrefs, NotificationPrefs.user_id == User.id)
+        .where(User.deletion_requested_at.is_(None))
     )).all()
     out = []
     for u, p in rows:

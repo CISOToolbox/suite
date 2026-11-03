@@ -12,7 +12,9 @@ with each override: an override can hand a secret out too.
 import json
 import pathlib
 import re
+import sys
 
+import pytest
 import yaml
 
 SUITE = pathlib.Path(__file__).resolve().parents[1]
@@ -136,10 +138,40 @@ def test_each_database_is_off_the_shared_network():
         assert members.get("agent-egress", {"backup-agent"}) == {"backup-agent"}, (extra, members.get("agent-egress"))
 
 
+def merged_networks(extra: list[str]) -> dict[str, dict]:
+    """Top-level networks of the base file merged with `extra`, as compose
+    merges them: per network, an override's keys replace the base's."""
+    nets = {name: dict(cfg or {}) for name, cfg in _load("docker-compose.yml")["networks"].items()}
+    for f in extra:
+        for name, cfg in (_load(f).get("networks") or {}).items():
+            nets.setdefault(name, {}).update(cfg or {})
+    return nets
+
+
 def test_private_networks_have_no_way_out():
-    declared = _load("docker-compose.yml")["networks"]
-    for name in [f"{m}-data" for m in MODULES] + ["ciso-recovery"]:
-        assert (declared.get(name) or {}).get("internal") is True, name
+    # On each merge: an override redeclaring `<m>-data: {internal: false}`
+    # would open the network as surely as the base file. An external or
+    # renamed network is another one, created elsewhere, maybe shared.
+    for extra in OVERRIDES:
+        declared = merged_networks(extra)
+        for name in [f"{m}-data" for m in MODULES] + ["ciso-recovery"]:
+            cfg = declared.get(name) or {}
+            assert cfg.get("internal") is True, (extra, name)
+            assert not cfg.get("external") and "name" not in cfg, (extra, name, cfg)
+
+
+@pytest.mark.parametrize("change", ["internal: false", "external: true", "name: ciso-net"])
+def test_an_override_reopening_a_private_network_is_seen(monkeypatch, tmp_path, change):
+    # The merge above must see what compose would: a fake override that
+    # reopens one network fails the check.
+    (tmp_path / "reopen.yml").write_text(f"networks:\n  risk-data:\n    {change}\n")
+    real = _load
+    monkeypatch.setattr(sys.modules[__name__], "_load",
+                        lambda name: yaml.safe_load((tmp_path / name).read_text())
+                        if name == "reopen.yml" else real(name))
+    monkeypatch.setattr(sys.modules[__name__], "OVERRIDES", [["reopen.yml"]])
+    with pytest.raises(AssertionError):
+        test_private_networks_have_no_way_out()
 
 
 def test_s3_override_gives_each_container_its_own_way_out():

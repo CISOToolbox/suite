@@ -160,7 +160,6 @@ _registerTranslations("en", {
     "review.deleted": "Review deleted",
     "error": "Error",
     "user.bulk_deleted": "{n} user(s) deleted",
-    "app.save_refused": "Save refused by the server: {reason}. The page reloads what was saved.",
     "app.bulk_deleted": "{n} application(s) deleted",
     "app.confirm_delete": "Delete application?",
     "app.confirm_delete_body": "Delete {nom} from the list?",

@@ -194,6 +194,46 @@ def test_every_module_can_deprovision() -> list[str]:
     return problems
 
 
+def _top_level_names(path: Path) -> set[str]:
+    names: set[str] = set()
+    for node in ast.parse(path.read_text(encoding="utf-8")).body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            names.add(node.name)
+        elif isinstance(node, (ast.Import, ast.ImportFrom)):
+            names.update((a.asname or a.name).split(".")[0] for a in node.names)
+        elif isinstance(node, ast.Assign):
+            names.update(t.id for t in node.targets if isinstance(t, ast.Name))
+    return names
+
+
+def test_audit_imports_resolve() -> list[str]:
+    """`from src.audit import X` must name something `src/audit.py` defines.
+
+    The import sits inside the route, so a missing name is no start-up error:
+    AppSec, Surface and Watch imported `log_write` from `src.audit`, which
+    only has `log_action`, and their `delete-user` answered 500 for every
+    account that existed — the deletion Pilot reported as unfinished."""
+    problems = []
+    for audit in sorted(REPO_ROOT.glob("*/src/audit.py")):
+        defined = _top_level_names(audit)
+        for path in sorted(audit.parent.rglob("*.py")):
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            # Shared helpers try one audit module and fall back on the other.
+            guarded = {id(n) for t in ast.walk(tree) if isinstance(t, ast.Try)
+                       and any(isinstance(h.type, ast.Name) and h.type.id == "ImportError"
+                               for h in t.handlers)
+                       for n in ast.walk(t)}
+            for node in ast.walk(tree):
+                if (isinstance(node, ast.ImportFrom) and node.module == "src.audit"
+                        and id(node) not in guarded):
+                    for alias in node.names:
+                        if alias.name not in defined:
+                            problems.append(
+                                f"{path.relative_to(REPO_ROOT)}:{node.lineno}: "
+                                f"src.audit has no {alias.name}")
+    return problems
+
+
 # What Pilot pushes to every module from its settings (`_push_to_modules`).
 # Pilot did not read the answers, so a module without the route never got the
 # config and nothing said so: Surface had no `ai-custom` (its custom LLM always
@@ -990,6 +1030,7 @@ CHECKS = (
     ("every send validates the host", test_every_surface_send_validates_the_host),
     ("mail links use PUBLIC_BASE_URL", test_mail_links_use_the_suite_env_name),
     ("every module can de-provision", test_every_module_can_deprovision),
+    ("src.audit imports resolve", test_audit_imports_resolve),
     ("Pilot pushes reach every module", test_every_module_receives_what_pilot_pushes),
     ("pushed proxy restored at start-up", test_every_module_restores_its_proxy_at_startup),
     ("backups leave out what Pilot pushes", test_backups_leave_out_what_pilot_pushes),

@@ -128,7 +128,8 @@ async def update_project(
     # FEAT-33 stale-tab guard: refuse the whole-blob overwrite when a
     # server-initiated writer bumped server_rev since this tab loaded.
     if body.expected_server_rev is not None and (project.server_rev or 0) > body.expected_server_rev:
-        raise HTTPException(status_code=409,
+        # Marked so the page tells this conflict apart from any other 409.
+        raise HTTPException(status_code=409, headers={"X-CT-Conflict": "stale"},
                             detail="Données modifiées côté serveur depuis le chargement (Pilot/scheduler) — rechargez avant une sauvegarde globale.")
     if body.data is not None:
         project.data = _sanitize_blob(body.data)

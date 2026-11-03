@@ -19,7 +19,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.audit import log_action
 from src.auth import get_current_user, require_edit_role
 from src.database import get_db
-from src.models import Scope, ScopeRecipient, User, WatchTarget
+from src.models import Scope, User, WatchTarget
+from src.scope_access import manages, visible as _scope_visible
 from src.schemas import (
     WatchTargetCreate, WatchTargetUpdate, WatchTargetResponse,
 )
@@ -29,26 +30,13 @@ from src.matcher import match_target
 router = APIRouter(prefix="/api/scopes", tags=["targets"])
 
 
-async def _scope_visible(db: AsyncSession, scope: Scope, user: Optional[User]) -> bool:
-    if user is None:
-        return True  # auth disabled: the caller is admin, everything is visible
-    if scope.owner_id == user.id:
-        return True
-    r = await db.execute(
-        select(ScopeRecipient.email).where(
-            ScopeRecipient.scope_id == scope.id, ScopeRecipient.email == user.email.lower()
-        )
-    )
-    return r.scalar_one_or_none() is not None
-
-
 async def _load_scope_for(user: Optional[User], db: AsyncSession, scope_id: uuid.UUID, owner_only: bool = False) -> Scope:
     scope = (await db.execute(select(Scope).where(Scope.id == scope_id))).scalar_one_or_none()
     if not scope:
         raise HTTPException(status_code=404, detail="scope not found")
     if owner_only:
         # user is None => auth disabled => admin: the owner-only gate does not apply.
-        if user is not None and scope.owner_id != user.id:
+        if not manages(scope, user):
             raise HTTPException(status_code=403, detail="only the owner can mutate targets")
     else:
         if not await _scope_visible(db, scope, user):

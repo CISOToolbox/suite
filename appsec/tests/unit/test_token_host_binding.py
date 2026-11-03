@@ -7,6 +7,7 @@ read differently ("github.com?@evil.example") is refused everywhere, since
 vetting one host while git contacts another is the same leak."""
 import os
 import sys
+import urllib.parse
 from types import SimpleNamespace
 
 import pytest
@@ -17,7 +18,7 @@ os.environ.setdefault("JWT_SECRET", "test-secret-that-is-long-enough-32ch")
 os.environ.setdefault("ENCRYPTION_KEY", "test-encryption-key-long-enough-1234")
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from src import scanners, schemas  # noqa: E402
+from src import scanners, schemas, ssrf_guard  # noqa: E402
 from src.models import Application  # noqa: E402
 from src.routes import applications  # noqa: E402
 from src.schemas import ApplicationUpdate, repo_host, tokens_to_clear  # noqa: E402
@@ -100,6 +101,54 @@ class TestRepoHost:
         assert repo_host("https://jdoe%40corp.example@git.corp.example/x.git") == "git.corp.example"
         assert scanners._inject_token("https://acme@dev.azure.com/acme/p/_git/r", "T") == \
             "https://x-access-token:T@dev.azure.com/acme/p/_git/r"
+
+
+class TestRecheckVetsTheUrlGitGets:
+    """The host re-checked before git runs is the host of the URL git gets.
+
+    Cleaning the URL before the re-check (say, stripping trailing blanks)
+    would vet "github.com" while git, holding the token, contacts
+    "github.com\\xa0" — whatever that resolves to."""
+
+    URLS = [
+        "https://github.com\xa0/a.git",
+        "https://github.com\xa0",
+        "https://github.com\x0b",
+        "https://acme@github.com\u2003",
+    ]
+
+    @pytest.fixture
+    def calls(self, monkeypatch):
+        seen = {"vetted": [], "git": []}
+
+        def resolve(host, **kw):
+            seen["vetted"].append(host)
+            return "203.0.113.10"
+
+        def run(cmd, **kw):
+            seen["git"].append(cmd)
+            return SimpleNamespace(returncode=0, stdout="0123abcd\trefs/heads/main\n", stderr="")
+
+        monkeypatch.setattr(ssrf_guard, "resolve_safe_target", resolve)
+        monkeypatch.setattr(scanners.subprocess, "run", run)
+        monkeypatch.setattr(scanners, "decrypt_token", lambda _c: "SECRETPAT")
+        return seen
+
+    @staticmethod
+    def _git_url(cmd):
+        url = next(a for a in cmd if "://" in a)
+        assert "x-access-token:SECRETPAT@" in url
+        return urllib.parse.urlsplit(url).hostname
+
+    @pytest.mark.parametrize("url", URLS)
+    def test_remote_head(self, calls, url):
+        scanners.get_remote_head(url, "main", "ENC")
+        assert calls["vetted"] == [self._git_url(calls["git"][0])]
+
+    @pytest.mark.parametrize("url", URLS)
+    def test_clone(self, calls, url):
+        scanners._cleanup(scanners._clone_repo(url, "main", "ENC"))
+        assert calls["vetted"] == [self._git_url(calls["git"][0])]
 
 
 class TestRepoToken:

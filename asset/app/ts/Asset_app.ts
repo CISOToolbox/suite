@@ -2753,9 +2753,7 @@ function _editAssetMeasureRow(id: string): void {
         });
         AssetAPI.patchMeasure(pid!, m!.id, patch).then(function() {
             _reloadMeasures();
-        }).catch(function(e: any) {
-            if (typeof showStatus === "function") showStatus(e.message || String(e), true);
-        });
+        }).catch(ct_changeFailed);
     });
 }
 

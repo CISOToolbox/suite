@@ -1843,7 +1843,7 @@ function _applyDecision(r: AccessReview, entry: AccessReviewEntry, idx: number |
             decision: decision, decided_by: entry.decided_by, decided_at: entry.decided_at
         }).then(function() {
             _reloadProjectData();
-        }).catch(function(e) { console.error("Patch entry failed:", e); });
+        }).catch(ct_changeFailed);
     } else {
         _save();
     }
@@ -2216,7 +2216,7 @@ function saveSAField(field: string, val: string): void {
     var pid = (window as Window).getActiveProjectId ? getActiveProjectId() : null;
     if (pid && window.AccessAPI) {
         var patch: Record<string, any> = {}; patch[field] = val;
-        AccessAPI.patchServiceAccount(pid, sa.id, patch).catch(function(e) { console.error("Patch SA failed:", e); });
+        AccessAPI.patchServiceAccount(pid, sa.id, patch).catch(ct_changeFailed);
     } else { _save(); }
 } window.saveSAField = saveSAField;
 
@@ -2339,7 +2339,7 @@ window._editAccessMeasureRow = function(row) {
         var pid = (window as Window).getActiveProjectId ? getActiveProjectId() : null;
         if (pid && window.AccessAPI) {
             AccessAPI.patchMeasure(pid, m!.id, patch)
-                .catch(function(e) { console.error("Patch measure failed:", e); });
+                .catch(ct_changeFailed);
         }
         _save();
         renderPanel();

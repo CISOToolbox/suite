@@ -389,7 +389,8 @@ async def tick_digests(db: AsyncSession, now: datetime | None = None) -> int:
     pairs = (await db.execute(
         select(User, NotificationPrefs)
         .join(NotificationPrefs, NotificationPrefs.user_id == User.id)
-        .where(NotificationPrefs.enabled.is_(True))
+        .where(NotificationPrefs.enabled.is_(True),
+               User.deletion_requested_at.is_(None))  # pending deletion: no more mail
     )).all()
     for user, prefs in pairs:
         if prefs.day_of_week != today.weekday():

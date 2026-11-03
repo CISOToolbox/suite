@@ -341,16 +341,26 @@ IdP: `https://<your-domain>/auth/callback/entra` (or `/google`, `/oidc`).
 > instance before the domain joined Workspace).
 >
 > For the same reason, before reassigning a former user's address to
-> someone else, delete their account in **Pilot > Permissions** and check
-> that every module confirmed the deletion. If some modules did not answer,
-> the account is already gone from Pilot but those modules still hold it:
-> once they are back, let the address sign in once (it lands in `pending`)
-> and delete that account again before approving anyone. Setting the
-> account back to `pending` is not enough: approving it later would hand
-> the new person the old account. Shares made by email address, such as
-> Watch scope recipients, and the person's entry in **Pilot > Users** (the
-> directory) are not removed with the account and must be cleaned up
-> separately.
+> someone else, delete their account in **Pilot > Permissions**. Setting
+> the account back to `pending` is not enough: approving it later would
+> hand the new person the old account. The deletion also removes the Watch
+> scope shares made to that address and its Watch digest history, and
+> detaches the person's directory entry from it (the entry is kept,
+> inactive). A directory entry fed by Access stays on the address: Access
+> owns it. Until every module has confirmed, the account stays listed as
+> *Deletion pending*: it can no longer sign in, and the address cannot open
+> a new account. Retry from the same screen once the modules are back; a
+> module marked as running an image without the deletion route needs its
+> image updated first. A pending deletion cannot be cancelled: a module
+> that never answers (removed, or never deployed) keeps it pending until
+> its internal URL is set to an empty value in Pilot's environment
+> (`<MODULE>_URL=` on the `pilot-app` service, in the compose file or an
+> override), which makes Pilot skip it, or until the module is left out of
+> `PILOT_MODULES`, which drops it from Pilot's registry. Removing the URL
+> variable is not enough: Pilot then falls back to the default URL and
+> calls the module again. Pilot reads these variables into its registry
+> when the module list or menu is loaded (opening the Permissions screen
+> does it), not at start-up: open it once before retrying.
 
 **Trying the suite without any IdP** — set a single line in `.env`:
 

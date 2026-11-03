@@ -249,6 +249,48 @@ async def _do_scan(app_id: uuid.UUID, force: bool, triggered_by: str) -> None:
         await _do_scan_locked(app_id, force, triggered_by)
 
 
+_REPO_SCANNERS = ("trivy_fs", "gitleaks", "sast")
+
+
+async def _fail_repo_scanners(db: AsyncSession, app: Application, scanners: list[str],
+                              err: Exception, triggered_by: str) -> list[str]:
+    """Record a failed job per repo-based scanner and return the scanners
+    still worth running: an image scan does not need the repository.
+
+    ``last_scan_at`` advances here, so an app whose repository cannot be
+    reached waits for its next slot instead of heading every tick (it
+    advances again once a remaining image scan is done).
+
+    A manual trigger has already created a ``pending`` job per scanner: it
+    takes the failure, otherwise it would stay pending and block "Scan now"
+    and the tick until the stale sweep.
+    """
+    now = datetime.now(timezone.utc)
+    repo_scanners = [s for s in scanners if s in _REPO_SCANNERS]
+    pending = (await db.execute(
+        select(ScanJob).where(
+            ScanJob.application_id == app.id,
+            ScanJob.scanner.in_(repo_scanners),
+            ScanJob.status == "pending",
+        )
+    )).scalars().all() if repo_scanners else []
+    for job in pending:
+        job.status = "failed"
+        job.error = str(err)[:2000]
+        job.started_at = job.started_at or now
+        job.completed_at = now
+    taken = {job.scanner for job in pending}
+    for scanner_name in [s for s in repo_scanners if s not in taken]:
+        db.add(ScanJob(
+            id=uuid.uuid4(), application_id=app.id, scanner=scanner_name,
+            status="failed", started_at=now, completed_at=now,
+            error=str(err)[:2000], triggered_by=triggered_by,
+        ))
+    app.last_scan_at = now
+    await db.commit()
+    return [s for s in scanners if s not in _REPO_SCANNERS]
+
+
 async def _do_scan_locked(app_id: uuid.UUID, force: bool, triggered_by: str) -> None:
     async with async_session() as db:
         result = await db.execute(select(Application).where(Application.id == app_id))
@@ -277,9 +319,21 @@ async def _do_scan_locked(app_id: uuid.UUID, force: bool, triggered_by: str) -> 
 
         # Check if repo has new commits since last scan
         if needs_repo and app.repo_url and not force:
-            remote_head = await asyncio.to_thread(
-                get_remote_head, app.repo_url, app.repo_branch, app.repo_token_encrypted
-            )
+            try:
+                remote_head = await asyncio.to_thread(
+                    get_remote_head, app.repo_url, app.repo_branch, app.repo_token_encrypted
+                )
+            except RuntimeError as head_err:
+                # Host re-check refused the URL. Same outcome as a failed
+                # clone: without a visible failed job and a fresh
+                # last_scan_at, the app would head every tick and starve
+                # the others.
+                logger.error("Remote head check failed for %s: %s", app.name, head_err)
+                scanners = await _fail_repo_scanners(db, app, scanners, head_err, triggered_by)
+                if not scanners:
+                    return
+                needs_repo = False
+                remote_head = ""
             if remote_head and remote_head == (app.last_scan_commit or ""):
                 # Record a "skipped" job per repo-based scanner so the
                 # scan history reflects that the scheduler did run but
@@ -336,17 +390,10 @@ async def _do_scan_locked(app_id: uuid.UUID, force: bool, triggered_by: str) -> 
                     )
                 except RuntimeError as clone_err:
                     logger.error("Clone failed for %s: %s", app.name, clone_err)
-                    for scanner_name in [s for s in scanners if s in ("trivy_fs", "gitleaks", "sast")]:
-                        job = ScanJob(
-                            id=uuid.uuid4(), application_id=app.id, scanner=scanner_name,
-                            status="failed", started_at=datetime.now(timezone.utc),
-                            completed_at=datetime.now(timezone.utc),
-                            error=str(clone_err)[:2000], triggered_by="scheduler",
-                        )
-                        db.add(job)
-                    app.last_scan_at = datetime.now(timezone.utc)
-                    await db.commit()
-                    return
+                    scanners = await _fail_repo_scanners(
+                        db, app, scanners, clone_err, triggered_by)
+                    if not scanners:
+                        return
 
             from src.database import async_session as _mk_session
             for scanner_name in scanners:
@@ -376,10 +423,18 @@ async def _do_scan_locked(app_id: uuid.UUID, force: bool, triggered_by: str) -> 
                 if ts_app:
                     ts_app.last_scan_at = datetime.now(timezone.utc)
                     if repo_dir and app.repo_url:
-                        head = await asyncio.to_thread(
-                            get_remote_head, app.repo_url, app.repo_branch,
-                            app.repo_token_encrypted,
-                        )
+                        try:
+                            head = await asyncio.to_thread(
+                                get_remote_head, app.repo_url, app.repo_branch,
+                                app.repo_token_encrypted,
+                            )
+                        except RuntimeError as head_err:
+                            # The scan itself is done: keep last_scan_at.
+                            # last_scan_commit stays as it was, so the next
+                            # planned run scans again rather than skipping.
+                            logger.warning("Remote head check failed for %s after the scan: %s",
+                                           app.name, head_err)
+                            head = ""
                         if head:
                             ts_app.last_scan_commit = head
                 await ts_db.commit()

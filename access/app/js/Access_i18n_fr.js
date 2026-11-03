@@ -160,7 +160,6 @@ _registerTranslations("fr", {
     "review.deleted": "Revue supprimée",
     "error": "Erreur",
     "user.bulk_deleted": "{n} utilisateur(s) supprimé(s)",
-    "app.save_refused": "Enregistrement refusé par le serveur : {reason}. La page recharge ce qui est enregistré.",
     "app.bulk_deleted": "{n} application(s) supprimée(s)",
     "app.confirm_delete": "Supprimer l'application ?",
     "app.confirm_delete_body": "Supprimer {nom} de la liste ?",

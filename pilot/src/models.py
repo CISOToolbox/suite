@@ -40,6 +40,11 @@ class User(Base):
     ai_enabled = Column(String(5), default="false", server_default=text("'false'"))
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), server_default=text("NOW()"))
     last_login = Column(DateTime(timezone=True), nullable=True)
+    # Set when an admin deletes the account and a module has not confirmed
+    # yet: the row stays, unable to sign in, until every module has (see
+    # routes/users.py). `deletion_report` is the last answer of each module.
+    deletion_requested_at = Column(DateTime(timezone=True), nullable=True)
+    deletion_report = Column(JSONB, nullable=True)
 
 
 class Personnel(Base):
