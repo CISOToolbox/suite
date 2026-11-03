@@ -45,7 +45,7 @@ RUN apt-get update && apt-get upgrade -y \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* \
     && rm -f /usr/bin/wget /usr/bin/curl 2>/dev/null || true
 
-# Copy pip packages from builder — this brings in setuptools==83.0.0 as pinned in
+# Copy pip packages from builder — this brings in setuptools==84.1.0 as pinned in
 # requirements.txt (DEP-05, 2 MODERATE).
 # Do NOT re-install setuptools below this line. A `pip install "setuptools<81"`
 # used to sit here (copy-pasted from the appsec image) and silently downgraded
