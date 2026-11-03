@@ -147,7 +147,7 @@ class ScopeRecipientAdd(BaseModel):
 
 class ScopeResponse(BaseModel):
     id: uuid.UUID
-    owner_id: uuid.UUID
+    owner_id: uuid.UUID | None = None
     owner_email: str = ""
     name: str
     description: str

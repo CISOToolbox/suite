@@ -48,6 +48,8 @@ _registerTranslations("en", {
     "scopes.section_shared": "Scopes shared with me",
     "scopes.badge_shared": "Shared",
     "scopes.shared_by": "Shared by",
+    "scopes.badge_no_owner": "No owner",
+    "scopes.no_owner_hint": "The owner's account was deleted. Watch administrators manage this scope.",
     "scopes.no_description": "No description",
     "scopes.recipients_count": "{n} recipient(s)",
     "scopes.load_error": "Could not load scopes.",

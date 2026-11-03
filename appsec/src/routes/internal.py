@@ -285,6 +285,12 @@ async def delete_user(request: Request, db: AsyncSession = Depends(get_db)):
 
     Objects the person owned are KEPT — `owner_id` is ON DELETE SET NULL —
     only the account row and the role go.
+
+    The address also leaves every application's `notification_emails`: that
+    list, keyed by email, decides who receives finding alerts and the weekly
+    recap. Left there, the next holder of the address would receive them —
+    with every alert on, since Pilot has just dropped the preferences and an
+    address without any gets the defaults.
     """
     _check_service_token(request)
     from sqlalchemy import func as _func
@@ -294,18 +300,32 @@ async def delete_user(request: Request, db: AsyncSession = Depends(get_db)):
     email = (body.get("email") or "").strip().lower()
     if not email:
         raise HTTPException(status_code=422, detail="email required")
+    unsubscribed = 0
+    for app in (await db.execute(select(Application))).scalars().all():
+        kept = [e for e in (app.notification_emails or [])
+                if str(e).strip().lower() != email]
+        if len(kept) != len(app.notification_emails or []):
+            app.notification_emails = kept
+            unsubscribed += 1
     target = (await db.execute(
         select(LocalUser).where(_func.lower(LocalUser.email) == email)
     )).scalar_one_or_none()
+    from src.audit_common import log_write
     if target is None:
-        return {"ok": True, "deleted": False}
-    from src.audit import log_write
+        if unsubscribed:
+            await log_write(db, None, request, "user.delete", actor="pilot",
+                            entity_type="user", entity_id=email,
+                            details={"applications_unsubscribed": unsubscribed})
+        await db.commit()
+        return {"ok": True, "deleted": unsubscribed > 0,
+                "applications_unsubscribed": unsubscribed}
     await log_write(db, None, request, "user.delete", actor="pilot",
                     entity_type="user", entity_id=email,
-                    details={"role": target.role or ""})
+                    details={"role": target.role or "",
+                             "applications_unsubscribed": unsubscribed})
     await db.delete(target)
     await db.commit()
-    return {"ok": True, "deleted": True}
+    return {"ok": True, "deleted": True, "applications_unsubscribed": unsubscribed}
 
 def _validate_proxy_url(url: str) -> None:
     """Reject a proxy URL that points at an internal target (see

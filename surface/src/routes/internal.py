@@ -604,7 +604,7 @@ async def delete_user(request: Request, db: AsyncSession = Depends(get_db)):
     )).scalar_one_or_none()
     if target is None:
         return {"ok": True, "deleted": False}
-    from src.audit import log_write
+    from src.audit_common import log_write
     await log_write(db, None, request, "user.delete", actor="pilot",
                     entity_type="user", entity_id=email,
                     details={"role": target.role or ""})

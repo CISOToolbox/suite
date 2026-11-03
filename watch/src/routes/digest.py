@@ -34,6 +34,7 @@ from src.digest import (
 )
 from src.digest_grouping import group_alerts
 from src.models import DigestRun, Scope, User
+from src.scope_access import managed_clause, manages
 from src.rate_limit import RateLimiter
 
 router = APIRouter(prefix="/api/digest", tags=["digest"])
@@ -161,7 +162,7 @@ async def list_runs(
         )).scalars().all()
     else:
         own_scope_ids = (await db.execute(
-            select(Scope.id).where(Scope.owner_id == user.id)
+            select(Scope.id).where(managed_clause(user))
         )).scalars().all()
         rows = (await db.execute(
             select(DigestRun).where(
@@ -196,7 +197,7 @@ async def get_run_body(
         scope = (await db.execute(
             select(Scope).where(Scope.id == row.scope_id)
         )).scalar_one_or_none()
-        is_owner = bool(user is not None and scope and scope.owner_id == user.id)
+        is_owner = bool(user is not None and scope and manages(scope, user))
     if not (is_recipient or is_owner):
         raise HTTPException(status_code=403, detail="forbidden")
     body = row.body_html or ""

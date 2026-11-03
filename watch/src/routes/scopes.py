@@ -5,7 +5,9 @@ to be Watch users yet. Visibility rule: a scope is visible to its
 owner AND to any user whose email is in the recipients list.
 
 Mutations are owner-only. Recipients can read the scope and its target
-list (phase 2+) but cannot edit anything.
+list (phase 2+) but cannot edit anything. A scope whose owner's account was
+deleted keeps a null owner and is managed by Watch administrators
+(src/scope_access.py).
 
 A scope makes the organisation's SMTP send mail, and its threat prompt makes
 the LLM run on every send. So creating or editing one needs a module role
@@ -17,8 +19,9 @@ AUTH_MODE=none: `user is None` means auth is disabled, not "anonymous"
 (see THE `None` CONTRACT in src/auth_common.py). There is then no identity
 to filter or attribute ownership on, and the caller is admin by contract:
 every scope is visible and every owner-only gate passes. Creating a scope
-is the one thing that cannot work — `scopes.owner_id` is a NOT NULL FK to
-`users.id` — so it answers 503 via `require_identity()` instead of 500.
+is the one thing that cannot work — a scope is created with a real owner
+(`scopes.owner_id` only becomes NULL when that owner's account is deleted)
+— so it answers 503 via `require_identity()` instead of 500.
 """
 
 from __future__ import annotations
@@ -38,6 +41,7 @@ from src.auth import (
 from src.auth_routes_common import _ALLOWED_EMAIL_DOMAINS
 from src.database import get_db
 from src.models import Scope, ScopeRecipient, User
+from src.scope_access import managed_clause, manages, visible as _scope_visible
 from src.schemas import (
     ScopeCreate, ScopeUpdate, ScopeResponse,
     ScopeRecipientAdd, ScopeRecipientResponse,
@@ -58,22 +62,11 @@ async def _load_recipients(db: AsyncSession, scope_id: uuid.UUID) -> list[ScopeR
     return list(r.scalars())
 
 
-async def _owner_email(db: AsyncSession, owner_id: uuid.UUID) -> str:
+async def _owner_email(db: AsyncSession, owner_id: Optional[uuid.UUID]) -> str:
+    if owner_id is None:
+        return ""
     r = await db.execute(select(User.email).where(User.id == owner_id))
     return r.scalar_one_or_none() or ""
-
-
-async def _scope_visible(db: AsyncSession, scope: Scope, user: Optional[User]) -> bool:
-    if user is None:
-        return True  # auth disabled: the caller is admin, everything is visible
-    if scope.owner_id == user.id:
-        return True
-    r = await db.execute(
-        select(ScopeRecipient.email).where(
-            ScopeRecipient.scope_id == scope.id, ScopeRecipient.email == user.email.lower()
-        )
-    )
-    return r.scalar_one_or_none() is not None
 
 
 async def _require_known_recipient(db: AsyncSession, email: str, user: Optional[User]) -> None:
@@ -121,7 +114,8 @@ def _scope_to_response(scope: Scope, owner_email: str, recipients: list[ScopeRec
         created_at=scope.created_at,
         updated_at=scope.updated_at,
         recipients=[ScopeRecipientResponse.model_validate(rcp) for rcp in recipients],
-        is_owner=(user is None or scope.owner_id == user.id),
+        # Owner rights, which an administrator holds on an ownerless scope.
+        is_owner=manages(scope, user),
     )
 
 
@@ -137,8 +131,8 @@ async def list_scopes(user: Optional[User] = Depends(get_current_user), db: Asyn
     if user is None:
         scopes = list((await db.execute(select(Scope))).scalars().all())
     else:
-        # Owned
-        owned = (await db.execute(select(Scope).where(Scope.owner_id == user.id))).scalars().all()
+        # Owned (and, for an administrator, ownerless)
+        owned = (await db.execute(select(Scope).where(managed_clause(user)))).scalars().all()
         # Shared via recipient email
         shared_ids = (await db.execute(
             select(ScopeRecipient.scope_id).where(ScopeRecipient.email == user.email.lower())
@@ -146,11 +140,11 @@ async def list_scopes(user: Optional[User] = Depends(get_current_user), db: Asyn
         shared = []
         if shared_ids:
             shared = (await db.execute(
-                select(Scope).where(Scope.id.in_(shared_ids), Scope.owner_id != user.id)
+                select(Scope).where(Scope.id.in_(shared_ids))
             )).scalars().all()
-        scopes = list(owned) + list(shared)
-    my_id = user.id if user else None
-    scopes.sort(key=lambda s: (not (s.owner_id == my_id), s.name.lower()))
+        owned_ids = {s.id for s in owned}
+        scopes = list(owned) + [s for s in shared if s.id not in owned_ids]
+    scopes.sort(key=lambda s: (not manages(s, user), s.name.lower()))
 
     out: list[ScopeResponse] = []
     for s in scopes:
@@ -163,8 +157,9 @@ async def list_scopes(user: Optional[User] = Depends(get_current_user), db: Asyn
 @router.post("", response_model=ScopeResponse, status_code=201)
 async def create_scope(body: ScopeCreate, request: Request, user: Optional[User] = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     require_edit_role(user)
-    # `scopes.owner_id` is a NOT NULL FK: a scope cannot exist without a real
-    # owner, so this is one of the rare routes that needs an actual identity.
+    # A scope is created with a real owner (`scopes.owner_id` is only left
+    # NULL by the deletion of that owner's account), so this is one of the
+    # rare routes that needs an actual identity.
     owner = require_identity(user)
     if (body.threat_prompt or "").strip():
         _check_ai_access(user)
@@ -220,7 +215,7 @@ async def update_scope(scope_id: uuid.UUID, body: ScopeUpdate, request: Request,
     if not scope:
         raise HTTPException(status_code=404, detail="scope not found")
     # user is None => auth disabled => admin: the owner-only gate does not apply.
-    if user is not None and scope.owner_id != user.id:
+    if not manages(scope, user):
         raise HTTPException(status_code=403, detail="only the owner can edit this scope")
     if body.name is not None:
         scope.name = body.name.strip()
@@ -279,7 +274,7 @@ async def delete_scope(scope_id: uuid.UUID, request: Request, user: Optional[Use
     scope = (await db.execute(select(Scope).where(Scope.id == scope_id))).scalar_one_or_none()
     if not scope:
         raise HTTPException(status_code=404, detail="scope not found")
-    if user is not None and scope.owner_id != user.id:
+    if not manages(scope, user):
         raise HTTPException(status_code=403, detail="only the owner can delete this scope")
     name = scope.name
     await db.delete(scope)
@@ -295,7 +290,7 @@ async def add_recipient(scope_id: uuid.UUID, body: ScopeRecipientAdd, request: R
     scope = (await db.execute(select(Scope).where(Scope.id == scope_id))).scalar_one_or_none()
     if not scope:
         raise HTTPException(status_code=404, detail="scope not found")
-    if user is not None and scope.owner_id != user.id:
+    if not manages(scope, user):
         raise HTTPException(status_code=403, detail="only the owner can add recipients")
     await _require_known_recipient(db, body.email, user)
     # Upsert: if already present, refresh the name snapshot.
@@ -330,7 +325,7 @@ async def remove_recipient(scope_id: uuid.UUID, email: str, request: Request, us
     scope = (await db.execute(select(Scope).where(Scope.id == scope_id))).scalar_one_or_none()
     if not scope:
         raise HTTPException(status_code=404, detail="scope not found")
-    if user is not None and scope.owner_id != user.id:
+    if not manages(scope, user):
         raise HTTPException(status_code=403, detail="only the owner can remove recipients")
     email_norm = email.strip().lower()
     await db.execute(

@@ -424,9 +424,13 @@ async def _finish_sign_in(request: Request, db: AsyncSession, **identity) -> Red
     it in — or send the browser back to the sign-in page saying why not."""
     try:
         user = await _upsert_user(db, **identity)
-    except HTTPException:
-        return RedirectResponse(url="/login.html?error=domain_not_allowed")
+    except HTTPException as exc:
+        reason = "account_deleting" if exc.detail == _ACCOUNT_BEING_DELETED else "domain_not_allowed"
+        return RedirectResponse(url="/login.html?error=" + reason)
     return _login_response(user, request.cookies.get("oauth_redirect", "/"))
+
+
+_ACCOUNT_BEING_DELETED = "Account being deleted"
 
 
 async def _upsert_user(db: AsyncSession, email: str, name: str, picture: str, provider: str, provider_id: str) -> User:
@@ -437,6 +441,10 @@ async def _upsert_user(db: AsyncSession, email: str, name: str, picture: str, pr
         raise HTTPException(status_code=403, detail="Email domain not allowed")
     result = await db.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
+    if user is not None and user.deletion_requested_at is not None:
+        # The address must not reach this account again, nor a new one,
+        # until every module has dropped what it holds for it.
+        raise HTTPException(status_code=403, detail=_ACCOUNT_BEING_DELETED)
     now = datetime.now(timezone.utc)
     if user:
         user.name = name

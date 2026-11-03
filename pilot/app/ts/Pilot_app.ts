@@ -2359,6 +2359,10 @@ function _doRenderUsers(c: HTMLElement) {
     h += '<th>' + t("pilot.users.col_ai") + '</th><th class="ct-text-label">' + t("pilot.users.col_login") + '</th><th></th></tr></thead><tbody>';
 
     _users.forEach(function(u) {
+        if (u.deletion_requested_at) {
+            h += _deletionPendingRow(u);
+            return;
+        }
         var perms = u.permissions || {};
         h += '<tr>';
         h += '<td><div class="ct-flex ct-items-center ct-gap-1">';
@@ -2398,6 +2402,36 @@ function _doRenderUsers(c: HTMLElement) {
     c.innerHTML = h;
 }
 
+// Modules whose answer settles a deletion (see _DELETION_CONFIRMED in
+// src/routes/users.py): any other answer keeps the account pending.
+var _DELETION_CONFIRMED = ["deleted", "absent", "skipped"];
+
+function _deletionPendingModules(u: PilotUser): string[] {
+    var report = u.deletion_report || {};
+    return Object.keys(report).filter(function(m) { return _DELETION_CONFIRMED.indexOf(report[m]) < 0; }).sort();
+}
+
+// An account whose deletion a module has not confirmed: no role to edit, the
+// modules still holding it, and a retry. `unsupported` is told apart: that
+// module runs an image without the deletion route, retrying alone will not do.
+function _deletionPendingRow(u: PilotUser): string {
+    var report = u.deletion_report || {};
+    var waiting = _deletionPendingModules(u).map(function(m) {
+        var why = report[m] === "unsupported" ? t("pilot.users.deletion_unsupported") : t("pilot.users.deletion_no_answer");
+        return esc((_MODULE_LABELS[m] || m) + " (" + why + ")");
+    });
+    var h = '<tr class="ct-muted">';
+    h += '<td>' + esc(u.name || "-") + '</td>';
+    h += '<td class="ct-text-meta">' + esc(u.email) + '</td>';
+    h += '<td><span class="ct-bg-high-tint ct-text-high-ink ct-text-label ct-py-1 ct-px-1 ct-r-sm ct-nowrap">' + esc(t("pilot.users.deletion_pending")) + '</span></td>';
+    h += '<td colspan="' + (Object.keys(_MODULE_ROLES).length + 2) + '" class="ct-text-label">'
+       + esc(t("pilot.users.deletion_waiting")) + ' ' + (waiting.length ? waiting.join(", ") : "-") + '</td>';
+    h += '<td class="ct-ta-c"><button class="ct-btn" data-variant="ghost" data-click="_deleteUser" data-args=\'' + _da(u.id, u.email, true) + '\'>'
+       + esc(t("pilot.users.deletion_retry")) + '</button></td>';
+    h += '</tr>';
+    return h;
+}
+
 window._changeRole = function(uid: string, role: string) {
     // A global role change reaches every module: confirmed, like a deletion,
     // and the select is put back when declined.
@@ -2412,12 +2446,14 @@ window._changeRole = function(uid: string, role: string) {
     });
 };
 
-window._deleteUser = function(uid: string, email: string) {
-    if (!confirm(t("pilot.users.delete_confirm", { email: email }))) return;
+// `retry`: the account is already pending deletion, the call only asks the
+// modules that have not confirmed again — no new confirmation.
+window._deleteUser = function(uid: string, email: string, retry?: boolean) {
+    if (!retry && !confirm(t("pilot.users.delete_confirm", { email: email }))) return;
     showStatus(t("pilot.users.deleting"));
     _fetch("/users/" + uid, { method: "DELETE" }).then(function(resp) {
-        // A module that did not answer keeps its row: say so rather than
-        // reporting a clean deletion.
+        // A module that did not confirm keeps its row, and the account stays
+        // listed as pending deletion: say so rather than reporting a clean one.
         var failed = (resp && resp.failed) || [];
         showStatus(failed.length
             ? t("pilot.users.deleted_partial", { modules: failed.join(", ") })
@@ -3381,6 +3417,13 @@ var _rstPollTimer: number | null = null;
 var _rstPollError = "";
 var _rstDiffs: Record<string, any> = {};
 var _rstJournal: any[] | null = null;
+// Last promotion of the selected module (running|done|failed), followed by
+// polling while it runs; undefined = not fetched yet, null = none.
+var _rstPromotion: any = undefined;
+var _rstPromoTimer: number | null = null;
+// Consecutive failures to read the promotion state; polling stops after a few.
+var _rstPromoFails = 0;
+var _rstPromoError = "";
 
 function _rstRender(c: HTMLElement) {
     if (!_rstWindow) {
@@ -3430,6 +3473,10 @@ function _rstRender(c: HTMLElement) {
 
     // ── Recent module activity (server journal): pick an EVENT rather than
     // guessing a timestamp ──
+    if (_rstPromotion === undefined) {
+        _rstPromotion = null;
+        _rstPollPromotion(mod);
+    }
     if (_rstJournal === null) {
         _fetch("/restore/journal/" + encodeURIComponent(mod)).then(function(d: any) {
             _rstJournal = d || [];
@@ -3463,6 +3510,8 @@ function _rstRender(c: HTMLElement) {
                 + '<p class="ct-muted">' + esc(s.error || "") + '</p></div>';
         } else if (s.status === "error") {
             h += '<div class="ct-bordered ct-r-lg ct-p-4" data-tone="critical">' + t("pilot.restore.error") + ' : ' + esc(s.error || "?") + '</div>';
+        } else if (s.status === "promoted") {
+            h += '<div class="ct-bordered ct-r-lg ct-p-4">' + esc(t("pilot.restore.promoted_session", { module: _rstModule })) + '</div>';
         } else if (s.status === "ready") {
             h += _rstObjectsTable(s);
         }
@@ -3470,8 +3519,86 @@ function _rstRender(c: HTMLElement) {
     if (_rstPollError && _rstSession && (_rstSession.status === "preparing" || _rstSession.status === "unreadable")) {
         h += '<p class="ct-muted">' + esc(t("pilot.restore.poll_error", { error: _rstPollError })) + '</p>';
     }
+    h += _rstPromotionBlock();
     c.innerHTML = h;
     if (_rstSession && (_rstSession.status === "preparing" || _rstSession.status === "unreadable")) _rstSchedulePoll();
+}
+
+function _rstPromotionBlock(): string {
+    var p = _rstPromotion;
+    if (_rstPromoError) {
+        return '<div class="ct-bordered ct-r-lg ct-p-4 ct-mt-4" data-tone="critical">'
+            + esc(t("pilot.restore.n2_poll_stopped", { error: _rstPromoError })) + '</div>';
+    }
+    if (!p) return "";
+    var when = p.time ? _rstFmtDT(p.time) : t("pilot.restore.latest");
+    if (p.state === "unknown") {
+        return '<div class="ct-bordered ct-r-lg ct-p-4 ct-mt-4" data-tone="critical"><span class="ct-badge" data-tone="high">' + t("pilot.restore.n2_unknown_badge") + '</span> '
+            + esc(t("pilot.restore.n2_unknown", { module: p.module || _rstModule, time: when })) + ' ' + esc(p.error || "") + '</div>';
+    }
+    if (p.state === "running") {
+        return '<div class="ct-bordered ct-r-lg ct-p-4 ct-mt-4"><span class="ct-badge" data-tone="info">' + t("pilot.restore.n2_running_badge") + '</span> '
+            + esc(t("pilot.restore.n2_running", { module: p.module || _rstModule, time: when }))
+            + ' <span class="ct-muted">(' + esc(t("pilot.restore.n2_phase_" + (p.phase || "promote"))) + ')</span></div>';
+    }
+    if (p.state === "failed") {
+        return '<div class="ct-bordered ct-r-lg ct-p-4 ct-mt-4" data-tone="critical">'
+            + esc(t("pilot.restore.n2_failed", { module: p.module || _rstModule, time: when })) + ' : ' + esc(p.error || "?") + '</div>';
+    }
+    return '<div class="ct-bordered ct-r-lg ct-p-4 ct-mt-4"><span class="ct-badge" data-tone="low">' + t("pilot.restore.n2_done_badge") + '</span> '
+        + esc(t("pilot.restore.n2_done_at", { module: p.module || _rstModule, time: when, at: _rstFmtDT(p.finished_at ? new Date(p.finished_at * 1000).toISOString() : null) }))
+        + (p.error ? ' <span class="ct-muted">' + esc(p.error) + '</span>' : '') + '</div>';
+}
+
+// Follow the module's promotion: once on entry (a promotion started before a
+// reload is still shown), then every few seconds while it runs.
+function _rstPollPromotion(mod: string) {
+    if (_rstPromoTimer) { window.clearTimeout(_rstPromoTimer); _rstPromoTimer = null; }
+    var again = function(delay: number) {
+        _rstPromoTimer = window.setTimeout(function() {
+            if (_panel === "backups" && _bkTab === "restore") _rstPollPromotion(mod);
+        }, delay);
+    };
+    _fetch("/restore/sessions/" + encodeURIComponent(mod) + "/promote").then(function(d: any) {
+        if (mod !== (_rstModule || mod)) return;
+        var was = _rstPromotion && _rstPromotion.state;
+        _rstPromotion = d;
+        _rstPromoFails = 0;
+        _rstPromoError = "";
+        if (was === "running" && d.state === "done") showStatus(t("pilot.restore.n2_done", { module: mod }));
+        if (was === "running" && d.state === "failed") showStatus(d.error || t("pilot.restore.error"), true);
+        // Running: follow it. Unknown: Pilot asks the agent again on each read.
+        if (d.state === "running") again(3000);
+        if (d.state === "unknown") again(10000);
+        if (_panel === "backups" && _bkTab === "restore") _renderPanel();
+    }).catch(function(e: any) {
+        var msg = e.message || String(e);
+        if (/^API 404/.test(msg)) return;   // never promoted
+        // Back off, then stop and say so rather than poll an unreachable
+        // server forever.
+        _rstPromoFails++;
+        if (_rstPromoFails >= 5) {
+            _rstPromoError = msg;
+            if (_panel === "backups" && _bkTab === "restore") _renderPanel();
+            return;
+        }
+        again(5000 * _rstPromoFails);
+    });
+}
+
+// The server refused an action because the session changed under this
+// screen (closed, expired, or reopened by another admin): drop it.
+function _rstSessionChanged(msg: string): boolean {
+    if (!/session changed/.test(msg)) return false;
+    _rstSession = null;
+    _rstDiffs = {};
+    showStatus(t("pilot.restore.session_changed"), true);
+    _renderPanel();
+    return true;
+}
+
+function _rstSessionParam(): string {
+    return "session=" + encodeURIComponent((_rstSession && _rstSession.session) || "");
 }
 
 function _rstFmtDT(iso: string | null): string {
@@ -3532,8 +3659,10 @@ function _rstObjectsTable(s: any): string {
     });
     h += '</tbody></table></div>';
 
-    // ── N2 danger zone ──
-    if ((s.module || _rstModule) !== "pilot") {
+    // ── N2 danger zone ── once per session: offered again, it would replace
+    // the live database a second time and lose what was written since.
+    var spent = _rstPromotion && _rstPromotion.state === "done" && _rstPromotion.session === s.session;
+    if ((s.module || _rstModule) !== "pilot" && !spent) {
         h += '<div class="ct-bordered ct-r-lg ct-p-4" data-tone="critical">';
         h += '<h3 class="ct-text-data ct-mb-2">' + t("pilot.restore.n2_title") + '</h3>';
         h += '<p class="ct-muted ct-mb-3" data-size="sm">' + t("pilot.restore.n2_warning") + '</p>';
@@ -3557,14 +3686,19 @@ function _rstRefreshJournal() {
 function _rstModuleChanged(val: string) {
     // The agent keeps one session at a time: switching module abandons the
     // previous exploration, so close it rather than leave it open, unseen.
-    if (_rstSession && _rstModule && _rstModule !== val) {
-        _fetch("/restore/sessions/" + encodeURIComponent(_rstModule), { method: "DELETE" }).catch(function() {});
+    // Only the session this screen opened: another admin may have reopened
+    // the module since, and that one is theirs.
+    if (_rstSession && _rstSession.session && _rstModule && _rstModule !== val) {
+        _fetch("/restore/sessions/" + encodeURIComponent(_rstModule) + "?" + _rstSessionParam(), { method: "DELETE" }).catch(function() {});
     }
     _rstModule = val;
     _rstSession = null;
     _rstPollError = "";
     _rstDiffs = {};
     _rstJournal = null;
+    _rstPromotion = undefined;
+    _rstPromoFails = 0;
+    _rstPromoError = "";
     _renderPanel();
 }
 
@@ -3600,8 +3734,8 @@ function _rstExplore() {
 // the operator facing a refusal the screen cannot act on.
 function _rstStart(mod: string, time: string | null) {
     _rstPollError = "";
-    _fetch("/restore/sessions", { method: "POST", body: { module: mod, time: time } }).then(function() {
-        _rstSession = { status: "preparing", module: mod, time: time };
+    _fetch("/restore/sessions", { method: "POST", body: { module: mod, time: time } }).then(function(d: any) {
+        _rstSession = { status: "preparing", module: mod, time: (d && d.time) || time, session: d && d.session };
         _renderPanel();
     }).catch(function(e: any) {
         var msg = e.message || String(e);
@@ -3623,6 +3757,11 @@ function _rstSchedulePoll() {
     _rstPollTimer = window.setTimeout(function() {
         if (!_rstSession || _panel !== "backups" || _bkTab !== "restore") return;
         _fetch("/restore/sessions/" + encodeURIComponent(_rstModule)).then(function(d: any) {
+            // Reopened by someone else (another admin, another tab): not ours.
+            if (_rstSession && _rstSession.session && d.session !== _rstSession.session) {
+                _rstSessionChanged("session changed");
+                return;
+            }
             _rstSession = d;
             _rstPollError = "";
             _renderPanel();
@@ -3641,9 +3780,9 @@ function _rstSchedulePoll() {
 }
 
 function _rstObjDiff(id: string) {
-    _fetch("/restore/sessions/" + encodeURIComponent(_rstModule) + "/objects/" + encodeURIComponent(id) + "/diff")
+    _fetch("/restore/sessions/" + encodeURIComponent(_rstModule) + "/objects/" + encodeURIComponent(id) + "/diff?" + _rstSessionParam())
         .then(function(d: any) { _rstDiffs[id] = d; _renderPanel(); })
-        .catch(function(e: any) { showStatus(e.message || String(e), true); });
+        .catch(function(e: any) { var m = e.message || String(e); if (!_rstSessionChanged(m)) showStatus(m, true); });
 }
 
 function _rstObjApply(id: string, name: string) {
@@ -3652,31 +3791,41 @@ function _rstObjApply(id: string, name: string) {
                    { yes: t("pilot.restore.confirm_yes"), no: t("btn_cancel") }).then(function(ok) {
         if (!ok) return;
         showStatus(t("pilot.restore.restoring"));
-        _fetch("/restore/sessions/" + encodeURIComponent(_rstModule) + "/objects/" + encodeURIComponent(id) + "/restore", { method: "POST", body: {} })
+        _fetch("/restore/sessions/" + encodeURIComponent(_rstModule) + "/objects/" + encodeURIComponent(id) + "/restore", { method: "POST", body: { session: _rstSession ? _rstSession.session : "" } })
             .then(function() {
                 showStatus(t("pilot.restore.restored", { name: name }));
                 delete _rstDiffs[id];
                 _fetch("/restore/sessions/" + encodeURIComponent(_rstModule)).then(function(d: any) { _rstSession = d; _renderPanel(); });
             })
-            .catch(function(e: any) { showStatus(e.message || String(e), true); });
+            .catch(function(e: any) { var m = e.message || String(e); if (!_rstSessionChanged(m)) showStatus(m, true); });
     });
 }
 
 function _rstPromote() {
     var mod = _rstModule;
-    var typed = window.prompt(t("pilot.restore.n2_prompt", { module: mod }));
+    var s = _rstSession;
+    if (!s) return;
+    // The confirmation names the instant too: the module alone does not say
+    // which state replaces the live one.
+    var when = s.time ? _rstFmtDT(s.time) : t("pilot.restore.latest");
+    var typed = window.prompt(t("pilot.restore.n2_prompt", { module: mod, time: when }));
     if (typed === null) return;
     if (typed !== mod) { showStatus(t("pilot.restore.n2_mismatch"), true); return; }
-    showStatus(t("pilot.restore.restoring"));
-    _fetch("/restore/sessions/" + encodeURIComponent(mod) + "/promote", { method: "POST", body: { confirm: typed } })
-        .then(function() { showStatus(t("pilot.restore.n2_done", { module: mod })); })
-        .catch(function(e: any) { showStatus(e.message || String(e), true); });
+    _fetch("/restore/sessions/" + encodeURIComponent(mod) + "/promote", { method: "POST", body: { confirm: typed, session: s.session || "" } })
+        .then(function(d: any) {
+            _rstPromotion = d;
+            // Already over: a promotion Pilot had lost track of, now resolved.
+            if (d.state === "done") { showStatus(t("pilot.restore.n2_done", { module: mod })); _renderPanel(); return; }
+            showStatus(t("pilot.restore.n2_started", { module: mod }));
+            _rstPollPromotion(mod);
+        })
+        .catch(function(e: any) { var m = e.message || String(e); if (!_rstSessionChanged(m)) showStatus(m, true); });
 }
 
 function _rstCloseSession() {
-    _fetch("/restore/sessions/" + encodeURIComponent(_rstModule), { method: "DELETE" })
+    _fetch("/restore/sessions/" + encodeURIComponent(_rstModule) + "?" + _rstSessionParam(), { method: "DELETE" })
         .then(function() { _rstSession = null; _rstDiffs = {}; _rstPollError = ""; _renderPanel(); })
-        .catch(function(e: any) { showStatus(e.message || String(e), true); });
+        .catch(function(e: any) { var m = e.message || String(e); if (!_rstSessionChanged(m)) showStatus(m, true); });
 }
 
 (window as any)._rstModuleChanged = _rstModuleChanged;

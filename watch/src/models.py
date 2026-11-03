@@ -71,14 +71,18 @@ class Scope(Base):
     (the user is necessarily logged in to create a scope). Recipients are
     keyed by email so that pre-provisioning works even before they have
     logged in to Watch for the first time.
+
+    Deleting the owner's account keeps the scope with a null owner, as in
+    every other module; Watch administrators then manage it (see
+    src/scope_access.py).
     """
     __tablename__ = "scopes"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     owner_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
         index=True,
     )
     name = Column(String(200), nullable=False)

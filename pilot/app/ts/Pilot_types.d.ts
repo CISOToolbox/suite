@@ -174,6 +174,8 @@ interface PilotUser {
     permissions?: Record<string, string>;
     ai_enabled?: string;     // "true" | "false" (stored as a string on the backend side)
     last_login?: string;
+    deletion_requested_at?: string | null;           // set while a module has not confirmed the deletion
+    deletion_report?: Record<string, string> | null; // last answer of each module
 }
 
 interface PilotCurrentUser {
@@ -423,7 +425,7 @@ interface Window {
     _dirExportForAccess?: () => void;
     _changeRole?: (uid: string, role: string) => void;
     _changeModPerm?: (uid: string, mod: string, role: string) => void;
-    _deleteUser?: (uid: string, email: string) => void;
+    _deleteUser?: (uid: string, email: string, retry?: boolean) => void;
     _resyncModules?: () => void;
     _toggleAI?: (uid: string, el: HTMLInputElement) => void;
     _saveBackupConfig?: () => void;

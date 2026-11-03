@@ -336,6 +336,10 @@ function _scopeCard(s, editable) {
     if (!editable) {
         h += '<span class="ct-bg-info-tint ct-text-info-ink ct-text-label ct-py-1 ct-px-1 ct-r-sm ct-nowrap" title="' + esc(t("scopes.shared_by") + " " + s.owner_email) + '">' + esc(t("scopes.badge_shared")) + '</span>';
     }
+    if (!s.owner_id) {
+        // The owner's account was deleted: Watch administrators manage the scope.
+        h += '<span class="ct-bg-high-tint ct-text-high-ink ct-text-label ct-py-1 ct-px-1 ct-r-sm ct-nowrap" title="' + esc(t("scopes.no_owner_hint")) + '">' + esc(t("scopes.badge_no_owner")) + '</span>';
+    }
     h += '</div>';
     if (s.description) {
         var snippet = s.description.length > 120 ? s.description.substring(0, 120) + "…" : s.description;

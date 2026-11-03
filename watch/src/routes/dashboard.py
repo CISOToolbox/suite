@@ -29,6 +29,7 @@ from src.models import (
     Alert, AlertMatch, AlertStatus, Scope, ScopeRecipient, User, WatchTarget,
 )
 from src.routes.alerts import _user_scope_ids
+from src.scope_access import managed_clause
 
 router = APIRouter(prefix="/api", tags=["dashboard"])
 
@@ -56,7 +57,7 @@ async def dashboard(
         shared_count = 0
     else:
         owned_count = (await db.execute(
-            select(func.count(Scope.id)).where(Scope.owner_id == user.id)
+            select(func.count(Scope.id)).where(managed_clause(user))
         )).scalar_one()
         shared_count = (await db.execute(
             select(func.count(ScopeRecipient.scope_id)).where(

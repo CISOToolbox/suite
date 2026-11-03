@@ -44,6 +44,8 @@ _registerTranslations("fr", {
     "scopes.section_shared": "Périmètres partagés avec moi",
     "scopes.badge_shared": "Partagé",
     "scopes.shared_by": "Partagé par",
+    "scopes.badge_no_owner": "Sans propriétaire",
+    "scopes.no_owner_hint": "Le compte du propriétaire a été supprimé. Les administrateurs de Watch gèrent ce périmètre.",
     "scopes.no_description": "Aucune description",
     "scopes.recipients_count": "{n} destinataire(s)",
     "scopes.load_error": "Impossible de charger les périmètres.",

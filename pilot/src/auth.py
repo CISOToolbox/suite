@@ -264,6 +264,10 @@ async def _resolve_user(
     user = await db.get(User, payload["sub"])
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
+    # An account whose deletion is under way is already gone for its holder:
+    # the row only waits for the modules to confirm (routes/users.py).
+    if user.deletion_requested_at is not None:
+        raise HTTPException(status_code=401, detail="Account being deleted")
     return user
 
 

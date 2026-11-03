@@ -264,25 +264,38 @@ async def delete_user(request: Request, db: AsyncSession = Depends(get_db)):
     updates, so nothing ever removed anything.
 
     Objects the person owned are KEPT — `owner_id` is ON DELETE SET NULL —
-    only the account row and the role go.
+    only the account row and the role go. Scopes left without an owner are
+    managed by Watch administrators (src/scope_access.py).
+
+    Scope recipients and the digest history are keyed by email, not by
+    account: they go too, or whoever is given the address next would read
+    those scopes, receive their digests and replay the archived ones.
     """
     _check_service_token(request)
-    from sqlalchemy import func as _func
+    from sqlalchemy import delete as _delete, func as _func
 
-    from src.models import User as LocalUser
+    from src.models import DigestRun, ScopeRecipient, User as LocalUser
     body = await request.json()
     email = (body.get("email") or "").strip().lower()
     if not email:
         raise HTTPException(status_code=422, detail="email required")
+    shares = (await db.execute(
+        _delete(ScopeRecipient).where(_func.lower(ScopeRecipient.email) == email)
+    )).rowcount or 0
+    runs = (await db.execute(
+        _delete(DigestRun).where(_func.lower(DigestRun.user_email) == email)
+    )).rowcount or 0
     target = (await db.execute(
         select(LocalUser).where(_func.lower(LocalUser.email) == email)
     )).scalar_one_or_none()
     if target is None:
-        return {"ok": True, "deleted": False}
-    from src.audit import log_write
+        await db.commit()
+        return {"ok": True, "deleted": bool(shares or runs)}
+    from src.audit_common import log_write
     await log_write(db, None, request, "user.delete", actor="pilot",
                     entity_type="user", entity_id=email,
-                    details={"role": target.role or ""})
+                    details={"role": target.role or "", "recipients_removed": shares,
+                             "digest_runs_removed": runs})
     await db.delete(target)
     await db.commit()
     return {"ok": True, "deleted": True}

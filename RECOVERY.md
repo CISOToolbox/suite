@@ -67,14 +67,65 @@ before the change:
   `--project-dir <dir>` if the directory holding `docker-compose.yml` is not
   the parent of `tools/`). It waits for the database to finish replaying its
   WAL, however long that takes, then sets the password the module is given
-  through the database container's local socket, without needing the old one.
+  through the database container's local socket, without needing the old one,
+  and only if the database does not already take it. Should the database
+  restart while it waits — a point in time beyond the archived WAL makes
+  PostgreSQL stop with `recovery ended before configured recovery target was
+  reached` — it stops and prints that line: restore again to an earlier point.
   It takes no backup: a new full backup would expire the oldest one, and with
   it the chance to restore again to the same point if the first target was
   wrong. The Ansible restore playbook runs it for you.
 
+  **The backup agent does not hold off, though.** It takes a full backup when
+  a repository has none (on a rebuilt host, as soon as it starts), and every
+  Sunday at `BACKUP_HOUR` (UTC), each followed by `expire`, which keeps the
+  last 2 full backups locally and `BACKUP_S3_RETENTION_FULL` (4 by default)
+  off-site. Each new full backup pushes the oldest one out, with the WAL only
+  it needed: a point in time can be restored only while a full backup taken
+  before it is still kept, and after that many new ones, none of the backups
+  that existed at the restore is left. Right after an in-place restore, list
+  what each repository still holds:
+
+  ```
+  docker compose exec backup-agent sh -c \
+    'PGBACKREST_CONFIG="$PGBACKREST_REPO1_PATH/agent/pgbackrest.conf" pgbackrest --stanza=<module> info'
+  ```
+
+  and make any second restore before the next Sunday's full backup. If more
+  time is needed, raise `BACKUP_S3_RETENTION_FULL` and recreate the
+  `backup-agent` container before that full backup runs.
+
 `DB_PASSWORD` is the fallback for every module whose `DB_PASSWORD_<MODULE>`
 is unset: an installation upgraded from a single shared password keeps
 working unchanged until you move it, module by module, with the same script.
+
+## Replacing a live database: time and space
+
+Replacing a module's database from Pilot runs in the background: the screen
+follows it (safety backup, then the swap) and says when it has finished or
+why it failed, however long it takes. Leaving the page does not stop it, and
+asking again while it runs only shows it. It replaces the database with the
+state of the restore session it was confirmed on: a session closed or
+reopened since, by another admin for instance, is refused, and a session
+replaces the database once — explore again to restore another time.
+
+At its peak, it holds:
+
+- in the module's database volume, the live database and the restored copy
+  (`<module>_restore`) side by side: leave at least the size of the database
+  free;
+- in the backup agent's container (`/tmp`, its writable layer), the restored
+  instance: the module's whole database cluster at the chosen point in time;
+- in the backup repository, the WAL written while the copy is loaded, about
+  the size of the database again, archived like any other write;
+- in Pilot's database, the safety backup of the current state (an export of
+  the module).
+
+The data is streamed from the restored instance into the copy, never held in
+memory. The copy is labelled with the point in time it holds: a swap
+interrupted after the live database was dropped is finished only for that
+same point in time (the error gives the command), and a `<module>_restore`
+left by another one is never renamed in its place.
 
 ## Schema and migrations
 

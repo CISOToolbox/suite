@@ -49,6 +49,7 @@
             userinfo_failed: "Could not retrieve your profile.",
             pending: "Your account is awaiting approval by an administrator.",
             domain_not_allowed: "Sign-in is not open to this email domain.",
+            account_deleting: "This account is being deleted and can no longer sign in.",
         };
         el.textContent = messages[error] || "An error occurred.";
     }

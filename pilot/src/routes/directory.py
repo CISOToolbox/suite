@@ -113,6 +113,29 @@ async def _sync_to_users(db: AsyncSession, email: str, name: str):
     ))
 
 
+async def _retire_directory_entry(db: AsyncSession, email: str) -> None:
+    """Detach the directory entry of a deleted account from its address.
+
+    The entry is kept for history (name, function, manager), marked
+    `inactif`, and its email is rewritten to a unique address under the
+    reserved `.invalid` TLD, which keeps the original readable. Entries match
+    by email, so otherwise the next account given that address would take
+    the former holder's entry over — function, manager and status included.
+
+    Entries fed by Access (`sync_source="access"`) are left alone: Access
+    owns them and would push them back on its next sync."""
+    email = (email or "").strip().lower()
+    if not email:
+        return
+    p = (await db.execute(select(Personnel).where(Personnel.email == email))).scalar_one_or_none()
+    if p is None or (p.sync_source or "") == "access":
+        return
+    suffix = f".deleted-{p.id.hex[:12]}.invalid"
+    p.email = email[:255 - len(suffix)] + suffix
+    p.statut = "inactif"
+    p.updated_at = datetime.now(timezone.utc)
+
+
 def _check_service_token(request: Request) -> None:
     if not SERVICE_TOKEN:
         raise HTTPException(status_code=503, detail="Service token not configured")
