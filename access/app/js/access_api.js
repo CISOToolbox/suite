@@ -39,7 +39,20 @@
                 errText = await resp.text();
             }
             catch (e) { }
-            throw new Error("API " + resp.status + ": " + errText.substring(0, 200));
+            var detail = errText;
+            try {
+                var parsed = JSON.parse(errText);
+                if (parsed && parsed.detail)
+                    detail = typeof parsed.detail === "string" ? parsed.detail : JSON.stringify(parsed.detail);
+            }
+            catch (e) { }
+            var err = new Error("API " + resp.status + ": " + errText.substring(0, 200));
+            err.status = resp.status;
+            err.detail = detail;
+            // FEAT-33: only this marker means "data changed server-side"; any
+            // other 409 is a change the server refuses.
+            err.stale = resp.status === 409 && resp.headers.get("X-CT-Conflict") === "stale";
+            throw err;
         }
         return resp.json();
     }
@@ -155,6 +168,37 @@
         alert(t("chrome.stale_conflict"));
         window.location.reload();
     }
+    // The project save was refused (a closed review, an invalid status…): say
+    // why, then reload what the server keeps — every later save would fail the
+    // same way. Returns false when the error is not such a refusal.
+    function _saveRefused(err) {
+        var st = err && err.status;
+        if (st !== 409 && st !== 422)
+            return false;
+        alert(t("app.save_refused", { reason: String((err && err.detail) || "") }));
+        window.location.reload();
+        return true;
+    }
+    function _onSaveError(err) {
+        if (err && err.stale) {
+            _staleConflict();
+            return;
+        }
+        if (_saveRefused(err))
+            return;
+        console.error("Autosave failed:", err);
+    }
+    // A loaded file is written in one go: a failure must not go unnoticed.
+    function _onLoadSaveError(err) {
+        if (err && err.stale) {
+            _staleConflict();
+            return;
+        }
+        if (_saveRefused(err))
+            return;
+        console.error("Saving the loaded file failed:", err);
+        showStatus(String((err && err.message) || err), true);
+    }
     window._autoSave = function () {
         if (!_dataReady)
             return;
@@ -167,13 +211,7 @@
                 return;
             AccessAPI.update(saveId, { name: (D.metadata && D.metadata.organization) || "", data: JSON.parse(JSON.stringify(D)),
                 expected_server_rev: _serverRev })
-                .catch(function (err) {
-                if (err && String(err.message || "").indexOf("API 409") === 0) {
-                    _staleConflict();
-                    return;
-                }
-                console.error("Autosave failed:", err);
-            });
+                .catch(_onSaveError);
         }, 800);
     };
     var _origLoadBuffer = window._loadBuffer;
@@ -184,10 +222,10 @@
             _origLoadBuffer(buffer, filename);
             setTimeout(function () {
                 if (_activeId) {
-                    AccessAPI.saveFull(_activeId, D);
+                    AccessAPI.saveFull(_activeId, D).catch(_onLoadSaveError);
                 }
                 else {
-                    AccessAPI.create({ name: (D.metadata && D.metadata.organization) || "", data: JSON.parse(JSON.stringify(D)) }).then(function (p) { _activeId = p.id; localStorage.setItem("access_active_project", _activeId); });
+                    AccessAPI.create({ name: (D.metadata && D.metadata.organization) || "", data: JSON.parse(JSON.stringify(D)) }).then(function (p) { _activeId = p.id; localStorage.setItem("access_active_project", _activeId); }).catch(_onLoadSaveError);
                 }
             }, 200);
         };
@@ -256,6 +294,7 @@
         function _load(id) {
             AccessAPI.get(id).then(function (p) {
                 _activeId = p.id;
+                _serverRev = p.server_rev || 0; // FEAT-33: the revision this tab starts from
                 localStorage.setItem("access_active_project", _activeId);
                 var d = typeof p.data === "string" ? JSON.parse(p.data) : (p.data || {});
                 Object.keys(D).forEach(function (k) { delete D[k]; });
@@ -275,6 +314,7 @@
             var init = typeof ACCESS_INIT_DATA !== "undefined" ? JSON.parse(JSON.stringify(ACCESS_INIT_DATA)) : {};
             AccessAPI.create({ name: "", data: init }).then(function (p) {
                 _activeId = p.id;
+                _serverRev = p.server_rev || 0;
                 localStorage.setItem("access_active_project", _activeId);
                 Object.keys(D).forEach(function (k) { delete D[k]; });
                 Object.assign(D, init);

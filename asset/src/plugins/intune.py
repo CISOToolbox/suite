@@ -292,7 +292,7 @@ class IntuneAssetPlugin(AssetPlugin):
         {"key": "client_id", "label": "Client ID (app registration)",
          "label_en": "Client ID (app registration)", "type": "text", "required": True},
         {"key": "client_secret", "label": "Client secret",
-         "label_en": "Client secret", "type": "password", "required": True},
+         "label_en": "Client secret", "type": "password", "secret": True, "required": True},
         {"key": "exclude_personal", "label": "Exclure les appareils personnels (BYOD)",
          "label_en": "Exclude personal (BYOD) devices", "type": "checkbox", "required": False},
         {"key": "only_compliant", "label": "Seulement les appareils conformes",

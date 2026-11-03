@@ -78,7 +78,7 @@ class GitHubOrgPlugin(AccessPlugin):
     label_en = "GitHub"
     config_schema = [
         {"key": "organization", "label": "Organisation GitHub", "label_en": "GitHub Organization", "type": "text", "required": True, "placeholder": "my-org"},
-        {"key": "access_token", "label": "Access Token (PAT)", "label_en": "Access Token (PAT)", "type": "password", "required": True},
+        {"key": "access_token", "label": "Access Token (PAT)", "label_en": "Access Token (PAT)", "type": "password", "secret": True, "required": True},
     ]
     setup_guide = (
         "1. Aller dans GitHub > Settings > Developer settings > Personal access tokens > Fine-grained tokens\n"

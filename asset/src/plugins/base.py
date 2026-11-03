@@ -105,11 +105,18 @@ class AssetPlugin(ABC):
     plugin_type: str = ""
     label: str = ""
     label_en: str = ""
-    # [{key, label, label_en, type, required, placeholder}]
+    # [{key, label, label_en, type, required, placeholder, secret}]
     # type ∈ {text, password, checkbox, select, textarea, number}
+    # A credential field carries "secret": True: it is masked on every read
+    # (plugin list, Pilot connectors API), whatever its key name or type.
     config_schema: list[dict] = []
     setup_guide: str = ""
     setup_guide_en: str = ""
+
+    @classmethod
+    def secret_keys(cls) -> frozenset[str]:
+        """Config keys declared ``"secret": True`` in ``config_schema``."""
+        return frozenset(f["key"] for f in cls.config_schema if f.get("secret"))
 
     @abstractmethod
     async def test_connection(self, config: dict) -> dict:

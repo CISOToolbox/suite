@@ -48,6 +48,7 @@
             auth_failed: "Authentication failed. Please try again.",
             userinfo_failed: "Could not retrieve your profile.",
             pending: "Your account is awaiting approval by an administrator.",
+            domain_not_allowed: "Sign-in is not open to this email domain.",
         };
         el.textContent = messages[error] || "An error occurred.";
     }

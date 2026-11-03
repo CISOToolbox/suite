@@ -19,7 +19,7 @@ class ServiceNowPlugin(AccessPlugin):
     config_schema = [
         {"key": "instance", "label": "Instance ServiceNow", "label_en": "ServiceNow Instance", "type": "text", "required": True, "placeholder": "myorg.service-now.com"},
         {"key": "username", "label": "Nom d'utilisateur", "label_en": "Username", "type": "text", "required": True},
-        {"key": "password", "label": "Mot de passe", "label_en": "Password", "type": "password", "required": True},
+        {"key": "password", "label": "Mot de passe", "label_en": "Password", "type": "password", "secret": True, "required": True},
     ]
     setup_guide = (
         "1. Créer un utilisateur d'intégration dans ServiceNow (ex: svc-ciso-access)\n"

@@ -69,7 +69,10 @@ class AccessPlugin(ABC):
     plugin_type: str = ""
     label: str = ""
     label_en: str = ""
-    config_schema: list[dict] = []  # [{key, label, label_en, type, required, placeholder}]
+    # [{key, label, label_en, type, required, placeholder, secret}]
+    # A credential field carries "secret": True: it is masked on every read
+    # (plugin list, Pilot connectors API), whatever its key name or type.
+    config_schema: list[dict] = []
     setup_guide: str = ""
     setup_guide_en: str = ""
     # File-import connectors set this True. Instead of calling an API, they
@@ -78,6 +81,11 @@ class AccessPlugin(ABC):
     # ``sync()``. Such connectors are imported via the multipart endpoint
     # ``import-connector-file``, not the JSON ``import-connector``.
     accepts_file: bool = False
+
+    @classmethod
+    def secret_keys(cls) -> frozenset[str]:
+        """Config keys declared ``"secret": True`` in ``config_schema``."""
+        return frozenset(f["key"] for f in cls.config_schema if f.get("secret"))
 
     @abstractmethod
     async def test_connection(self, config: dict) -> dict:

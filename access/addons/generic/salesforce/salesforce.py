@@ -43,10 +43,10 @@ class SalesforcePlugin(AccessPlugin):
     config_schema = [
         {"key": "instance_url", "label": "URL de l'instance", "label_en": "Instance URL", "type": "text", "required": True, "placeholder": "https://myorg.my.salesforce.com"},
         {"key": "client_id", "label": "Client ID (Connected App)", "label_en": "Client ID (Connected App)", "type": "text", "required": True},
-        {"key": "client_secret", "label": "Client Secret", "label_en": "Client Secret", "type": "password", "required": True},
+        {"key": "client_secret", "label": "Client Secret", "label_en": "Client Secret", "type": "password", "secret": True, "required": True},
         {"key": "username", "label": "Nom d'utilisateur", "label_en": "Username", "type": "text", "required": True, "placeholder": "integration@example.com"},
-        {"key": "password", "label": "Mot de passe", "label_en": "Password", "type": "password", "required": True},
-        {"key": "security_token", "label": "Jeton de sécurité", "label_en": "Security Token", "type": "password", "required": False, "placeholder": "(optionnel si IP de confiance)"},
+        {"key": "password", "label": "Mot de passe", "label_en": "Password", "type": "password", "secret": True, "required": True},
+        {"key": "security_token", "label": "Jeton de sécurité", "label_en": "Security Token", "type": "password", "secret": True, "required": False, "placeholder": "(optionnel si IP de confiance)"},
     ]
     setup_guide = (
         "1. Aller dans Setup > Apps > App Manager > New Connected App\n"

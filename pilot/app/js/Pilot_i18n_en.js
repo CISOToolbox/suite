@@ -575,6 +575,7 @@ _registerTranslations("en", {
     "pilot.users.role.pending": "Pending",
     "pilot.users.role.user": "User",
     "pilot.users.role.viewer": "Viewer",
+    "pilot.users.role_confirm": "Change the role of {email} to {role}?\n\nThe new role applies in Pilot and in every module.",
     "pilot.users.role_updated": "Role updated",
     "pilot.users.delete": "Delete the account and its permissions",
     "pilot.users.delete_confirm": "Permanently delete {email}?\n\nThe account and its permissions will be removed from Pilot and from every module. Objects this person owned (analyses, projects…) are kept, with no owner.\n\nIf the account still exists in your corporate directory, signing in will re-create it.",

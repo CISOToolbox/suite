@@ -27,6 +27,12 @@ SERVICE_TOKEN = os.getenv("SERVICE_TOKEN", "")
 
 router = APIRouter(prefix="/api/projects/{project_id}", tags=["si_users"])
 
+# Identity fields of a Pilot-managed SiUser (sync_source == "pilot"): owned by
+# the central directory, never edited from Access — neither here nor through
+# the project blob PUT. `statut` is included because Pilot maps it from its
+# own actif/inactif state.
+PILOT_LOCKED_FIELDS = ("nom", "prenom", "email", "fonction", "statut")
+
 
 def _validate_url_field(value: str, field_name: str, max_len: int = 500) -> str:
     """Backend guard for user-provided URL fields. Allows https?://, mailto:
@@ -151,11 +157,9 @@ async def patch_si_user(project_id: uuid.UUID, si_user_id: str, body: dict, user
               "background_check", "nda_signed"]
     # When this SiUser is managed by Pilot, identity fields are owned by
     # the central directory — any attempt to change them from Access is
-    # rejected (defence in depth against UI tampering). `statut` is
-    # included because Pilot maps it from its own actif/inactif state.
-    _PILOT_LOCKED = {"nom", "prenom", "email", "fonction", "statut"}
+    # rejected (defence in depth against UI tampering).
     if su.sync_source == "pilot":
-        attempted = [f for f in _PILOT_LOCKED if f in body and str(body[f] or "") != (getattr(su, f) or "")]
+        attempted = [f for f in PILOT_LOCKED_FIELDS if f in body and str(body[f] or "") != (getattr(su, f) or "")]
         if attempted:
             raise HTTPException(
                 status_code=403,

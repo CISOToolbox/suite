@@ -82,10 +82,13 @@ def _sanitize_err(exc: Exception, context: str) -> str:
     return f"{context} — check server logs"
 
 
-def _mask_config(cfg: dict) -> dict:
+def _mask_config(cfg: dict, plugin_cls) -> dict:
+    """Mask the fields the connector declares ``secret``. A row whose
+    connector is no longer installed has no schema: every value is masked."""
+    secret = plugin_cls.secret_keys() if plugin_cls else None
     masked: dict = {}
     for k, v in (cfg or {}).items():
-        if any(s in k.lower() for s in ("secret", "password", "key", "token", "credential")):
+        if secret is None or k in secret:
             masked[k] = "****" if v else ""
         else:
             masked[k] = v
@@ -96,7 +99,7 @@ def _to_dict(pc: AssetPluginConfig) -> dict:
     cfg = {}
     if pc.config_enc:
         try:
-            cfg = _mask_config(decrypt_config(pc.config_enc))
+            cfg = _mask_config(decrypt_config(pc.config_enc), PLUGIN_REGISTRY.get(pc.plugin_type))
         except Exception:
             cfg = {}
     return {

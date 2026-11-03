@@ -17,7 +17,7 @@ class OktaPlugin(AccessPlugin):
     label_en = "Okta"
     config_schema = [
         {"key": "domain", "label": "Domaine Okta", "label_en": "Okta Domain", "type": "text", "required": True, "placeholder": "dev-123456.okta.com"},
-        {"key": "api_token", "label": "Jeton API (SSWS)", "label_en": "API Token (SSWS)", "type": "password", "required": True},
+        {"key": "api_token", "label": "Jeton API (SSWS)", "label_en": "API Token (SSWS)", "type": "password", "secret": True, "required": True},
     ]
     setup_guide = (
         "1. Se connecter à la console d'administration Okta\n"

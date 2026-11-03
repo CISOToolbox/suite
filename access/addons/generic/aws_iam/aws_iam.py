@@ -13,7 +13,7 @@ class AwsIamPlugin(AccessPlugin):
     label_en = "AWS IAM"
     config_schema = [
         {"key": "access_key_id", "label": "Access Key ID", "label_en": "Access Key ID", "type": "text", "required": True},
-        {"key": "secret_access_key", "label": "Secret Access Key", "label_en": "Secret Access Key", "type": "password", "required": True},
+        {"key": "secret_access_key", "label": "Secret Access Key", "label_en": "Secret Access Key", "type": "password", "secret": True, "required": True},
         {"key": "region", "label": "Région", "label_en": "Region", "type": "text", "required": False, "placeholder": "us-east-1"},
     ]
     setup_guide = (

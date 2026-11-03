@@ -80,7 +80,7 @@ class HrGenericPlugin(AccessPlugin):
          "label_en": "API URL (employee list, JSON)", "type": "text", "required": True,
          "placeholder": "https://sirh.example.com/api/employees"},
         {"key": "api_token", "label": "Jeton Bearer (optionnel)",
-         "label_en": "Bearer token (optional)", "type": "password", "required": False},
+         "label_en": "Bearer token (optional)", "type": "password", "secret": True, "required": False},
         {"key": "users_key", "label": "Clé JSON de la liste (optionnel, ex : results)",
          "label_en": "JSON list key (optional, e.g. results)", "type": "text", "required": False,
          "placeholder": "results"},

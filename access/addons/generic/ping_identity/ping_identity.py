@@ -49,7 +49,7 @@ class PingOnePlugin(AccessPlugin):
     config_schema = [
         {"key": "environment_id", "label": "Environment ID", "label_en": "Environment ID", "type": "text", "required": True},
         {"key": "client_id", "label": "Client ID (Worker App)", "label_en": "Client ID (Worker App)", "type": "text", "required": True},
-        {"key": "client_secret", "label": "Client Secret", "label_en": "Client Secret", "type": "password", "required": True},
+        {"key": "client_secret", "label": "Client Secret", "label_en": "Client Secret", "type": "password", "secret": True, "required": True},
         {"key": "region", "label": "Région (NA, EU, AP, CA)", "label_en": "Region (NA, EU, AP, CA)", "type": "text", "required": True, "placeholder": "EU"},
     ]
     setup_guide = (

@@ -49,10 +49,13 @@ _prefix = "/api/projects/{project_id}/plugins"
 proj_router = APIRouter(prefix=_prefix, tags=["plugins"])
 
 
-def _mask_config(cfg: dict) -> dict:
+def _mask_config(cfg: dict, plugin_cls) -> dict:
+    """Mask the fields the connector declares ``secret``. A row whose
+    connector is no longer installed has no schema: every value is masked."""
+    secret = plugin_cls.secret_keys() if plugin_cls else None
     masked = {}
     for k, v in cfg.items():
-        if any(s in k.lower() for s in ("secret", "password", "key", "token", "credential")):
+        if secret is None or k in secret:
             masked[k] = "****" if v else ""
         else:
             masked[k] = v
@@ -60,13 +63,13 @@ def _mask_config(cfg: dict) -> dict:
 
 
 def _to_dict(pc: PluginConfig) -> dict:
+    plugin_cls = PLUGIN_REGISTRY.get(pc.plugin_type)
     config_masked = {}
     if pc.config_enc:
         try:
-            config_masked = _mask_config(decrypt_config(pc.config_enc))
+            config_masked = _mask_config(decrypt_config(pc.config_enc), plugin_cls)
         except Exception:
             config_masked = {}
-    plugin_cls = PLUGIN_REGISTRY.get(pc.plugin_type)
     return {
         "id": pc.id,
         "plugin_type": pc.plugin_type,
@@ -285,6 +288,21 @@ async def test_plugin_config(project_id: uuid.UUID, request: Request, user: Opti
     cls = PLUGIN_REGISTRY.get(plugin_type)
     if not cls:
         return {"ok": False, "error": f"Plugin type '{plugin_type}' not available", "details": ""}
+
+    # Testing an existing connector from its edit form: the masked secrets come
+    # back as "****" and mean "unchanged", as on save.
+    plugin_id = body.get("plugin_id")
+    if plugin_id and isinstance(config, dict):
+        pc = await db.get(PluginConfig, (project_id, str(plugin_id)))
+        if pc is not None and pc.plugin_type == plugin_type and pc.config_enc:
+            try:
+                stored = decrypt_config(pc.config_enc)
+            except Exception as e:
+                return {"ok": False, "error": _sanitize_plugin_error(e, "Cannot decrypt config"), "details": ""}
+            config = dict(config)
+            for k in cls.secret_keys():
+                if config.get(k) == "****" and k in stored:
+                    config[k] = stored[k]
 
     try:
         result = await cls().test_connection(config)

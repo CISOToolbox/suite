@@ -24,17 +24,17 @@ RUN pip install --no-cache-dir --prefix=/install --require-hashes -r requirement
 # ── Stage 2: security scanning tools ─────────────────────────────
 FROM python:3.13-slim@sha256:6771159cd4fa5d9bba1258caf0b82e6b73458c694d178ad97c5e925c2d0e1a91 AS tools
 
-ARG TRIVY_VERSION=0.75.0
+ARG TRIVY_VERSION=0.76.1
 ARG GITLEAKS_VERSION=8.30.1
 ARG OPENGREP_VERSION=1.30.0
 ARG TARGETARCH
 
 # Official release sha256 sums (CNT-05) — taken from the checksum files
 # published alongside the GitHub releases:
-#   trivy_0.75.0_checksums.txt / gitleaks_8.30.1_checksums.txt
+#   trivy_0.76.1_checksums.txt / gitleaks_8.30.1_checksums.txt
 # MUST be updated together with the version ARGs above.
-ARG TRIVY_SHA256_AMD64=b6d7b944b6cbf4e7de5b4bc6c3635900c50fed53b64b77b99a5fbc3136cd1d5d
-ARG TRIVY_SHA256_ARM64=23018f1f7136b8391bb300e2579bcf4759e3c64012856f51c0fb6fffe1ee3841
+ARG TRIVY_SHA256_AMD64=3350f4fac96ed099590c4a353bddb226f86311a0a2e7a8c626c162790d947f10
+ARG TRIVY_SHA256_ARM64=37a9cc16ddf281cb6ce3726e324f33e42d1f7884b20b7c10e159cefd5530d487
 ARG GITLEAKS_SHA256_AMD64=551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
 ARG GITLEAKS_SHA256_ARM64=e4a487ee7ccd7d3a7f7ec08657610aa3606637dab924210b3aee62570fb4b080
 # Opengrep (SAST) publishes no checksum file: its binaries are signed with

@@ -2434,6 +2434,13 @@
         c.innerHTML = h;
     }
     window._changeRole = function (uid, role) {
+        // A global role change reaches every module: confirmed, like a deletion,
+        // and the select is put back when declined.
+        var user = _users.find(function (u) { return u.id === uid; });
+        if (!user || !confirm(t("pilot.users.role_confirm", { email: user.email, role: t("pilot.users.role." + role) }))) {
+            _renderPanel();
+            return;
+        }
         _fetch("/users/" + uid, { method: "PUT", body: { role: role } }).then(function () {
             showStatus(t("pilot.users.role_updated"));
             _loadUsers().then(function () { _renderPanel(); });

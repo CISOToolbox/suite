@@ -2676,7 +2676,11 @@ window._plgTestInline = function(pluginId) {
         if (existing) pluginType = existing.plugin_type;
     }
 
-    AccessAPI.testPluginConfig(pid, { plugin_type: pluginType, config: config }).then(function(r) {
+    // An existing connector's masked secrets come back as "****": the server
+    // tests with the stored value for those (plugin_id says which).
+    var body: { plugin_type: string; config: Record<string, unknown>; plugin_id?: string } = { plugin_type: pluginType, config: config };
+    if (pluginId) body.plugin_id = pluginId;
+    AccessAPI.testPluginConfig(pid, body).then(function(r) {
         if (span) {
             span.textContent = r.ok ? t("plg.test_ok") : (t("plg.test_fail") + ": " + (r.error || ""));
             span.style.color = r.ok ? "var(--ct-low)" : "var(--ct-critical)";

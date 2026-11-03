@@ -360,7 +360,7 @@ class LdapAdAssetPlugin(AssetPlugin):
          "type": "text", "required": True,
          "placeholder": "CN=svc-ciso-asset,OU=ServiceAccounts,DC=corp,DC=local"},
         {"key": "bind_password", "label": "Mot de passe Bind", "label_en": "Bind Password",
-         "type": "password", "required": True},
+         "type": "password", "secret": True, "required": True},
         {"key": "base_dn", "label": "Base DN (recherche)", "label_en": "Base DN",
          "type": "text", "required": True, "placeholder": "DC=corp,DC=local"},
         {"key": "computer_filter", "label": "Filtre LDAP", "label_en": "LDAP filter",

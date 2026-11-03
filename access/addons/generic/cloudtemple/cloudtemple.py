@@ -138,7 +138,7 @@ class CloudTempleIamPlugin(AccessPlugin):
         {"key": "client_id", "label": "Client ID (PAT)",
          "label_en": "Client ID (PAT)", "type": "text", "required": True},
         {"key": "client_secret", "label": "Secret ID (PAT)",
-         "label_en": "Secret ID (PAT)", "type": "password", "required": True},
+         "label_en": "Secret ID (PAT)", "type": "password", "secret": True, "required": True},
         {"key": "tenant_id", "label": "Tenant ID (optionnel)",
          "label_en": "Tenant ID (optional)", "type": "text", "required": False,
          "placeholder": "Laisser vide pour utiliser le tenant du PAT"},

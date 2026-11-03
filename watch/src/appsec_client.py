@@ -26,6 +26,13 @@ def is_configured() -> bool:
     return bool(APPSEC_URL and SERVICE_TOKEN)
 
 
+def forbidden_payload() -> dict[str, Any]:
+    """The answer for a caller without a role in AppSec: nothing of AppSec's
+    inventory, and why, so the view can say so."""
+    return {"configured": True, "forbidden": True,
+            "matched_findings": [], "matched_sbom": [], "applications": []}
+
+
 async def sbom_impact(cve_id: str | None, affected: list[dict[str, Any]]) -> dict[str, Any]:
     """Call POST {APPSEC_URL}/api/internal/sbom/impact and return its JSON body.
 

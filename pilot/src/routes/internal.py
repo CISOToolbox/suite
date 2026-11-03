@@ -59,6 +59,7 @@ async def internal_modules_menu(request: Request, db: AsyncSession = Depends(get
 async def user_status(
     request: Request,
     email: str,
+    module: str = "",
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Is `email` still an active account, and with which role?
@@ -66,6 +67,11 @@ async def user_status(
     `active` is what a module should gate on. `pending` is deliberately not
     active: Pilot parks new accounts there until an admin approves them, and a
     module must not let one in ahead of that decision.
+
+    With `module`, `module_role` is the account's current role in that module
+    ("" for none): the calling module lowers its session's role to it, so a
+    demotion applies without waiting for the session to expire. Only the
+    asked module's entry is returned, as in the token Pilot mints for it.
     """
     _check_service_token(request)
     normalised = (email or "").strip().lower()
@@ -75,12 +81,13 @@ async def user_status(
     result = await db.execute(select(User).where(User.email == normalised))
     user = result.scalar_one_or_none()
     if user is None:
-        return {"exists": False, "active": False, "role": "", "modules": []}
+        return {"exists": False, "active": False, "role": "", "modules": [], "module_role": ""}
     return {
         "exists": True,
         "active": user.role != "pending",
         "role": user.role or "",
         "modules": list(user.modules or []),
+        "module_role": str((user.permissions or {}).get(module) or "") if module else "",
     }
 
 

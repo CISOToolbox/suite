@@ -969,7 +969,19 @@ def test_every_module_mounts_the_shared_sign_in() -> list[str]:
     return problems
 
 
+def test_every_csp_keeps_forms_on_the_origin() -> list[str]:
+    """An injected <form> must not post the page's fields to another origin:
+    every module's CSP carries form-action 'self' (not covered by default-src)."""
+    problems = []
+    for main in sorted(REPO_ROOT.glob("*/src/main.py")):
+        src = main.read_text(encoding="utf-8")
+        if "script-src 'self'" in src and "form-action 'self'" not in src:
+            problems.append(f"{main.parent.parent.name}/src/main.py: the CSP has no form-action 'self'")
+    return problems
+
+
 CHECKS = (
+    ("forms stay on the origin", test_every_csp_keeps_forms_on_the_origin),
     ("canonical field names", test_every_receiver_uses_the_canonical_fields),
     ("no pre-composed prompt", test_ai_requests_carry_no_precomposed_prompt),
     ("external artefacts verified", test_externally_built_artefacts_are_verified_at_build),

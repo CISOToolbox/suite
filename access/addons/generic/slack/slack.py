@@ -16,7 +16,7 @@ class SlackPlugin(AccessPlugin):
     label = "Slack"
     label_en = "Slack"
     config_schema = [
-        {"key": "bot_token", "label": "Bot Token (xoxb-...)", "label_en": "Bot Token (xoxb-...)", "type": "password", "required": True},
+        {"key": "bot_token", "label": "Bot Token (xoxb-...)", "label_en": "Bot Token (xoxb-...)", "type": "password", "secret": True, "required": True},
     ]
     setup_guide = (
         "1. Aller sur https://api.slack.com/apps et créer une nouvelle application\n"

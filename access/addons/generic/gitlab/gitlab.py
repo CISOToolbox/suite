@@ -66,7 +66,7 @@ class GitLabPlugin(AccessPlugin):
     label_en = "GitLab"
     config_schema = [
         {"key": "base_url", "label": "URL GitLab", "label_en": "GitLab URL", "type": "text", "required": True, "placeholder": "https://gitlab.example.com"},
-        {"key": "access_token", "label": "Access Token", "label_en": "Access Token", "type": "password", "required": True},
+        {"key": "access_token", "label": "Access Token", "label_en": "Access Token", "type": "password", "secret": True, "required": True},
     ]
     setup_guide = (
         "1. Aller dans GitLab > Préférences > Access Tokens (admin) ou Group > Settings > Access Tokens\n"

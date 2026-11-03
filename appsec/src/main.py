@@ -18,7 +18,15 @@ from src.models import Base
 APP_URL = os.getenv("APP_URL", "http://localhost:8080")
 MODULE_NAME = os.getenv("MODULE_NAME", "appsec")
 
-app = FastAPI(title="CISO Toolbox — AppSec", version="0.1.0", docs_url=None, redoc_url=None, openapi_url=None)
+# The API docs list every route, internal ones included: off unless a
+# deployment asks for them.
+_API_DOCS = os.getenv("ENABLE_API_DOCS", "").strip().lower() in ("1", "true", "yes")
+app = FastAPI(
+    title="CISO Toolbox — AppSec", version="0.1.0",
+    docs_url="/docs" if _API_DOCS else None,
+    redoc_url="/redoc" if _API_DOCS else None,
+    openapi_url="/openapi.json" if _API_DOCS else None,
+)
 
 
 @app.exception_handler(Exception)
@@ -37,7 +45,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
         if request.url.scheme == "https":
             response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
-        csp = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://api.anthropic.com https://api.openai.com https://services.nvd.nist.gov; font-src 'self'; frame-ancestors 'none'"
+        csp = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://api.anthropic.com https://api.openai.com https://services.nvd.nist.gov; font-src 'self'; frame-ancestors 'none'; form-action 'self'"
         response.headers["Content-Security-Policy"] = csp
         # Same cache policy as the suite proxy (nginx $cache_policy): without
         # Cache-Control, a standalone deployment (no proxy) leaves the browser

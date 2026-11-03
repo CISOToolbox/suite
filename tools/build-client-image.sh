@@ -19,8 +19,9 @@
 #   --tag TAG          image tag (default: local) -> ciso-<module>-<client>:TAG
 #   --custom-dir DIR   external client add-on directory (the organization's
 #                      own repository, e.g. <client>/<module>-addons/).
-#                      Staged as addons/custom/<client>/ for the build, removed
-#                      afterwards — the public tree never keeps client code.
+#                      Staged as custom/<client> in a temporary build context,
+#                      outside the module tree: the public tree never holds
+#                      client code, even when the build is killed.
 #   --platforms P      build a MULTI-ARCH manifest (e.g. linux/amd64,linux/arm64)
 #                      instead of the host arch only. Mandatory for GHCR:
 #                      a single-arch image will not start on the other platform.
@@ -71,23 +72,25 @@ MOD_DIR="$ROOT/$module"
 [ -d "$MOD_DIR" ] || { echo "!! unknown module: $module ($MOD_DIR missing)"; exit 1; }
 [ -f "$MOD_DIR/Dockerfile.addons" ] || { echo "!! $module has no Dockerfile.addons overlay"; exit 1; }
 
-# Single EXIT handler: un-stage external client add-ons AND restore the
-# multi-language app/ tree (bash keeps only one trap per signal).
+# The overlay is built from a temporary context outside the module tree: the
+# selected add-ons, client code included, are staged there and nowhere else.
+ctx="$(mktemp -d "${TMPDIR:-/tmp}/ciso-client-build.XXXXXX")"
+
+# Single EXIT handler: drop the build context AND restore the multi-language
+# app/ tree (bash keeps only one trap per signal).
 _on_exit() {
-    [ -n "${_custom_stage:-}" ] && rm -rf "$_custom_stage"
+    rm -rf "$ctx"
     [ -d "$MOD_DIR/.app-i18n-bak" ] && { rm -rf "$MOD_DIR/app"; mv "$MOD_DIR/.app-i18n-bak" "$MOD_DIR/app"; }
     return 0
 }
 trap _on_exit EXIT
 
-# External client add-ons (the organization's repository) staged into the module tree for the
-# duration of the build only.
+# External client add-ons (the organization's repository) are read in place
+# and staged as custom/<client> in the build context.
 if [ -n "$custom_dir" ]; then
     [ -d "$custom_dir" ] || { echo "!! --custom-dir not found: $custom_dir"; exit 1; }
-    _custom_stage="$MOD_DIR/addons/custom/$client"
-    rm -rf "$_custom_stage"; mkdir -p "$_custom_stage"
-    cp -r "$custom_dir/." "$_custom_stage/"
-    echo "── staged external client add-ons: $custom_dir -> addons/custom/$client ──"
+    custom_dir="$(cd "$custom_dir" && pwd)"
+    echo "── external client add-ons: $custom_dir -> custom/$client ──"
     case ",$addons," in *",custom/$client,"*) : ;; *)
         [ -n "$addons" ] && addons="$addons,custom/$client" || addons="generic,custom/$client" ;;
     esac
@@ -106,7 +109,7 @@ case "$tag" in
     */*|*:*) img="$tag" ;;
     *)       img="ciso-${module}-${client}:${tag}" ;;
 esac
-stage="$MOD_DIR/.client-addons"
+stage="$ctx/.client-addons"
 
 # 0. i18n packaging (optional): restrict the languages bundled into the
 #    image. Applied on a backup of app/, restored on exit (trap) so the
@@ -142,7 +145,8 @@ IFS=',' read -ra sels <<< "$addons"
 for s in "${sels[@]}"; do
     s="$(echo "$s" | xargs)"  # trim
     src="$MOD_DIR/addons/$s"
-    [ -d "$src" ] || { echo "!! addon path not found: $module/addons/$s"; rm -rf "$stage"; exit 1; }
+    [ -n "$custom_dir" ] && [ "$s" = "custom/$client" ] && src="$custom_dir"
+    [ -d "$src" ] || { echo "!! addon path not found: $module/addons/$s"; exit 1; }
     mkdir -p "$stage/$s"
     cp -r "$src/." "$stage/$s/"
     # Strip build-time-only artifacts — a compiled-worker add-on (e.g. the Rust
@@ -165,13 +169,12 @@ if [ -n "$platforms" ]; then
     podman build --platform "$platforms" --manifest "$img" \
         --build-arg BASE="$base" --build-arg EXCLUDE_CORE="$excl_space" \
         --build-arg PRODUCT_VERSION="$prodver" \
-        -f "$MOD_DIR/Dockerfile.addons" "$MOD_DIR"
+        -f "$MOD_DIR/Dockerfile.addons" "$ctx"
 else
     docker build --build-arg BASE="$base" --build-arg EXCLUDE_CORE="$excl_space" \
         --build-arg PRODUCT_VERSION="$prodver" \
-        -f "$MOD_DIR/Dockerfile.addons" -t "$img" "$MOD_DIR"
+        -f "$MOD_DIR/Dockerfile.addons" -t "$img" "$ctx"
 fi
-rm -rf "$stage"
 
 echo "✓ built $img"
 if $push; then

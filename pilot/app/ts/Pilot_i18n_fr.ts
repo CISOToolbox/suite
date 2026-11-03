@@ -577,6 +577,7 @@ _registerTranslations("fr", {
   "pilot.users.role.pending": "En attente",
   "pilot.users.role.user": "Utilisateur",
   "pilot.users.role.viewer": "Lecteur",
+  "pilot.users.role_confirm": "Passer {email} au rôle {role} ?\n\nLe nouveau rôle s'applique dans Pilot et dans tous les modules.",
   "pilot.users.role_updated": "Rôle mis à jour",
   "pilot.users.delete": "Supprimer le compte et ses habilitations",
   "pilot.users.delete_confirm": "Supprimer définitivement {email} ?\n\nSon compte et ses habilitations seront retirés de Pilot et de tous les modules. Les objets dont cette personne était propriétaire (analyses, projets…) sont conservés, sans propriétaire.\n\nSi le compte existe encore dans votre annuaire d'entreprise, une reconnexion le recréera.",

@@ -732,7 +732,7 @@ class CloudTempleAssetPlugin(AssetPlugin):
         {"key": "client_id", "label": "Client ID (PAT)",
          "label_en": "Client ID (PAT)", "type": "text", "required": True},
         {"key": "client_secret", "label": "Secret ID (PAT)",
-         "label_en": "Secret ID (PAT)", "type": "password", "required": True},
+         "label_en": "Secret ID (PAT)", "type": "password", "secret": True, "required": True},
         {"key": "include_vmware", "label": "Inclure IaaS VMware (vCenter)",
          "label_en": "Include IaaS VMware (vCenter)", "type": "checkbox", "required": False},
         {"key": "include_openiaas", "label": "Inclure OpenIaaS (XCP-ng / XOA)",

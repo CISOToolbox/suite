@@ -51,6 +51,15 @@ OIDC_LABEL = os.getenv("OIDC_LABEL", "SSO")
 
 SCOPES = "openid profile email"
 
+# Optional comma-separated allow-list of sign-in domains, as in the standalone
+# modules: an address outside it never gets an account, not even a pending
+# one. Empty = every domain the identity provider authenticates.
+_ALLOWED_EMAIL_DOMAINS = tuple(
+    d.strip().lower().lstrip("@")
+    for d in os.getenv("ALLOWED_EMAIL_DOMAINS", "").split(",")
+    if d.strip()
+)
+
 _oidc_endpoints: dict | None = None
 
 
@@ -234,9 +243,7 @@ async def callback_entra(request: Request, db: AsyncSession = Depends(get_db)):
     provider_id = claims.get("oid") or claims.get("sub", "")
     if not email:
         return RedirectResponse(url="/login.html?error=userinfo_failed")
-    user = await _upsert_user(db, email=email, name=name, picture="", provider="entra", provider_id=provider_id)
-    redirect_after = request.cookies.get("oauth_redirect", "/")
-    return _login_response(user, redirect_after)
+    return await _finish_sign_in(request, db, email=email, name=name, picture="", provider="entra", provider_id=provider_id)
 
 
 @router.get("/login/google")
@@ -276,9 +283,7 @@ async def callback_google(request: Request, db: AsyncSession = Depends(get_db)):
     if not resp.is_success:
         return RedirectResponse(url="/login.html?error=userinfo_failed")
     userinfo = resp.json()
-    user = await _upsert_user(db, email=userinfo.get("email", ""), name=userinfo.get("name", ""), picture=userinfo.get("picture", ""), provider="google", provider_id=userinfo.get("sub", ""))
-    redirect_after = request.cookies.get("oauth_redirect", "/")
-    return _login_response(user, redirect_after)
+    return await _finish_sign_in(request, db, email=userinfo.get("email", ""), name=userinfo.get("name", ""), picture=userinfo.get("picture", ""), provider="google", provider_id=userinfo.get("sub", ""))
 
 
 @router.get("/login/oidc")
@@ -333,7 +338,10 @@ async def callback_oidc(request: Request, db: AsyncSession = Depends(get_db)):
             userinfo = await _verify_id_token_jwks(
                 id_token, jwks_url,
                 audience=OIDC_CLIENT_ID,
-                issuer=endpoints.get("issuer"),
+                # The discovery document must carry `issuer`; when it does
+                # not, check against the configured one rather than not at
+                # all (verification is skipped for an empty issuer).
+                issuer=endpoints.get("issuer") or OIDC_ISSUER,
             )
         except Exception:
             return RedirectResponse(url="/login.html?error=token_verify_failed")
@@ -344,9 +352,7 @@ async def callback_oidc(request: Request, db: AsyncSession = Depends(get_db)):
     email = userinfo.get("email", "")
     if not email:
         return RedirectResponse(url="/login.html?error=userinfo_failed")
-    user = await _upsert_user(db, email=email, name=userinfo.get("name") or userinfo.get("preferred_username", ""), picture=userinfo.get("picture", ""), provider="oidc", provider_id=userinfo.get("sub", ""))
-    redirect_after = request.cookies.get("oauth_redirect", "/")
-    return _login_response(user, redirect_after)
+    return await _finish_sign_in(request, db, email=email, name=userinfo.get("name") or userinfo.get("preferred_username", ""), picture=userinfo.get("picture", ""), provider="oidc", provider_id=userinfo.get("sub", ""))
 
 
 @router.post("/logout")
@@ -413,10 +419,22 @@ async def me(response: Response, user: User = Depends(get_current_user_permissiv
     return user
 
 
+async def _finish_sign_in(request: Request, db: AsyncSession, **identity) -> RedirectResponse:
+    """Find or create the account an identity provider vouched for, and sign
+    it in — or send the browser back to the sign-in page saying why not."""
+    try:
+        user = await _upsert_user(db, **identity)
+    except HTTPException:
+        return RedirectResponse(url="/login.html?error=domain_not_allowed")
+    return _login_response(user, request.cookies.get("oauth_redirect", "/"))
+
+
 async def _upsert_user(db: AsyncSession, email: str, name: str, picture: str, provider: str, provider_id: str) -> User:
     # Normalize email to lowercase so identical addresses with different
     # casings (john@x.com vs JOHN@x.com) resolve to a single user account.
     email = (email or "").strip().lower()
+    if _ALLOWED_EMAIL_DOMAINS and email.rpartition("@")[2] not in _ALLOWED_EMAIL_DOMAINS:
+        raise HTTPException(status_code=403, detail="Email domain not allowed")
     result = await db.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
     now = datetime.now(timezone.utc)
@@ -436,19 +454,25 @@ async def _upsert_user(db: AsyncSession, email: str, name: str, picture: str, pr
             last_login=now,
         )
         db.add(user)
-    await _ensure_directory_entry(db, email, name)
+    # A pending account is only a sign-in attempt: it enters the directory
+    # when an admin approves it (users.py), not before — otherwise any address
+    # the identity provider vouches for could be picked as a reviewer or a
+    # recipient in the modules.
+    if user.role != "pending":
+        await _ensure_directory_entry(db, email, name)
     await db.commit()
     await db.refresh(user)
     return user
 
 
 async def _ensure_directory_entry(db: AsyncSession, email: str, name: str) -> None:
-    """Auto-provision a personnel directory entry for an OAuth login.
+    """Auto-provision a personnel directory entry for an approved account.
 
     The directory and the user accounts table are intentionally separate (HR
-    directory vs login accounts) but the admin bootstrap and any future OAuth
+    directory vs login accounts) but the admin bootstrap and every approved
     user should also appear in the directory so they can be referenced by other
-    modules (Access reviewers, project responsables...)."""
+    modules (Access reviewers, project responsables...). Called at sign-in for
+    an account that is not pending, and when an admin approves one."""
     email = (email or "").strip().lower()
     if not email:
         return

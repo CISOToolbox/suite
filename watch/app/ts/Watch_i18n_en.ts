@@ -202,6 +202,7 @@ _registerTranslations("en", {
     "alerts.detail.sbom_packages": "Matching SBOM packages",
     "alerts.detail.sbom_none": "No matching SBOM component.",
     "alerts.detail.sbom_unavailable": "AppSec unavailable — try again later.",
+    "alerts.detail.sbom_forbidden": "The SBOM impact is shown to accounts with access to AppSec.",
     "alerts.detail.sbom_not_configured": "AppSec is not deployed alongside Watch.",
     "alerts.detail.sbom_more": "+ {n} more — open AppSec for the full list.",
     "sources.empty": "No watch sources configured yet.",

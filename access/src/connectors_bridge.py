@@ -62,7 +62,7 @@ def schema_from_plugin(plugin_type: str, plugin_cls: type[AccessPlugin]) -> dict
                 "fr": f.get("label", fid),
                 "en": f.get("label_en") or f.get("label", fid),
             },
-            "secret": f.get("type") == "password",
+            "secret": bool(f.get("secret")),
             "required": bool(f.get("required", False)),
             "placeholder": f.get("placeholder", ""),
         })

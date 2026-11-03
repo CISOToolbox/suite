@@ -32,6 +32,16 @@ def _today() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
 
+async def revoke_review_derogations(db: AsyncSession, project_id, review_id: str, entry_ids, actor: str) -> None:
+    """FEAT-45 — a deleted review takes its entries along: settle any
+    derogation on them (DELETE /reviews/{id} and the blob PUT). No commit."""
+    from src.models import Derogation
+    from src.nonconformity_common import revoke_for_subject
+    for eid in entry_ids:
+        await revoke_for_subject(db, Derogation, "review_entry", f"{project_id}:{review_id}:{eid}",
+                                 "review deleted", actor=actor)
+
+
 def _gen_id(prefix: str, existing: list, max_num: int = 0) -> str:
     for item in existing:
         try:
@@ -770,11 +780,9 @@ async def delete_review(project_id: uuid.UUID, review_id: str, user: Optional[Us
     if review.status != "en_cours":
         raise HTTPException(status_code=400, detail="Cannot delete closed review")
     # FEAT-45 — the entries go with the review: any derogation on them is settled.
-    from src.models import Derogation
-    from src.nonconformity_common import revoke_for_subject
     _actor = (user.name if user else None) or (user.email if user else None) or "system"
-    for eid in (await db.execute(select(ReviewEntry.id).where(ReviewEntry.project_id == project_id, ReviewEntry.review_id == review_id))).scalars().all():
-        await revoke_for_subject(db, Derogation, "review_entry", f"{project_id}:{review_id}:{eid}", "review deleted", actor=_actor)
+    entry_ids = (await db.execute(select(ReviewEntry.id).where(ReviewEntry.project_id == project_id, ReviewEntry.review_id == review_id))).scalars().all()
+    await revoke_review_derogations(db, project_id, review_id, entry_ids, _actor)
     from sqlalchemy import delete
     await db.execute(delete(ReviewEntry).where(ReviewEntry.project_id == project_id, ReviewEntry.review_id == review_id))
     await db.delete(review)

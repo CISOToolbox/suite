@@ -616,6 +616,39 @@ def run_trivy_image(image: str, app_id: str, token_encrypted: str = "") -> tuple
 # GITLEAKS — secret detection
 # ═══════════════════════════════════════════════════════════════
 
+def _redacted_match(leak: dict) -> str:
+    """The matched text with the secret itself replaced: context for triage,
+    never the value. The description is shown to every AppSec viewer and
+    sent to the AI provider. Without --redact on purpose: the secret's digest
+    is the finding's identity (`secret_id`), and gitleaks' redaction would
+    give every secret the same one."""
+    match = leak.get("Match", "") or ""
+    secret = leak.get("Secret", "") or ""
+    if not secret or secret not in match:
+        return "REDACTED"
+    return match.replace(secret, "REDACTED")[:100]
+
+
+def _match_line(text: str) -> tuple[int, int] | None:
+    start = text.find("\nMatch: ")
+    if start < 0:
+        return None
+    end = text.find("\n", start + 1)
+    return start, end if end >= 0 else len(text)
+
+
+def keep_redacted_match(incoming: str, stored: str) -> str:
+    """A description written back from elsewhere (Pilot's cache) for a measure
+    raised from a gitleaks finding: its "Match:" line is the stored one, so a
+    copy made before the redaction cannot bring the secret back."""
+    line = _match_line(incoming or "")
+    if line is None:
+        return incoming
+    kept = _match_line(stored or "")
+    replacement = stored[kept[0]:kept[1]] if kept else "\nMatch: REDACTED"
+    return incoming[:line[0]] + replacement + incoming[line[1]:]
+
+
 def run_gitleaks(repo_dir: str, app_id: str, scan_paths: list[str] | None = None) -> list[dict]:
     if scan_paths:
         merged: list[dict] = []
@@ -662,7 +695,7 @@ def run_gitleaks(repo_dir: str, app_id: str, scan_paths: list[str] | None = None
             "type": "secret",
             "severity": "high",
             "title": f"Secret detected: {rule} in {filepath}",
-            "description": f"Rule: {rule}\nFile: {filepath}:{line}\nMatch: {leak.get('Match', '')[:100]}",
+            "description": f"Rule: {rule}\nFile: {filepath}:{line}\nMatch: {_redacted_match(leak)}",
             "target": f"{filepath}:{line}",
             "evidence": {
                 "rule": rule,
