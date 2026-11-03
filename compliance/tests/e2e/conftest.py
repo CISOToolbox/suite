@@ -62,10 +62,10 @@ POSTURE_FLAG = "auth_enabled" if MODULE == "pilot" else "central"
 # In the suite, only Pilot carries federated authentication.
 HAS_TOKEN_LOGIN = MODULE != "pilot"
 
-# appsec and watch set docs_url=None / openapi_url=None: not publishing its
-# schema is a deliberate hardening, not a failure. The test honours it instead
-# of flagging it indefinitely.
-HAS_OPENAPI = MODULE not in ("appsec", "watch")
+# No module publishes its schema unless the deployment sets ENABLE_API_DOCS:
+# the docs list every route, internal ones included. Export the same value to
+# the test run when the stack under test enables them.
+HAS_OPENAPI = (os.getenv("ENABLE_API_DOCS") or "").strip().lower() in ("1", "true", "yes")
 
 # A local standalone deployment normally carries a self-signed certificate.
 _CTX = ssl.create_default_context()

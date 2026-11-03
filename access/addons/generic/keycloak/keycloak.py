@@ -22,7 +22,7 @@ class KeycloakPlugin(AccessPlugin):
         {"key": "base_url", "label": "URL de base", "label_en": "Base URL", "type": "text", "required": True, "placeholder": "https://keycloak.example.com"},
         {"key": "realm", "label": "Realm", "label_en": "Realm", "type": "text", "required": True},
         {"key": "client_id", "label": "Client ID", "label_en": "Client ID", "type": "text", "required": True},
-        {"key": "client_secret", "label": "Client Secret", "label_en": "Client Secret", "type": "password", "required": True},
+        {"key": "client_secret", "label": "Client Secret", "label_en": "Client Secret", "type": "password", "secret": True, "required": True},
     ]
     setup_guide = (
         "1. Aller dans Keycloak Admin Console > realm cible > Clients\n"

@@ -193,6 +193,7 @@ _registerTranslations("fr", {
     "alerts.detail.sbom_packages": "Paquets SBOM correspondants",
     "alerts.detail.sbom_none": "Aucun composant SBOM correspondant.",
     "alerts.detail.sbom_unavailable": "AppSec indisponible — réessayer plus tard.",
+    "alerts.detail.sbom_forbidden": "L'impact SBOM est réservé aux comptes ayant accès à AppSec.",
     "alerts.detail.sbom_not_configured": "AppSec n'est pas déployé avec Watch.",
     "alerts.detail.sbom_more": "+ {n} autre(s) — ouvre AppSec pour la liste complète.",
     "sources.empty": "Aucune source de veille configurée.",

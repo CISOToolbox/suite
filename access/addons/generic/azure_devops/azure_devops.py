@@ -61,7 +61,7 @@ class AzureDevOpsPlugin(AccessPlugin):
     label_en = "Azure DevOps"
     config_schema = [
         {"key": "organization", "label": "Organisation", "label_en": "Organization", "type": "text", "required": True, "placeholder": "myorg"},
-        {"key": "pat", "label": "Personal Access Token", "label_en": "Personal Access Token", "type": "password", "required": True},
+        {"key": "pat", "label": "Personal Access Token", "label_en": "Personal Access Token", "type": "password", "secret": True, "required": True},
     ]
     setup_guide = (
         "1. Aller dans Azure DevOps > User Settings (icône en haut à droite) > Personal Access Tokens\n"

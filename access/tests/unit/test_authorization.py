@@ -12,6 +12,7 @@ import os
 import sys
 import textwrap
 from types import SimpleNamespace
+from unittest import mock
 
 import pytest
 
@@ -199,19 +200,20 @@ PUBLIC_ROUTES = {
     # The identity-provider sign-in: start of the flow and its callback.
     *{("GET", f"/auth/{step}/{idp}") for step in ("login", "callback") for idp in ("entra", "google", "oidc")},
 }
-# Everything mounted outside FastAPI's APIRoute: the docs and the static front.
-NON_API_ROUTES = {
-    ("Route", "/openapi.json"), ("Route", "/docs"),
-    ("Route", "/docs/oauth2-redirect"), ("Route", "/redoc"), ("Mount", ""),
-}
+# Everything mounted outside FastAPI's APIRoute: the static front. The API
+# docs are off unless ENABLE_API_DOCS is set, and the tests run without it.
+NON_API_ROUTES = {("Mount", "")}
 
 
 def _app():
     """The application as it runs. Imported from the module directory: the
-    static mount resolves ``app/`` against the working directory."""
+    static mount resolves ``app/`` against the working directory. Imported
+    without ENABLE_API_DOCS, whatever the developer's shell exports: the
+    inventory below is the default posture."""
     if MODULE_DIR not in sys.path:
         sys.path.insert(0, MODULE_DIR)
-    with contextlib.chdir(MODULE_DIR):
+    with contextlib.chdir(MODULE_DIR), mock.patch.dict(os.environ):
+        os.environ.pop("ENABLE_API_DOCS", None)
         from src.main import app
     return app
 

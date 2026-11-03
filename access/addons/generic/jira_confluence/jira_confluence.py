@@ -19,7 +19,7 @@ class AtlassianPlugin(AccessPlugin):
     config_schema = [
         {"key": "domain", "label": "Domaine Atlassian", "label_en": "Atlassian Domain", "type": "text", "required": True, "placeholder": "myorg.atlassian.net"},
         {"key": "email", "label": "Email du compte", "label_en": "Account email", "type": "text", "required": True, "placeholder": "admin@example.com"},
-        {"key": "api_token", "label": "Jeton API", "label_en": "API Token", "type": "password", "required": True},
+        {"key": "api_token", "label": "Jeton API", "label_en": "API Token", "type": "password", "secret": True, "required": True},
     ]
     setup_guide = (
         "1. Aller sur https://id.atlassian.com/manage-profile/security/api-tokens\n"

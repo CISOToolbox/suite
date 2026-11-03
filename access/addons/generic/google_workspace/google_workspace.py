@@ -52,7 +52,7 @@ class GoogleWorkspacePlugin(AccessPlugin):
     label = "Google Workspace"
     label_en = "Google Workspace"
     config_schema = [
-        {"key": "service_account_json", "label": "Clé JSON du compte de service", "label_en": "Service Account JSON Key", "type": "textarea", "required": True, "placeholder": '{"type": "service_account", ...}'},
+        {"key": "service_account_json", "label": "Clé JSON du compte de service", "label_en": "Service Account JSON Key", "type": "textarea", "secret": True, "required": True, "placeholder": '{"type": "service_account", ...}'},
         {"key": "admin_email", "label": "Email administrateur délégué", "label_en": "Delegated admin email", "type": "text", "required": True, "placeholder": "admin@example.com"},
         {"key": "domain", "label": "Domaine", "label_en": "Domain", "type": "text", "required": True, "placeholder": "example.com"},
     ]

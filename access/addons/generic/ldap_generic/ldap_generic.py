@@ -254,7 +254,7 @@ class LdapGenericPlugin(AccessPlugin):
     config_schema = [
         {"key": "ldap_url", "label": "URL du serveur LDAP", "label_en": "LDAP Server URL", "type": "text", "required": True, "placeholder": "ldaps://ldap.example.com:636"},
         {"key": "bind_dn", "label": "Bind DN", "label_en": "Bind DN", "type": "text", "required": True, "placeholder": "cn=readonly,dc=example,dc=com"},
-        {"key": "bind_password", "label": "Mot de passe Bind", "label_en": "Bind Password", "type": "password", "required": True},
+        {"key": "bind_password", "label": "Mot de passe Bind", "label_en": "Bind Password", "type": "password", "secret": True, "required": True},
         {"key": "base_dn", "label": "Base DN (recherche)", "label_en": "Base DN (search)", "type": "text", "required": True, "placeholder": "dc=example,dc=com"},
         {"key": "user_filter", "label": "Filtre utilisateurs", "label_en": "User filter", "type": "text", "required": False, "placeholder": "(objectClass=inetOrgPerson)"},
         {"key": "use_ssl", "label": "Utiliser SSL/STARTTLS", "label_en": "Use SSL/STARTTLS", "type": "checkbox", "required": False},

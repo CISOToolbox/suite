@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.auth import VALID_MODULES, get_current_user, require_admin
 from src.database import get_db
 from src.models import ModuleRegistry, User
+from src.routes.auth import _ensure_directory_entry
 from src.schemas import UserResponse, UserUpdate
 
 router = APIRouter(prefix="/api/users", tags=["users"])
@@ -48,6 +49,10 @@ async def update_user(user_id: uuid.UUID, body: UserUpdate, user: User = Depends
                     status_code=409,
                     detail="Refused: this would leave the suite without an administrator.",
                 )
+        if target.role == "pending" and body.role != "pending":
+            # Approval: the account enters the directory now, not at its
+            # first sign-in attempt (see _upsert_user).
+            await _ensure_directory_entry(db, target.email, target.name or "")
         target.role = body.role
     if body.modules is not None:
         invalid = set(body.modules) - VALID_MODULES

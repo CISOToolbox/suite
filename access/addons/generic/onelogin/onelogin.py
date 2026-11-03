@@ -36,7 +36,7 @@ class OneLoginPlugin(AccessPlugin):
     config_schema = [
         {"key": "region", "label": "Région (us ou eu)", "label_en": "Region (us or eu)", "type": "text", "required": True, "placeholder": "us"},
         {"key": "client_id", "label": "Client ID", "label_en": "Client ID", "type": "text", "required": True},
-        {"key": "client_secret", "label": "Client Secret", "label_en": "Client Secret", "type": "password", "required": True},
+        {"key": "client_secret", "label": "Client Secret", "label_en": "Client Secret", "type": "password", "secret": True, "required": True},
     ]
     setup_guide = (
         "1. Se connecter à la console d'administration OneLogin\n"

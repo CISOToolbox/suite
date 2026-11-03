@@ -1228,6 +1228,10 @@ async function _fillSbomImpact(alertId: string): Promise<void> {
         body.innerHTML = '<div class="ct-muted">' + esc(t("alerts.detail.sbom_not_configured")) + '</div>';
         return;
     }
+    if (data.forbidden) {
+        body.innerHTML = '<div class="ct-muted">' + esc(t("alerts.detail.sbom_forbidden")) + '</div>';
+        return;
+    }
     if (data.error) {
         body.innerHTML = '<div class="ct-muted">' + esc(t("alerts.detail.sbom_unavailable")) + '</div>';
         return;

@@ -22,7 +22,7 @@ class EntraIdPlugin(AccessPlugin):
     config_schema = [
         {"key": "tenant_id", "label": "Tenant ID", "label_en": "Tenant ID", "type": "text", "required": True},
         {"key": "client_id", "label": "Client ID", "label_en": "Client ID", "type": "text", "required": True},
-        {"key": "client_secret", "label": "Client Secret", "label_en": "Client Secret", "type": "password", "required": True},
+        {"key": "client_secret", "label": "Client Secret", "label_en": "Client Secret", "type": "password", "secret": True, "required": True},
     ]
     setup_guide = (
         "1. Aller dans Azure Portal > Entra ID > Inscriptions d'applications\n"

@@ -206,7 +206,12 @@ async def patch_measure(source_id: str, request: Request, db: AsyncSession = Dep
     if "title" in body:
         m.title = body["title"]
     if "description" in body:
-        m.description = body["description"]
+        description = body["description"]
+        f = await db.get(Finding, m.finding_id) if m.finding_id else None
+        if f is not None and f.scanner == "gitleaks" and isinstance(description, str):
+            from src.scanners import keep_redacted_match
+            description = keep_redacted_match(description, m.description or "")
+        m.description = description
     if "status" in body:
         m.statut = _denormalize_status(body["status"])
     if "assignee" in body:

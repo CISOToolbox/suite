@@ -72,3 +72,6 @@ ruvector.db
 access/.client-addons/
 surface/.client-addons/
 */.client-addons/
+
+# Client add-ons: only the empty .gitkeep of addons/custom/ is versioned
+**/addons/custom/*/

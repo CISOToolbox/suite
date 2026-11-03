@@ -14,6 +14,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.auth import get_current_user
+from src.auth_common import sibling_module_role
 from src.database import get_db
 from src.models import Application, User
 from src.routes.auth_helpers import get_project_or_404
@@ -166,8 +167,15 @@ async def import_csv(project_id: uuid.UUID, file: UploadFile, user: Optional[Use
 
 @router.post("/applications/sync-asset")
 async def sync_from_asset(project_id: uuid.UUID, user: Optional[User] = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    """Sync applications from Asset module — imports assets of type 'application'."""
+    """Sync applications from Asset module — imports assets of type 'application'.
+
+    Asset's export is read with the service token, which Asset serves without
+    any ACL: the caller must hold a role in Asset (asked to Pilot,
+    fail-closed), or this would read every Asset project on their behalf.
+    """
     project = await get_project_or_404(project_id, user, db, require_perm="edit")
+    if not await sibling_module_role(user, "asset"):
+        raise HTTPException(status_code=403, detail="No access to the Asset module")
 
     asset_url = os.getenv("ASSET_URL", "")
     service_token = os.getenv("SERVICE_TOKEN", "")

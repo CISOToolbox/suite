@@ -16,7 +16,7 @@ class JumpCloudPlugin(AccessPlugin):
     label = "JumpCloud"
     label_en = "JumpCloud"
     config_schema = [
-        {"key": "api_key", "label": "Clé API", "label_en": "API Key", "type": "password", "required": True},
+        {"key": "api_key", "label": "Clé API", "label_en": "API Key", "type": "password", "secret": True, "required": True},
     ]
     setup_guide = (
         "1. Se connecter à la console d'administration JumpCloud\n"

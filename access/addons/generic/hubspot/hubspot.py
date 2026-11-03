@@ -16,7 +16,7 @@ class HubspotPlugin(AccessPlugin):
     label = "HubSpot CRM"
     label_en = "HubSpot CRM"
     config_schema = [
-        {"key": "api_key", "label": "Jeton d'accès (Private App)", "label_en": "Access token (Private App)", "type": "password", "required": True},
+        {"key": "api_key", "label": "Jeton d'accès (Private App)", "label_en": "Access token (Private App)", "type": "password", "secret": True, "required": True},
     ]
     setup_guide = (
         "1. Aller dans HubSpot > Paramètres > Intégrations > Applications privées\n"

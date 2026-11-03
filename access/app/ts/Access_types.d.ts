@@ -327,7 +327,7 @@ interface AccessApi {
     patchPlugin(pid: string, id: string, f: Record<string, unknown>): Promise<AccessPlugin>;
     deletePlugin(pid: string, id: string): Promise<unknown>;
     testPlugin(pid: string, id: string): Promise<AccessPluginTestResult>;
-    testPluginConfig(pid: string, body: { plugin_type: string; config: Record<string, unknown> }): Promise<AccessPluginTestResult>;
+    testPluginConfig(pid: string, body: { plugin_type: string; config: Record<string, unknown>; plugin_id?: string }): Promise<AccessPluginTestResult>;
     importReviewFromConnector(pid: string, rid: string, body?: Record<string, unknown>): Promise<AccessConnectorImportResult>;
     importReviewFromConnectorFile(pid: string, rid: string, file: File, pluginId?: string): Promise<AccessConnectorImportResult>;
     pluginHistory(pid: string, id: string): Promise<AccessSyncJob[]>;

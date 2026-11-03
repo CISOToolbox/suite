@@ -17,7 +17,7 @@ class NotionPlugin(AccessPlugin):
     label = "Notion"
     label_en = "Notion"
     config_schema = [
-        {"key": "api_key", "label": "Jeton d'intégration", "label_en": "Integration token", "type": "password", "required": True},
+        {"key": "api_key", "label": "Jeton d'intégration", "label_en": "Integration token", "type": "password", "secret": True, "required": True},
         {"key": "workspace_id", "label": "Workspace ID (optionnel)", "label_en": "Workspace ID (optional)", "type": "text", "required": False},
     ]
     setup_guide = (

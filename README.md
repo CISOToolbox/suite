@@ -240,9 +240,10 @@ repository** — client code never enters this tree. Layout convention:
     └── install.sh            # optional system-level setup (Surface)
 ```
 
-Point the build at that directory with `--custom-dir`: it is staged as
-`addons/custom/<client>/` for the duration of the build and removed
-afterwards, so the suite tree stays clean:
+Point the build at that directory with `--custom-dir`: it is read in place
+and staged as `custom/<client>` in a temporary build context outside the
+suite tree, so client code never lands in the module directory, even when
+the build is interrupted:
 
 ```bash
 tools/build-client-image.sh acme --module access \

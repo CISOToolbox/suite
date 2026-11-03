@@ -19,7 +19,8 @@ from src.models import (
 )
 from src.backup_common import row_dict as _bk_row
 from src.proof_rules import enforce_proof_evidence
-from src.routes.si_users import _validate_url_field
+from src.routes.reviews import _today, revoke_review_derogations
+from src.routes.si_users import PILOT_LOCKED_FIELDS, _validate_url_field
 from src.schemas import (
     ProjectCreate, ProjectListItem, ProjectResponse,
     ProjectUpdate, ShareRequest,
@@ -225,6 +226,110 @@ def _s(val) -> str:
     return str(val)
 
 
+def _review_row(project_id, i: int, r: dict) -> Review:
+    return Review(
+        project_id=project_id, id=r.get("id", ""), sort_order=i,
+        application_id=_s(r.get("application_id", "")),
+        status=_s(r.get("status", "en_cours")),
+        started_at=_s(r.get("started_at", "")),
+        closed_at=_s(r.get("closed_at", "")),
+        closed_by=_s(r.get("closed_by", "")),
+    )
+
+
+def _entry_row(project_id, review_id: str, j: int, e: dict) -> ReviewEntry:
+    return ReviewEntry(
+        project_id=project_id, review_id=review_id, id=e.get("id", ""),
+        sort_order=j,
+        type_compte=_s(e.get("type_compte", "personnel")),
+        email_or_login=_s(e.get("email_or_login", "")),
+        nom=_s(e.get("nom", "")), prenom=_s(e.get("prenom", "")),
+        roles=_s(e.get("roles", "")), groups=_s(e.get("groups", "")),
+        si_user_id=e.get("si_user_id") or None,
+        decision=_s(e.get("decision", "pending")),
+        decided_by=_s(e.get("decided_by", "")),
+        decided_at=_s(e.get("decided_at", "")),
+        notes=_s(e.get("notes", "")),
+        last_login_at=_parse_dt(e.get("last_login_at")),
+        account_enabled=e.get("account_enabled"),
+    )
+
+
+_REVIEW_STATUSES = ("en_cours", "cloturee")
+
+
+def _review_as_stored(r: dict) -> dict:
+    """The review as it reads back once a blob PUT has stored it, entries
+    keyed by id (their display order is not part of the review)."""
+    rid = r.get("id", "")
+    entries = [_entry_row(None, rid, j, e) for j, e in enumerate(r.get("entries") or [])]
+    out = _review_to_dict(_review_row(None, 0, r), entries)
+    out["entries"] = sorted(out["entries"], key=lambda e: str(e["id"]))
+    return out
+
+
+def _enforce_blob_locks(stored: dict, data: dict, closer: str, can_delete: bool = False) -> dict:
+    """Apply to the blob PUT the locks the granular routes enforce
+    (routes/reviews.py, routes/si_users.py), so switching transport does not
+    lift them:
+
+    - a closed review (status other than ``en_cours``) is evidence: any
+      difference or reopening it → 409; re-sending it as stored is a no-op.
+      Dropping it → 409 too, unless its application goes as well (dropped
+      from this blob or already deleted) and the caller holds the ``delete``
+      permission — deleting an application takes its reviews with it;
+    - a review is ``en_cours`` or ``cloturee`` (422 otherwise); closing one
+      requires every entry decided (409 otherwise), and ``closed_at`` /
+      ``closed_by`` are server-assigned, never read from the body (an open
+      review carries neither);
+    - a Pilot-managed SiUser keeps its stored identity fields and its
+      ``sync_source``.
+
+    ``stored`` is ``_reconstruct_data`` before the write; returns the blob to
+    decompose.
+    """
+    out = dict(data)
+    stored_reviews = {r["id"]: r for r in stored.get("reviews") or []}
+    kept: set[str] = set()
+    reviews = []
+    for r in data.get("reviews") or []:
+        rid = r.get("id", "")
+        kept.add(rid)
+        before = stored_reviews.get(rid)
+        after = _review_as_stored(r)
+        if before is not None and before["status"] != "en_cours":
+            before = dict(before, entries=sorted(before["entries"], key=lambda e: str(e["id"])))
+            if after != before:
+                raise HTTPException(status_code=409, detail=f"Review {rid} is closed and cannot change")
+        elif after["status"] not in _REVIEW_STATUSES:
+            raise HTTPException(status_code=422, detail=f"Invalid review status: {after['status'][:40]}")
+        elif after["status"] != "en_cours":
+            pending = [e for e in after["entries"] if e["decision"] == "pending"]
+            if pending:
+                raise HTTPException(status_code=409, detail=f"{len(pending)} entries still pending")
+            r = dict(r, closed_at=_today(), closed_by=closer)
+        else:
+            r = dict(r, closed_at="", closed_by="")
+        reviews.append(r)
+    kept_apps = {a.get("id") for a in data.get("applications") or [] if isinstance(a, dict)}
+    dropped = sorted(rid for rid, r in stored_reviews.items()
+                     if r["status"] != "en_cours" and rid not in kept
+                     and not (can_delete and r["application_id"] not in kept_apps))
+    if dropped:
+        raise HTTPException(status_code=409, detail="A closed review cannot be deleted: " + ", ".join(dropped))
+    out["reviews"] = reviews
+
+    pilot_users = {u["id"]: u for u in stored.get("si_users") or [] if u.get("sync_source") == "pilot"}
+    users = []
+    for u in data.get("si_users") or []:
+        before = pilot_users.get(u.get("id")) if isinstance(u, dict) else None
+        if before is not None:
+            u = dict(u, sync_source="pilot", **{f: before[f] for f in PILOT_LOCKED_FIELDS})
+        users.append(u)
+    out["si_users"] = users
+    return out
+
+
 async def _decompose_data(db: AsyncSession, project_id: uuid.UUID, data: dict):
     meta = data.get("metadata") or {}
     db.add(ProjectMetadata(
@@ -305,30 +410,9 @@ async def _decompose_data(db: AsyncSession, project_id: uuid.UUID, data: dict):
         ))
 
     for i, r in enumerate(data.get("reviews") or []):
-        db.add(Review(
-            project_id=project_id, id=r.get("id", ""), sort_order=i,
-            application_id=_s(r.get("application_id", "")),
-            status=_s(r.get("status", "en_cours")),
-            started_at=_s(r.get("started_at", "")),
-            closed_at=_s(r.get("closed_at", "")),
-            closed_by=_s(r.get("closed_by", "")),
-        ))
+        db.add(_review_row(project_id, i, r))
         for j, e in enumerate(r.get("entries") or []):
-            db.add(ReviewEntry(
-                project_id=project_id, review_id=r.get("id", ""), id=e.get("id", ""),
-                sort_order=j,
-                type_compte=_s(e.get("type_compte", "personnel")),
-                email_or_login=_s(e.get("email_or_login", "")),
-                nom=_s(e.get("nom", "")), prenom=_s(e.get("prenom", "")),
-                roles=_s(e.get("roles", "")), groups=_s(e.get("groups", "")),
-                si_user_id=e.get("si_user_id") or None,
-                decision=_s(e.get("decision", "pending")),
-                decided_by=_s(e.get("decided_by", "")),
-                decided_at=_s(e.get("decided_at", "")),
-                notes=_s(e.get("notes", "")),
-                last_login_at=_parse_dt(e.get("last_login_at")),
-                account_enabled=e.get("account_enabled"),
-            ))
+            db.add(_entry_row(project_id, r.get("id", ""), j, e))
 
     for i, m in enumerate(data.get("measures") or []):
         db.add(Measure(
@@ -412,7 +496,8 @@ async def update_project(project_id: uuid.UUID, body: ProjectUpdate, user: Optio
     # FEAT-33 stale-tab guard: refuse the whole-blob overwrite when a
     # server-initiated writer bumped server_rev since this tab loaded.
     if body.expected_server_rev is not None and (project.server_rev or 0) > body.expected_server_rev:
-        raise HTTPException(status_code=409,
+        # Marked so the page tells this conflict apart from a refused change.
+        raise HTTPException(status_code=409, headers={"X-CT-Conflict": "stale"},
                             detail="Données modifiées côté serveur depuis le chargement (Pilot/scheduler) — rechargez avant une sauvegarde globale.")
     if not _can("edit", project, user):
         raise HTTPException(status_code=403, detail="Access denied")
@@ -421,8 +506,19 @@ async def update_project(project_id: uuid.UUID, body: ProjectUpdate, user: Optio
     if body.organization is not None:
         project.organization = body.organization
     if body.data is not None:
+        stored = await _reconstruct_data(db, project.id)
+        data = _enforce_blob_locks(stored, body.data,
+                                   closer=(user.name or user.email) if user else "",
+                                   can_delete=_can("delete", project, user))
+        # A review the blob drops goes like DELETE /reviews/{id}: the
+        # derogations on its entries are settled.
+        kept_reviews = {r.get("id") for r in data["reviews"]}
+        actor = ((user.name or user.email) if user else "") or "system"
+        for r in stored.get("reviews") or []:
+            if r["id"] not in kept_reviews:
+                await revoke_review_derogations(db, project.id, r["id"], [e["id"] for e in r["entries"]], actor)
         await _delete_children(db, project.id)
-        await _decompose_data(db, project.id, body.data)
+        await _decompose_data(db, project.id, data)
     project.updated_at = datetime.now(timezone.utc)
     from src.audit import log_write
     await log_write(db, user, None,

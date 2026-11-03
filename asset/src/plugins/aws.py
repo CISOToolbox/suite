@@ -22,7 +22,7 @@ class AwsAssetPlugin(AssetPlugin):
     label_en = "AWS (EC2 / RDS)"
     config_schema = [
         {"key": "access_key_id", "label": "Access Key ID", "label_en": "Access Key ID", "type": "text", "required": True, "placeholder": "AKIA…"},
-        {"key": "secret_access_key", "label": "Secret Access Key", "label_en": "Secret Access Key", "type": "password", "required": True},
+        {"key": "secret_access_key", "label": "Secret Access Key", "label_en": "Secret Access Key", "type": "password", "secret": True, "required": True},
         {"key": "region", "label": "Région", "label_en": "Region", "type": "text", "required": False, "placeholder": "eu-west-3"},
     ]
     setup_guide = (

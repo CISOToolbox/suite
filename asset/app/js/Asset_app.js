@@ -167,16 +167,7 @@ function _typeColor(type) {
     if (Object.prototype.hasOwnProperty.call(colors, type))
         return colors[type];
     var custom = _getCustomTypes().find(function (x) { return x.id === type; });
-    return _customTypeColor(custom ? custom.color : "");
-}
-// The colour of a custom type is data rendered into a style attribute: only a
-// #rrggbb value is used, anything else (an import, a row stored before the
-// server validated it) falls back to the default data colour.
-function _customTypeColor(value) {
-    // Trimmed and lower-cased like the server does, so a colour typed with
-    // stray spaces or in upper case renders as it will once stored.
-    var v = typeof value === "string" ? value.trim().toLowerCase() : "";
-    return /^#[0-9a-f]{6}$/.test(v) ? v : CT_COLORS.gray.vivid;
+    return ctHexColor(custom ? custom.color : "", CT_COLORS.gray.vivid);
 }
 // CT series-color names for the dashboard donut. _svgDonut resolves color
 // NAMES through _svgSeriesColor, never raw hex — these mirror the hues of
@@ -950,7 +941,7 @@ function _renderAssetTypesModal() {
             h += '<td><code class="ct-text-label">' + esc(ct.id) + '</code></td>';
             h += '<td>' + esc(ct.label || "") + '</td>';
             h += '<td>' + esc(ct.label_en || "") + '</td>';
-            h += '<td><span style="display:inline-block;width:16px;height:16px;border-radius:3px;vertical-align:middle;background:' + esc(_customTypeColor(ct.color)) + '"></span> <code class="ct-text-label">' + esc(ct.color || "") + '</code></td>';
+            h += '<td><span style="display:inline-block;width:16px;height:16px;border-radius:3px;vertical-align:middle;background:' + esc(ctHexColor(ct.color, CT_COLORS.gray.vivid)) + '"></span> <code class="ct-text-label">' + esc(ct.color || "") + '</code></td>';
             h += '<td class="ct-ta-r"><button class="ct-btn mt-8 ct-text-label ct-py-1 ct-px-2" data-write data-variant="danger" data-click="_deleteCustomType" data-args=\'' + _da(i) + '\' data-size="xs" data-icon>' + _icon("trash", 14) + '</button></td>';
             h += '</tr>';
         });

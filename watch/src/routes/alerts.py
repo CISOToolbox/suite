@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.audit import log_action
 from src.auth import get_current_user, require_identity
+from src.auth_common import sibling_module_role
 from src.database import get_db
 from src.models import (
     Alert, AlertAnalysis, AlertMatch, AlertStatus, FeedState, Scope, ScopeRecipient,
@@ -247,13 +248,13 @@ async def alert_sbom_impact(
 ):
     """Phase 7: cross-reference the alert against the AppSec SBOM.
 
-    Same visibility rule as the alert detail endpoint. The Watch
-    backend acts as the trusted caller to AppSec — the end user only
-    learns of impacts on applications they can already see through the
-    Watch alert (Watch does not leak AppSec ACLs here; it just relays
-    what AppSec returned about its own application inventory).
+    Same visibility rule as the alert detail endpoint. The call to AppSec
+    uses the service token, which AppSec serves without any ACL, and its
+    answer names AppSec's applications, packages and findings: it is only
+    made for a caller who holds a role in AppSec (asked to Pilot,
+    fail-closed). Anyone else gets an empty answer flagged ``forbidden``.
     """
-    from src.appsec_client import sbom_impact
+    from src.appsec_client import forbidden_payload, is_configured, sbom_impact
 
     visible = await _user_scope_ids(db, user)
     if not visible:
@@ -270,6 +271,9 @@ async def alert_sbom_impact(
     )).scalar_one()
     if not seen:
         raise HTTPException(status_code=404, detail="alert not found")
+
+    if is_configured() and not await sibling_module_role(user, "appsec"):
+        return forbidden_payload()
 
     cve_id = ""
     if a.source == "nvd" and (a.external_id or "").upper().startswith("CVE-"):
