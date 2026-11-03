@@ -244,12 +244,44 @@ async def _do_scan(app_id: uuid.UUID, force: bool, triggered_by: str) -> None:
     lock = await _get_app_lock(app_id)
     if lock.locked():
         logger.info("Scan already in progress for %s (in-process lock), skipping", app_id)
+        if triggered_by != "scheduler":
+            async with async_session() as db:
+                await _close_pending_jobs(db, app_id, _ALREADY_RUNNING)
+                await db.commit()
         return
     async with lock:
         await _do_scan_locked(app_id, force, triggered_by)
 
 
 _REPO_SCANNERS = ("trivy_fs", "gitleaks", "sast")
+_ALREADY_RUNNING = "Another scan of this application was already running"
+
+
+async def _close_pending_jobs(db: AsyncSession, app_id: uuid.UUID, reason: str, *,
+                              status: str = "skipped",
+                              scanners: list[str] | None = None) -> set[str]:
+    """Close the ``pending`` jobs "Scan now" created ahead for this app (all
+    scanners, or only ``scanners``) and return the scanners they were for.
+
+    Every exit that does not reach ``_run_single_scanner`` calls this: a
+    job left pending blocks "Scan now" and the tick until the stale sweep.
+    One conditional UPDATE, not a read then a write: a scan already running
+    for the app may take one of these jobs to ``running`` in between, and
+    that job must stay its own. The caller commits.
+    """
+    from sqlalchemy import func, update as sa_update
+    clauses = [ScanJob.application_id == app_id, ScanJob.status == "pending"]
+    if scanners is not None:
+        clauses.append(ScanJob.scanner.in_(scanners))
+    now = datetime.now(timezone.utc)
+    closed = await db.execute(
+        sa_update(ScanJob).where(*clauses).values(
+            status=status, error=reason[:2000], completed_at=now,
+            started_at=func.coalesce(ScanJob.started_at, now),
+        ).returning(ScanJob.scanner)
+        .execution_options(synchronize_session=False)
+    )
+    return {row[0] for row in closed}
 
 
 async def _fail_repo_scanners(db: AsyncSession, app: Application, scanners: list[str],
@@ -267,19 +299,8 @@ async def _fail_repo_scanners(db: AsyncSession, app: Application, scanners: list
     """
     now = datetime.now(timezone.utc)
     repo_scanners = [s for s in scanners if s in _REPO_SCANNERS]
-    pending = (await db.execute(
-        select(ScanJob).where(
-            ScanJob.application_id == app.id,
-            ScanJob.scanner.in_(repo_scanners),
-            ScanJob.status == "pending",
-        )
-    )).scalars().all() if repo_scanners else []
-    for job in pending:
-        job.status = "failed"
-        job.error = str(err)[:2000]
-        job.started_at = job.started_at or now
-        job.completed_at = now
-    taken = {job.scanner for job in pending}
+    taken = await _close_pending_jobs(
+        db, app.id, str(err), status="failed", scanners=repo_scanners) if repo_scanners else set()
     for scanner_name in [s for s in repo_scanners if s not in taken]:
         db.add(ScanJob(
             id=uuid.uuid4(), application_id=app.id, scanner=scanner_name,
@@ -297,6 +318,9 @@ async def _do_scan_locked(app_id: uuid.UUID, force: bool, triggered_by: str) -> 
         app = result.scalar_one_or_none()
         if not app or not app.enabled:
             logger.warning("Scan aborted: app %s not found or disabled", app_id)
+            await _close_pending_jobs(
+                db, app_id, "Application disabled" if app else "Application not found")
+            await db.commit()
             return
 
         # Belt-and-braces DB-side check on top of the asyncio lock.
@@ -310,6 +334,9 @@ async def _do_scan_locked(app_id: uuid.UUID, force: bool, triggered_by: str) -> 
         )
         if running_q.scalar_one_or_none():
             logger.info("Scan already running for %s (DB row), skipping", app.name)
+            if triggered_by != "scheduler":
+                await _close_pending_jobs(db, app.id, _ALREADY_RUNNING)
+                await db.commit()
             return
 
         scanners = app.enabled_scanners or []
@@ -405,6 +432,8 @@ async def _do_scan_locked(app_id: uuid.UUID, force: bool, triggered_by: str) -> 
                     cur = await chk.get(Application, app_id)
                     if not cur or not cur.enabled:
                         logger.info("Scan halted mid-flight: %s disabled", app.name)
+                        await _close_pending_jobs(chk, app_id, "Application disabled during the scan")
+                        await chk.commit()
                         break
                 await _run_single_scanner(
                     app_id=app.id, app_name=app.name,
@@ -582,7 +611,7 @@ async def _tick() -> None:
             apps = [
                 a for a in result.scalars().all()
                 if (a.repo_url or "") or (a.docker_images or [])
-            ][:MAX_PER_TICK]
+            ]
 
             # Collect app IDs that already have active scan jobs
             active_app_ids = set()
@@ -594,12 +623,23 @@ async def _tick() -> None:
                 )
                 active_app_ids = {row[0] for row in active_q}
 
+        # Keep only the apps that are due, THEN take the slots: an app that
+        # is not due (long frequency) or already scanning must not hold one.
+        # An app whose lock is held is still scanning: a planned scan has no
+        # ``running`` row while it runs ``ls-remote`` and clones, and its
+        # ``last_scan_at`` has not moved yet.
+        due = []
         for app in apps:
             if app.id in active_app_ids:
+                continue
+            lock = _app_locks.get(app.id)
+            if lock is not None and lock.locked():
                 continue
             freq = timedelta(hours=app.scan_frequency_hours or 24)
             if app.last_scan_at and (now - app.last_scan_at) < freq:
                 continue
+            due.append(app)
+        for app in due[:MAX_PER_TICK]:
             logger.info("Scheduling scan for %s", app.name)
             asyncio.create_task(_scan_application(app.id))
     except Exception as e:
