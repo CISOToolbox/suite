@@ -8,10 +8,11 @@ name: Image Vulnerability Scan
 #   Fails on HIGH/CRITICAL with a fix available (ignore-unfixed), so a red build
 #   means "an upgrade exists that you have not applied", not noise.
 #
-# NOTE: images not yet published to GHCR (e.g. ciso-postgres, ciso-backup-agent,
-# ciso-audit-suite at the time of writing) cannot be pulled and their matrix leg
-# is skipped with a warning — it does not fail the run. Once published they are
-# scanned automatically (the list is derived from docker-compose.yml).
+# NOTE: one of our images left on a bare tag (a brand-new module pinned with
+# pin-images.sh --allow-missing) may not be published yet: its matrix leg is
+# skipped with a warning and does not fail the run. Every other image, pinned by
+# digest or upstream, must resolve: a leg that cannot fails instead of going
+# green without a scan (the list is derived from docker-compose.yml).
 
 on:
   schedule:
@@ -53,19 +54,36 @@ jobs:
       matrix:
         image: ${{ fromJson(needs.discover.outputs.images) }}
     steps:
-      # Some images may not be published yet; a failed pull must warn, not fail
-      # the whole run. Probe first and skip the leg if it is not resolvable.
+      # Probe first, with retries: a transient registry error is not
+      # "unpublished". Only one of our images on a bare tag may be skipped (see
+      # NOTE above); a digest-pinned or upstream image that cannot be resolved
+      # fails the leg instead of leaving it green without a scan.
       - name: Check image is pullable
         id: probe
         env:
           IMAGE: ${{ matrix.image }}   # repo-derived, but never inline in run:
         run: |
-          if docker manifest inspect "$IMAGE" >/dev/null 2>&1; then
-            echo "ok=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "::warning::$IMAGE is not in the registry yet — skipping"
-            echo "ok=false" >> "$GITHUB_OUTPUT"
-          fi
+          for attempt in 1 2 3; do
+            if err=$(docker manifest inspect "$IMAGE" 2>&1 >/dev/null); then
+              echo "ok=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            [ "$attempt" -lt 3 ] && sleep $((attempt * 10))
+          done
+          # Registry text, printed with workflow commands disabled.
+          token="probe-$RANDOM$RANDOM"
+          echo "::stop-commands::$token"
+          echo "$err"
+          echo "::$token::"
+          case "$IMAGE" in
+            *@sha256:*) ;;
+            ghcr.io/cisotoolbox/*)
+              echo "::warning::$IMAGE is not in the registry yet — skipping"
+              echo "ok=false" >> "$GITHUB_OUTPUT"
+              exit 0 ;;
+          esac
+          echo "::error::$IMAGE could not be resolved — not scanned"
+          exit 1
 
       # .trivyignore.yaml: findings accepted for a bounded time, each scoped to
       # one upstream binary with no fixed release yet (expired_at forces review).
