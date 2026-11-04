@@ -26,7 +26,7 @@ FROM python:3.13-slim@sha256:6771159cd4fa5d9bba1258caf0b82e6b73458c694d178ad97c5
 
 ARG TRIVY_VERSION=0.76.1
 ARG GITLEAKS_VERSION=8.30.1
-ARG OPENGREP_VERSION=1.30.0
+ARG OPENGREP_VERSION=1.32.0
 ARG TARGETARCH
 
 # Official release sha256 sums (CNT-05) — taken from the checksum files
@@ -40,11 +40,11 @@ ARG GITLEAKS_SHA256_ARM64=e4a487ee7ccd7d3a7f7ec08657610aa3606637dab924210b3aee62
 # Opengrep (SAST) publishes no checksum file: its binaries are signed with
 # Cosign by the repository's release workflow. The signature of each binary
 # was verified (cosign verify-blob, identity
-# https://github.com/opengrep/opengrep/.github/workflows/rolling-release.yml@refs/heads/main,
+# https://github.com/opengrep/opengrep/.github/workflows/rolling-release.yml@refs/heads/release-v1.32.0,
 # issuer https://token.actions.githubusercontent.com) before pinning these
 # sha256. MUST be re-verified and updated together with OPENGREP_VERSION.
-ARG OPENGREP_SHA256_AMD64=35779bdd72e92129c8df2a77f0c55e8c08356801ea92591ef32108d6b28d564c
-ARG OPENGREP_SHA256_ARM64=a5d5a4a58ba5d46ff51e921663da1c2bba38f4b03987f4aeec87f16c6ad3ecae
+ARG OPENGREP_SHA256_AMD64=7360d60174880bd9214f2dfbe439b7bce82b7a3d44cfe945ba833c85cc8bda75
+ARG OPENGREP_SHA256_ARM64=dc6229319c0d68948733053786a5614873947e5ec1d4669cc0e94ae9038cb99d
 # SAST rules: the opengrep-rules repository (LGPL 2.1 + Commons Clause, archived
 # upstream) at its last commit, embedded in the image — never fetched at scan
 # time. sast/prepare_rules.py keeps the security rules and the LICENSE.
