@@ -367,7 +367,7 @@ interface Window {
     _kpiSetFilter?: (field: string, value: string) => void;
     _kpiOpenDetail?: (code: string) => void;
     _kpiToggleActive?: (code: string, newValue: boolean) => void;
-    _kpiAwarenessExport?: (campaign: string) => void;
+    _kpiAwarenessExport?: (campaign: string, utcOffset: number) => void;
     _kpiDetailSubmitManual?: (code: string) => void;
     _kpiDetailSaveTune?: (code: string) => Promise<unknown>;
     _kpiDetailDelete?: (code: string) => void;

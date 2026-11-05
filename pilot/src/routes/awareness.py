@@ -11,7 +11,7 @@ import csv
 import io
 import json
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import func, select
@@ -50,12 +50,20 @@ async def get_awareness(
     except (ValueError, TypeError):
         return _EMPTY
     data["configured"] = True
+    # The per-user snapshot is stored apart and may lag the panel when its
+    # write failed: the detail shows, per campaign, the date of the rows the
+    # export carries (keyed as the export looks a campaign up).
+    key = func.lower(func.trim(PsatAssignment.campaign))
+    synced = await db.execute(select(key, func.max(PsatAssignment.synced_at)).group_by(key))
+    data["assignments_synced_at"] = {k: _utc(ts).isoformat() for k, ts in synced.all()}
     return data
 
 
 _CSV_HEADERS = {
-    "fr": ["Nom", "Prénom", "E-mail", "Date d'envoi", "Date de réalisation", "Statut", "Statut PSAT"],
-    "en": ["Last name", "First name", "E-mail", "Sent on", "Completed on", "Status", "PSAT status"],
+    "fr": ["Nom", "Prénom", "E-mail", "Date d'envoi", "Date de réalisation", "Statut", "Statut PSAT",
+           "Données au"],
+    "en": ["Last name", "First name", "E-mail", "Sent on", "Completed on", "Status", "PSAT status",
+           "Data as of"],
 }
 _CSV_STATUS = {
     "fr": {"completed": "Terminé", "completed_late": "Terminé en retard", "overdue": "En retard",
@@ -72,8 +80,22 @@ def _cell(value: str) -> str:
     return "'" + v if v.lstrip(" ")[:1] in ("=", "+", "-", "@", "\t", "\r", "\n") else v
 
 
-def _assignments_csv(rows: list, lang: str) -> str:
-    """CSV of a campaign's per-user progress, for Excel: UTF-8 BOM, ``;``."""
+def _utc(ts: datetime) -> datetime:
+    """PostgreSQL returns aware datetimes; a naive one (SQLite) is UTC."""
+    return ts if ts.tzinfo else ts.replace(tzinfo=timezone.utc)
+
+
+def _zone(utc_offset: int | None) -> timezone:
+    """The viewer's UTC offset at the time of the data, in minutes, sent by the
+    browser (a zone name would need a tz database the image does not fully
+    carry: Chrome still sends legacy names); UTC otherwise."""
+    return timezone(timedelta(minutes=utc_offset)) if utc_offset else timezone.utc
+
+
+def _assignments_csv(rows: list, lang: str, zone=timezone.utc) -> str:
+    """CSV of a campaign's per-user progress, for Excel: UTF-8 BOM, ``;``.
+    Each row carries the sync it comes from: a failed sync leaves the previous
+    snapshot in place, days old."""
     lang = lang if lang in _CSV_HEADERS else "en"
     out = io.StringIO()
     out.write("\ufeff")
@@ -83,14 +105,21 @@ def _assignments_csv(rows: list, lang: str) -> str:
         w.writerow([_cell(x) for x in (
             r.last_name, r.first_name, r.email, r.sent_date, r.completion_date,
             _CSV_STATUS[lang].get(r.status, r.status), r.psat_status,
+            _utc(r.synced_at).astimezone(zone).strftime("%Y-%m-%d %H:%M %Z"),
         )])
     return out.getvalue()
+
+
+def _data_day(rows: list, zone) -> str:
+    """The file is named after the day of its data, not of the download."""
+    return max(_utc(r.synced_at) for r in rows).astimezone(zone).date().isoformat()
 
 
 @router.get("/export.csv")
 async def export_campaign_csv(
     campaign: str = Query(..., min_length=1, max_length=2000),
     lang: str = Query("en", pattern="^(fr|en)$"),
+    utc_offset: int | None = Query(None, ge=-840, le=840),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -103,10 +132,11 @@ async def export_campaign_csv(
     )).scalars().all()
     if not rows:
         raise HTTPException(404, "No per-user data for this campaign yet — run the PSAT sync")
-    day = datetime.now(timezone.utc).date().isoformat()
+    zone = _zone(utc_offset)
+    day = _data_day(rows, zone)
     name = re.sub(r"[^a-z0-9-]", "", _campaign_slug(campaign)) or "campaign"
     return Response(
-        content=_assignments_csv(rows, lang),
+        content=_assignments_csv(rows, lang, zone),
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="psat-{name}-{day}.csv"'},
     )
