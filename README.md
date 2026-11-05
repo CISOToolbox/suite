@@ -635,9 +635,9 @@ bash tools/pin-images.sh --check    # CI gate: fail if any image is on a bare ta
 ```
 
 `--check` is local and network-free; it only asserts that nothing runs on a
-mutable tag. Images not yet published to GHCR (`ciso-postgres`,
-`ciso-backup-agent`, `ciso-audit-suite` at the time of writing) stay on their
-tag until released, and `pin-images.sh` pins them automatically once they are.
+mutable tag. An image not yet published to GHCR (a brand-new module) makes
+`pin-images.sh` fail; `--allow-missing` leaves it on its tag until it is
+released, and the next run pins it.
 
 The same posture applies to the infrastructure containers:
 
