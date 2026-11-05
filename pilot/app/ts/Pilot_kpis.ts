@@ -449,8 +449,17 @@
         var col = _postureColor(Number(c.pct || 0), 100);
         var lateN = c.completed_late || 0;
         var notDone = c.overdue || 0;
+        // Rows behind the export, keyed like the export looks the campaign up.
+        var exportAsOf = ((aw && aw.assignments_synced_at) || {})[campaignName.trim().toLowerCase()] || "";
+        // The CSV dates its rows at the viewer's UTC offset at that instant,
+        // so it reads like the detail.
+        var exportOffset = -new Date(exportAsOf || Date.now()).getTimezoneOffset();
         var h = '<div class="kpi-detail-section ct-mt-3">';
         h += '<div class="kpi-detail-section-title">' + t("pilot.kpi.detail") + ' — ' + esc(campaignName) + '</div>';
+        if (aw.generated_at) {
+            h += '<div class="ct-text-meta ct-muted ct-mb-2">' + t("pilot.kpi.aw_synced_at")
+               + ' : ' + esc(_fmtSyncDate(aw.generated_at)) + '</div>';
+        }
         h += '<div class="ct-text-data ct-muted ct-mb-2">'
            + '<strong style="color:' + col + '">' + (c.completed || 0) + ' / ' + (c.assigned || 0) + '</strong> ' + t("pilot.kpi.aw_completed")
            + (lateN ? ' · <strong class="ct-text-medium">' + lateN + ' ' + t("pilot.kpi.aw_late") + '</strong>' : '')
@@ -467,8 +476,13 @@
                + (c.grace_date ? ' · ' + t("pilot.kpi.grace_end") + ' : <strong>' + esc(c.grace_date) + '</strong>' : '')
                + ' · <span style="color:' + sevCol + '">' + esc(sevTxt) + '</span></div>';
         }
-        h += '<div class="ct-mb-2"><button class="ct-btn" data-click="_kpiAwarenessExport" data-args=\'' + _da(campaignName) + '\'>'
-           + t("pilot.kpi.aw_export_csv") + '</button></div>';
+        h += '<div class="ct-mb-2"><button class="ct-btn" data-click="_kpiAwarenessExport" data-args=\'' + _da(campaignName, exportOffset) + '\'>'
+           + t("pilot.kpi.aw_export_csv") + '</button>'
+           + (exportAsOf
+               ? ' <span class="ct-text-meta ct-muted">' + t("pilot.kpi.aw_export_as_of")
+                 + ' : ' + esc(_fmtSyncDate(exportAsOf)) + '</span>'
+               : '')
+           + '</div>';
         var late = c.late_users || [];
         var ov = c.overdue_users || [];
         if (!late.length && !ov.length) {
@@ -640,9 +654,10 @@
     };
 
     // FEAT-53 — per-user progress of a PSAT campaign, as the last sync saw it.
-    window._kpiAwarenessExport = function(campaign: string) {
+    window._kpiAwarenessExport = function(campaign: string, utcOffset: number) {
         var url = "api/awareness/export.csv?campaign=" + encodeURIComponent(campaign)
             + "&lang=" + (_locale === "fr" ? "fr" : "en");
+        if (isFinite(utcOffset)) url += "&utc_offset=" + Math.round(utcOffset);
         fetch(url, { credentials: "same-origin" }).then(function(resp) {
             if (resp.status === 404) { showStatus(t("pilot.kpi.aw_export_none"), true); return; }
             if (!resp.ok) throw new Error("API " + resp.status);
