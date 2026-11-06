@@ -55,16 +55,19 @@ jobs:
         image: ${{ fromJson(needs.discover.outputs.images) }}
     steps:
       # Probe first, with retries: a transient registry error is not
-      # "unpublished". Only one of our images on a bare tag may be skipped (see
-      # NOTE above); a digest-pinned or upstream image that cannot be resolved
-      # fails the leg instead of leaving it green without a scan.
+      # "unpublished". buildx, not `docker manifest inspect`: the latter
+      # rejects the nginx:alpine OCI index with "manifest verification failed"
+      # on current runner images, although the registry serves it under the
+      # pinned digest. Only one of our images on a bare tag may be skipped
+      # (see NOTE above); a digest-pinned or upstream image that cannot be
+      # resolved fails the leg instead of leaving it green without a scan.
       - name: Check image is pullable
         id: probe
         env:
           IMAGE: ${{ matrix.image }}   # repo-derived, but never inline in run:
         run: |
           for attempt in 1 2 3; do
-            if err=$(docker manifest inspect "$IMAGE" 2>&1 >/dev/null); then
+            if err=$(docker buildx imagetools inspect --raw "$IMAGE" 2>&1 >/dev/null); then
               echo "ok=true" >> "$GITHUB_OUTPUT"
               exit 0
             fi
