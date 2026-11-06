@@ -7,5 +7,8 @@
 # via PGBACKREST_* environment variables — no conf file, no secret baked in.
 FROM postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
 
+# zlib is upgraded from the Alpine repository: the pinned base still ships
+# 1.3.2-r0 (CVE-2026-85091), fixed in 1.3.2-r1.
 RUN apk add --no-cache pgbackrest && \
+    apk upgrade --no-cache zlib && \
     mkdir -p /var/log/pgbackrest && chown postgres:postgres /var/log/pgbackrest
