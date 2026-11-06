@@ -10,7 +10,10 @@ FROM postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be
 
 # gosu (and its su-exec alias) ship with the postgres base for its root
 # entrypoint; this agent runs as USER postgres and never calls them, so they go.
+# zlib is upgraded from the Alpine repository: the pinned base still ships
+# 1.3.2-r0 (CVE-2026-85091), fixed in 1.3.2-r1.
 RUN apk add --no-cache pgbackrest bash python3 && \
+    apk upgrade --no-cache zlib && \
     rm -f /usr/local/bin/gosu /usr/local/bin/su-exec && \
     mkdir -p /var/log/pgbackrest && chown postgres:postgres /var/log/pgbackrest
 
