@@ -121,6 +121,11 @@ services:
     # recovery window — until the next scheduled run.
     # ciso-postgres 16.2 and ciso-backup-agent 16.3 rebase on the current
     # postgres:16-alpine; the agent no longer carries gosu.
+    # ciso-postgres 16.3 and ciso-backup-agent 16.4 are rebuilt without cache
+    # for current Alpine packages (libssh2; libexpat in the agent). The agent
+    # also ships the restore and promotion fixes: promotion works and is
+    # atomic, one promotion per module at a time, named restore sessions,
+    # pgBackRest errors kept.
   pilot-app:
     image: ghcr.io/cisotoolbox/ciso-pilot-suite:v1.3.0@sha256:73edefb66a58eb4f2c2db87c6c0777d165d1c0f899c7b0c522c948ee338d480b
     container_name: ciso-pilot
@@ -260,7 +265,7 @@ services:
 
   pilot-db:
     # ciso-postgres = same postgres:16-alpine base + pgBackRest (FEAT-30).
-    image: ghcr.io/cisotoolbox/ciso-postgres:16.2@sha256:395990775711122a3b0cd0a38a9320ef68c49b65c81c92a6bfd79729f529693b
+    image: ghcr.io/cisotoolbox/ciso-postgres:16.3@sha256:0bf6be21565d43a5052f166bc72dd7f3a7d8362ca661fe4a9cd3fc74a3edbb0e
     # Continuous WAL archiving to the shared encrypted repository —
     # the PITR window starts at the first full backup (backup-agent).
     command: postgres -c wal_level=replica -c archive_mode=on
@@ -380,7 +385,7 @@ services:
 
   risk-db:
     # ciso-postgres = same postgres:16-alpine base + pgBackRest (FEAT-30).
-    image: ghcr.io/cisotoolbox/ciso-postgres:16.2@sha256:395990775711122a3b0cd0a38a9320ef68c49b65c81c92a6bfd79729f529693b
+    image: ghcr.io/cisotoolbox/ciso-postgres:16.3@sha256:0bf6be21565d43a5052f166bc72dd7f3a7d8362ca661fe4a9cd3fc74a3edbb0e
     # Continuous WAL archiving to the shared encrypted repository —
     # the PITR window starts at the first full backup (backup-agent).
     command: postgres -c wal_level=replica -c archive_mode=on
@@ -500,7 +505,7 @@ services:
 
   vendor-db:
     # ciso-postgres = same postgres:16-alpine base + pgBackRest (FEAT-30).
-    image: ghcr.io/cisotoolbox/ciso-postgres:16.2@sha256:395990775711122a3b0cd0a38a9320ef68c49b65c81c92a6bfd79729f529693b
+    image: ghcr.io/cisotoolbox/ciso-postgres:16.3@sha256:0bf6be21565d43a5052f166bc72dd7f3a7d8362ca661fe4a9cd3fc74a3edbb0e
     # Continuous WAL archiving to the shared encrypted repository —
     # the PITR window starts at the first full backup (backup-agent).
     command: postgres -c wal_level=replica -c archive_mode=on
@@ -630,7 +635,7 @@ services:
 
   compliance-db:
     # ciso-postgres = same postgres:16-alpine base + pgBackRest (FEAT-30).
-    image: ghcr.io/cisotoolbox/ciso-postgres:16.2@sha256:395990775711122a3b0cd0a38a9320ef68c49b65c81c92a6bfd79729f529693b
+    image: ghcr.io/cisotoolbox/ciso-postgres:16.3@sha256:0bf6be21565d43a5052f166bc72dd7f3a7d8362ca661fe4a9cd3fc74a3edbb0e
     # Continuous WAL archiving to the shared encrypted repository —
     # the PITR window starts at the first full backup (backup-agent).
     command: postgres -c wal_level=replica -c archive_mode=on
@@ -759,7 +764,7 @@ services:
 
   asset-db:
     # ciso-postgres = same postgres:16-alpine base + pgBackRest (FEAT-30).
-    image: ghcr.io/cisotoolbox/ciso-postgres:16.2@sha256:395990775711122a3b0cd0a38a9320ef68c49b65c81c92a6bfd79729f529693b
+    image: ghcr.io/cisotoolbox/ciso-postgres:16.3@sha256:0bf6be21565d43a5052f166bc72dd7f3a7d8362ca661fe4a9cd3fc74a3edbb0e
     # Continuous WAL archiving to the shared encrypted repository —
     # the PITR window starts at the first full backup (backup-agent).
     command: postgres -c wal_level=replica -c archive_mode=on
@@ -878,7 +883,7 @@ services:
 
   audit-db:
     # ciso-postgres = same postgres:16-alpine base + pgBackRest (FEAT-30).
-    image: ghcr.io/cisotoolbox/ciso-postgres:16.2@sha256:395990775711122a3b0cd0a38a9320ef68c49b65c81c92a6bfd79729f529693b
+    image: ghcr.io/cisotoolbox/ciso-postgres:16.3@sha256:0bf6be21565d43a5052f166bc72dd7f3a7d8362ca661fe4a9cd3fc74a3edbb0e
     # Continuous WAL archiving to the shared encrypted repository —
     # the PITR window starts at the first full backup (backup-agent).
     command: postgres -c wal_level=replica -c archive_mode=on
@@ -1014,7 +1019,7 @@ services:
 
   access-db:
     # ciso-postgres = same postgres:16-alpine base + pgBackRest (FEAT-30).
-    image: ghcr.io/cisotoolbox/ciso-postgres:16.2@sha256:395990775711122a3b0cd0a38a9320ef68c49b65c81c92a6bfd79729f529693b
+    image: ghcr.io/cisotoolbox/ciso-postgres:16.3@sha256:0bf6be21565d43a5052f166bc72dd7f3a7d8362ca661fe4a9cd3fc74a3edbb0e
     # Continuous WAL archiving to the shared encrypted repository —
     # the PITR window starts at the first full backup (backup-agent).
     command: postgres -c wal_level=replica -c archive_mode=on
@@ -1163,7 +1168,7 @@ services:
 
   surface-db:
     # ciso-postgres = same postgres:16-alpine base + pgBackRest (FEAT-30).
-    image: ghcr.io/cisotoolbox/ciso-postgres:16.2@sha256:395990775711122a3b0cd0a38a9320ef68c49b65c81c92a6bfd79729f529693b
+    image: ghcr.io/cisotoolbox/ciso-postgres:16.3@sha256:0bf6be21565d43a5052f166bc72dd7f3a7d8362ca661fe4a9cd3fc74a3edbb0e
     # Continuous WAL archiving to the shared encrypted repository —
     # the PITR window starts at the first full backup (backup-agent).
     command: postgres -c wal_level=replica -c archive_mode=on
@@ -1296,7 +1301,7 @@ services:
 
   appsec-db:
     # ciso-postgres = same postgres:16-alpine base + pgBackRest (FEAT-30).
-    image: ghcr.io/cisotoolbox/ciso-postgres:16.2@sha256:395990775711122a3b0cd0a38a9320ef68c49b65c81c92a6bfd79729f529693b
+    image: ghcr.io/cisotoolbox/ciso-postgres:16.3@sha256:0bf6be21565d43a5052f166bc72dd7f3a7d8362ca661fe4a9cd3fc74a3edbb0e
     # Continuous WAL archiving to the shared encrypted repository —
     # the PITR window starts at the first full backup (backup-agent).
     command: postgres -c wal_level=replica -c archive_mode=on
@@ -1428,7 +1433,7 @@ services:
 
   watch-db:
     # ciso-postgres = same postgres:16-alpine base + pgBackRest (FEAT-30).
-    image: ghcr.io/cisotoolbox/ciso-postgres:16.2@sha256:395990775711122a3b0cd0a38a9320ef68c49b65c81c92a6bfd79729f529693b
+    image: ghcr.io/cisotoolbox/ciso-postgres:16.3@sha256:0bf6be21565d43a5052f166bc72dd7f3a7d8362ca661fe4a9cd3fc74a3edbb0e
     # Continuous WAL archiving to the shared encrypted repository —
     # the PITR window starts at the first full backup (backup-agent).
     command: postgres -c wal_level=replica -c archive_mode=on
@@ -1478,7 +1483,7 @@ services:
   # verify weekly. No docker socket, no TLS pair, no extra daemon in
   # the DB containers. See backup-agent/agent.sh and the runbook.
   backup-agent:
-    image: ghcr.io/cisotoolbox/ciso-backup-agent:16.3@sha256:53d7b0e9b896ba286f44020dbd6d69784d3de6e1ffb5035af978db868eca132d
+    image: ghcr.io/cisotoolbox/ciso-backup-agent:16.4@sha256:18094f2743abdb03822f4bb1cde9558daed2bd749917a8cc38043ae28013cc9f
     container_name: ciso-backup-agent
     restart: unless-stopped
     security_opt:
