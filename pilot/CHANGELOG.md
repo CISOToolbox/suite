@@ -3,6 +3,70 @@
 Every release has its section here, written at release time from the
 changes since the previous one and published as the GitHub release notes.
 
+## 1.5.0 — 2026-11-07
+
+### Added
+
+- Date the PSAT detail and CSV export after their data
+- API errors carry status, reason and the version-conflict marker; shared handlers for a refused project save or change (shared)
+- Resolve the caller's role in a sibling module from Pilot (auth)
+- Add require_edit_role for routes that create business objects (auth)
+
+### Fixed
+
+- Date the PSAT export at the browser's UTC offset, not a zone name
+- Per-campaign export date, timestamps read as UTC whatever the host zone
+- Object restore and promotion exclude each other
+- Refuse to promote a session twice, and hide the button
+- An answer without a reason (empty body, proxy error page) says so instead of showing raw HTML (shared)
+- A retry settled by another one reports no stale module answers
+- Never start a promotion again when resolving an unknown one
+- A 400 is a refusal too, a 404 of a targeted change says its reason, a validation error is said field by field (shared)
+- An unconfirmed retry finding the account gone answers settled
+- An untracked promotion is unknown, not failed; keep the session alive
+- Settle an account deletion by id, so concurrent retries both succeed
+- No notification for an account pending deletion
+- Detach the directory entry of a deleted account from its address
+- Keep an unfinished account deletion pending and retryable
+- Restore actions name their session; follow promotion by polling
+- Bump Mako to 1.4.3 and setuptools to 84.1.0 (deps)
+- Keep the directory source setting out of the dispatcher (frontend)
+- Confirm a change of a user's global role
+- Confirm a change of the directory source (frontend)
+- Declare the finding view's default triage handler (frontend)
+- Keep unchanged and read-only roles when clamping to Pilot, and re-ask for a newer token (auth)
+- Restrict form targets to the origin in every module CSP (security)
+- Declare each module's event handlers (frontend)
+- Dispatch delegated events only to declared handlers (frontend)
+- Serve the API docs only when ENABLE_API_DOCS is set (suite)
+- Check the OIDC id_token issuer against OIDC_ISSUER when discovery omits it (auth)
+- Apply ALLOWED_EMAIL_DOMAINS and list only approved accounts in the directory
+- Lower module sessions to the roles Pilot currently grants (auth)
+- Authlib 1.9.1, pyasn1 0.6.5, dnspython 2.9.0 and joserfc 1.7.6 (deps)
+- Pin certifi 2026.10.19 as a transitive in every module (deps)
+- One promotion per module at a time (backup-agent)
+- Restore screen reports only module failures as unreadable, and frees orphan sessions
+- Say why a restore session cannot be read instead of looking stuck
+- Certifi 2026.10.19, dropping the compromised emSign roots (deps)
+
+### Changed
+
+- Share the #rrggbb check of a colour read from data (frontend)
+
+### Documentation
+
+- A Watch scope owner is no longer a NOT NULL FK (shared)
+
+### Tests
+
+- A campaign without rows gets no export date
+- Cover the sign-in gates and the module role served to modules
+
+### Maintenance
+
+- Sync the account deletion fixes to the standalone mirror (propagation)
+- Sync the API docs switch and posture tests to the standalone mirror (propagation)
+
 ## 1.4.1 — 2026-10-23
 
 ### Fixed

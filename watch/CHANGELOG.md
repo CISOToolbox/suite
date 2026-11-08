@@ -3,6 +3,69 @@
 Every release has its section here, written at release time from the
 changes since the previous one and published as the GitHub release notes.
 
+## 1.3.0 — 2026-11-07
+
+### Added
+
+- API errors carry status, reason and the version-conflict marker; shared handlers for a refused project save or change (shared)
+- Resolve the caller's role in a sibling module from Pilot (auth)
+- Add require_edit_role for routes that create business objects (auth)
+
+### Fixed
+
+- An answer without a reason (empty body, proxy error page) says so instead of showing raw HTML (shared)
+- A 400 is a refusal too, a 404 of a targeted change says its reason, a validation error is said field by field (shared)
+- Delete-user removes the digest history of the address
+- Spell out the auth-disabled sentinel in scope visibility
+- Keep an unfinished account deletion pending and retryable
+- Delete-user removes the scope recipients of the address
+- Keep the scopes of a deleted account, managed by administrators
+- Import log_write from audit_common in delete-user (appsec,surface,watch)
+- Bump Mako to 1.4.3 and setuptools to 84.1.0 (deps)
+- Keep the directory source setting out of the dispatcher (frontend)
+- Confirm a change of the directory source (frontend)
+- Declare the finding view's default triage handler (frontend)
+- Keep unchanged and read-only roles when clamping to Pilot, and re-ask for a newer token (auth)
+- Restrict form targets to the origin in every module CSP (security)
+- Declare each module's event handlers (frontend)
+- Dispatch delegated events only to declared handlers (frontend)
+- Show an alert's SBOM impact only to accounts with access to AppSec
+- Serve the API docs only when ENABLE_API_DOCS is set (suite)
+- Check the OIDC id_token issuer against OIDC_ISSUER when discovery omits it (auth)
+- Apply ALLOWED_EMAIL_DOMAINS and list only approved accounts in the directory
+- Lower module sessions to the roles Pilot currently grants (auth)
+- Treat module admins and disabled auth as admins in the recipient hint
+- Say why the preview has no threat brief
+- Tell non-admins an address outside the directory needs an allowed domain
+- Count the preview rate limit per threat brief, not per request
+- Run the preview's threat brief only for AI users, rate-limited
+- Restrict who can configure a scope and whom it mails
+- Authlib 1.9.1, pyasn1 0.6.5, dnspython 2.9.0 and joserfc 1.7.6 (deps)
+- Pin certifi 2026.10.19 as a transitive in every module (deps)
+- Certifi 2026.10.19, dropping the compromised emSign roots (deps)
+
+### Changed
+
+- Share the #rrggbb check of a colour read from data (frontend)
+
+### Documentation
+
+- A Watch scope owner is no longer a NOT NULL FK (shared)
+- Scopes.owner_id is no longer a NOT NULL FK
+
+### Tests
+
+- Check the preview HTML states why the brief is missing
+- Check the exact Watch-account address, neighbouring domains and the preview's skip reason
+- Make the recipient role case refuse on the role alone
+- Make the scope guard tests fail on their assertions without the fix
+- Cover the scope role, prompt, recipient and preview guards
+
+### Maintenance
+
+- Sync the AppSec recipients fix and the require_identity docstring to the copies and the standalone mirror (propagation)
+- Sync the API docs switch and posture tests to the standalone mirror (propagation)
+
 ## 1.2.1 — 2026-10-23
 
 ### Fixed

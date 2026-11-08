@@ -3,6 +3,136 @@
 Every release has its section here, written at release time from the
 changes since the previous one and published as the GitHub release notes.
 
+## 0.14.0 — 2026-11-08
+
+### Modules
+
+- pilot: 1.3.0 → **1.5.0**
+- risk: 1.1.2 → **1.3.0**
+- compliance: 1.1.2 → **1.3.0**
+- audit: 1.1.2 → **1.3.0**
+- vendor: 1.3.2 → **1.6.0**
+- asset: 1.2.2 → **1.4.0**
+- access: 1.3.2 → **1.5.0**
+- surface: 1.5.2 → **1.8.0**
+- appsec: 1.3.0 → **1.5.0**
+- watch: 1.1.2 → **1.3.0**
+
+### Added
+
+- One password per module database (compose)
+- One shared sign-in router for the nine backend modules — identity providers everywhere (auth)
+- Distinguish "not assessed" from 0 in the criticality formula
+
+### Fixed
+
+- Upgrade zlib in ciso-postgres and ciso-backup-agent (images)
+- Pin nginx:alpine 1.31.8 (suite)
+- A restore session is promoted once (backup-agent)
+- Restore workers stop their instance outside the lock (backup-agent)
+- Check twice before concluding a database is not running (tools)
+- Read a stopped database's reason from this wait's log only (tools)
+- Keep load errors, label only complete copies, close outside the lock (backup-agent)
+- Report why a restarting database stopped, not its refused connections (tools)
+- Name restore sessions and promote in the background (backup-agent)
+- Import log_write from audit_common in delete-user (appsec,surface,watch)
+- Leave a database password that is already right untouched (tools)
+- Refuse --recovery-session and --after-restore together (tools)
+- Stop waiting for a database that restarts during its replay (tools)
+- Keep pgBackRest's error when a restore fails (backup-agent)
+- Bump Mako to 1.4.3 and setuptools to 84.1.0 (deps)
+- Keep the directory source setting out of the dispatcher (frontend)
+- Declare the finding view's default triage handler (frontend)
+- Restrict form targets to the origin in every module CSP (security)
+- Build client images from a temporary context (tools)
+- Serve the API docs only when ENABLE_API_DOCS is set (suite)
+- Apply ALLOWED_EMAIL_DOMAINS and list only approved accounts in the directory
+- Refuse project creation, import and duplication to read-only roles (projects)
+- Zip 9.0.5, calamine 0.37 and quick-xml 0.42 in the SMB scanner
+- Authlib 1.9.1, pyasn1 0.6.5, dnspython 2.9.0 and joserfc 1.7.6 (deps)
+- One promotion per module at a time (backup-agent)
+- Atomic promotion, and restore sessions that cannot hurt each other (backup-agent)
+- Say why a restore session cannot be read instead of looking stuck
+- Make promotion work and keep restore sessions consistent (backup-agent)
+- Certifi 2026.10.19, dropping the compromised emSign roots (deps)
+- Realign an in-place restore without taking a backup (tools)
+- Realign in-place restores from any deployment layout (tools)
+- Make the restore-session realignment usable as documented (tools)
+- Realign a restore session to the current database password (tools)
+- Make the password rotation take its backup and fail loudly (tools)
+- Pass the settings the env scoping missed, keep IdP secrets in Pilot (compose)
+- Segment the stack network (compose)
+- Hand each app only the variables it reads (compose)
+- No multi-tenant Entra default — an unset tenant is empty, and the README says it is required (auth)
+- Every module's write journal records what a route says changed; one journal implementation
+- Exact masking docstring; contract checks proxy_common never forces allow_private (proxy)
+- Mask a token user name with an empty password, redact credentials in any case, contract reads the validator's AST (proxy)
+- Mask a token-only proxy userinfo, keep credentials out of refusals, leave omitted fields as they are (proxy)
+- A module released ahead of the suite passes the matrix check outside a release (release-check)
+- The AI agent reaches a custom LLM through the outbound proxy
+
+### Changed
+
+- One proxy URL validator in proxy_common, shared by the internal routes and Pilot (proxy)
+
+### Documentation
+
+- The infrastructure images are published (suite)
+- PILOT_MODULES also unblocks a pending deletion; the registry resyncs on the menu
+- Unblocking a pending deletion needs an empty module URL, not a removed one
+- Account deletion removes the Watch digest history and cannot be cancelled
+- Drop the manual clean-up after an account deletion
+- Describe how --custom-dir stages client add-ons now (suite)
+- Note that a personal Google account can predate the Workspace domain
+- Point to the Permissions screen, qualify Google sign-in and explain partial deletions
+- Widen the email-matching note to every provider and explain account deletion before address reuse
+- State that email linking applies to every provider and covers profile edits, brokering and reassigned addresses
+- Say when to drop the certifi pin (deps)
+- Per-module database passwords and per-container variables
+- Require an IdP that owns the email address for generic OIDC
+- --strict also requires the matrix row to equal the VERSION files
+- The page scanners' redirect policy and how each hop is checked
+- A refused origin is reported even when another origin answered
+- Only the checks that pin the validated address send the name as SNI
+- The JavaScript check reaches each script host as its own exceptions say
+- The scripts the JavaScript check finds are fetched by name
+- The JavaScript check fetches the scripts it finds by name
+- Through the egress proxy the name is resolved by the proxy, which must refuse internal destinations
+- The proxy carries the scans too (suite)
+- The proxy carries the third-party calls, not the scan probes (suite)
+- The scanners reach their targets directly (suite)
+- The egress proxy as it now works (suite)
+
+### Tests
+
+- A promoted session expires and holds the port (backup-agent)
+- Refuse a private network made external or renamed by an override (compose)
+- Check that private networks stay internal once overrides merge (compose)
+- Guard the declared event handlers of every module (suite)
+- Tie the sweep gate to the handler's user and let every fake reach the creation on the old code
+- Cover api_route, qualified models and other owner assignments in the sweep
+- Sweep every route file and verb for ungated project creation
+- Lock who joins each private network, and that it stays internal (compose)
+- Check the networks merged with each override (compose)
+- Catch bare and non-environment interpolation, lock S3 egress (compose)
+- Check isolation on the parsed files, overrides included (compose)
+- One role ladder per module, the same in Pilot and in the module (contracts)
+- The login tab title is exactly the logo, a missing page or index title is reported (contracts)
+- Each login page carries its own module's name (contracts)
+- Every proxy_common copy, Pilot's included, passes allow_private on to ssrf_guard (contracts)
+- The backup contract reads the filters, not a string (suite)
+- Backups leave out the proxy Pilot pushes (suite)
+- Every module that receives the proxy restores it at start-up (suite)
+- Every module declares the routes Pilot pushes its settings to (suite)
+- Stop collecting the contract checks as no-op tests (suite)
+
+### Maintenance
+
+- Ciso-postgres 16.4 and ciso-backup-agent 16.5 (compose)
+- Precise infra image notes (compose)
+- Ciso-postgres 16.3 and ciso-backup-agent 16.4 (compose)
+- Allowlist the certifi copy inside Opengrep, note when to drop the exception (deps)
+
 ## 0.13.0 — 2026-10-05
 
 ### Modules
