@@ -590,7 +590,7 @@
             h += '<div class="kpi-detail-section-title">' + t("pilot.kpi.enter_value") + '</div>';
             h += '<div class="kpi-detail-manual">';
             h += '<input type="number" step="any" id="kpi-detail-value" class="ct-input ct-w-140" placeholder="' + esc(t("pilot.kpi.value_placeholder", { unit: k.unit })) + '">';
-            h += '<input type="datetime-local" id="kpi-detail-ts" class="ct-input" style="width:200px">';
+            h += '<input type="datetime-local" id="kpi-detail-ts" class="ct-input ct-w-200">';
             h += '<input type="text" id="kpi-detail-note" class="ct-input ct-flex-1 ct-minw-120" placeholder="' + esc(t("pilot.kpi.note_optional")) + '">';
             h += '<button class="ct-btn" data-variant="primary" data-click="_kpiDetailSubmitManual" data-args=\'' + _da(k.code) + '\'>' + t("pilot.action.save") + '</button>';
             h += '</div>';
@@ -691,6 +691,8 @@
         });
     };
     window._kpiDetailSubmitManual = function (code) {
+        if (ct_datepicker.invalid(document.querySelector(".kpi-detail-manual")))
+            return; // a refused date
         var v = document.getElementById("kpi-detail-value").value;
         if (v === "" || isNaN(parseFloat(v))) {
             ct_modal.alert({ title: t("pilot.kpi.invalid_value"), message: t("pilot.kpi.enter_number") });
