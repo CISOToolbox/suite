@@ -62,21 +62,12 @@ changes since the previous one and published as the GitHub release notes.
 - A campaign without rows gets no export date
 - Cover the sign-in gates and the module role served to modules
 
-### Maintenance
-
-- Sync the account deletion fixes to the standalone mirror (propagation)
-- Sync the API docs switch and posture tests to the standalone mirror (propagation)
-
 ## 1.4.1 — 2026-10-23
 
 ### Fixed
 
 - A composed character is dispatched once in the Firefox and Safari event order too (socle)
 - A character composed with a dead key or an IME is dispatched once, complete (socle)
-
-### Maintenance
-
-- Socle composition dedup (propagation)
 
 ## 1.4.0 — 2026-10-20
 
