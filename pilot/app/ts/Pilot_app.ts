@@ -1557,6 +1557,7 @@ window._backToProjects = function() {
 };
 
 window._saveProject = function() {
+    if (ct_datepicker.invalid(document.getElementById("pj-start")!.closest(".ct-form-grid")!)) return;   // a refused date
     var nameVal = ((document.getElementById("pj-name") as HTMLInputElement).value || "").trim();
     if (!nameVal) {
         showStatus(t("pilot.projects.name_required"), true);
