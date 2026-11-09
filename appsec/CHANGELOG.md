@@ -3,6 +3,78 @@
 Every release has its section here, written at release time from the
 changes since the previous one and published as the GitHub release notes.
 
+## 1.5.0 — 2026-11-07
+
+### Added
+
+- API errors carry status, reason and the version-conflict marker; shared handlers for a refused project save or change (shared)
+- Resolve the caller's role in a sibling module from Pilot (auth)
+- Add require_edit_role for routes that create business objects (auth)
+
+### Fixed
+
+- Bump Opengrep to 1.32.0 (bundles urllib3 2.8.0 and certifi 2026.10.19)
+- Do not plan again an application whose scan holds its lock
+- Close only the Scan now jobs that are still pending
+- Close the Scan now jobs on every early exit of a scan
+- Give the tick's slots to applications that are due
+- An answer without a reason (empty body, proxy error page) says so instead of showing raw HTML (shared)
+- A 400 is a refusal too, a 404 of a targeted change says its reason, a validation error is said field by field (shared)
+- Delete-user removes the address from the applications' recipients
+- A head check refused after the scan keeps last_scan_at
+- A failed clone takes over the pending jobs of Scan now
+- Keep an unfinished account deletion pending and retryable
+- Import log_write from audit_common in delete-user (appsec,surface,watch)
+- An unreachable repository no longer starves the scheduler
+- Bump Mako to 1.4.3 and setuptools to 84.1.0 (deps)
+- Keep the directory source setting out of the dispatcher (frontend)
+- Confirm a change of the directory source (frontend)
+- Declare the finding view's default triage handler (frontend)
+- Redact gitleaks measures written back by Pilot
+- Keep the owner's text when redacting gitleaks measures
+- Keep unchanged and read-only roles when clamping to Pilot, and re-ask for a newer token (auth)
+- Ship trivy 0.76.1
+- Keep gitleaks secrets out of stored findings
+- Restrict form targets to the origin in every module CSP (security)
+- Declare each module's event handlers (frontend)
+- Dispatch delegated events only to declared handlers (frontend)
+- Serve the API docs only when ENABLE_API_DOCS is set (suite)
+- Check the OIDC id_token issuer against OIDC_ISSUER when discovery omits it (auth)
+- Apply ALLOWED_EMAIL_DOMAINS and list only approved accounts in the directory
+- Lower module sessions to the roles Pilot currently grants (auth)
+- Authlib 1.9.1, pyasn1 0.6.5, dnspython 2.9.0 and joserfc 1.7.6 (deps)
+- Pin certifi 2026.10.19 as a transitive in every module (deps)
+- Certifi 2026.10.19, dropping the compromised emSign roots (deps)
+- Re-check the exact repo URL the token is injected into
+- Fail closed on an scp-like repo URL without a user part
+- Treat an unparsable repo authority as having no host
+- Refuse percent-encoded ssh hosts and send the PAT over HTTP only
+- Bind repo tokens to the host git actually contacts
+- Clear stored tokens when an application moves to another host
+
+### Changed
+
+- Share the #rrggbb check of a colour read from data (frontend)
+
+### Documentation
+
+- A Watch scope owner is no longer a NOT NULL FK (shared)
+
+### Tests
+
+- Spell out the already-running reason in the Scan now tests
+- State what an all-digit id becomes on SQLite and how rare it is
+- Store UUID columns as text in the SQLite test databases
+- Run a tick's scans one after the other in the scheduler test
+- Re-read the recipient lists after a rollback, so a missing commit fails
+- Check the recipient lists before the delete-user report
+- Lock the host re-check to the URL handed to git
+
+### Maintenance
+
+- Sync the AppSec recipients fix and the require_identity docstring to the copies and the standalone mirror (propagation)
+- Sync the API docs switch and posture tests to the standalone mirror (propagation)
+
 ## 1.4.1 — 2026-10-23
 
 ### Fixed
