@@ -30,6 +30,18 @@ var AppSecAPI = (function () {
         }
         return r.json();
     }
+    // Query string of the set values; an array is a repeated parameter
+    // (severity=a&severity=b).
+    function _qs(params) {
+        var parts = [];
+        Object.entries(params || {}).forEach(function (e) {
+            (Array.isArray(e[1]) ? e[1] : [e[1]]).forEach(function (v) {
+                if (v !== null && v !== undefined && v !== "")
+                    parts.push(e[0] + "=" + encodeURIComponent(v));
+            });
+        });
+        return parts.join("&");
+    }
     return {
         _fetch: _fetch, // exposed for audit-log and other direct calls
         listApps: function () { return _fetch("/applications"); },
@@ -40,7 +52,7 @@ var AppSecAPI = (function () {
         triggerScan: function (id) { return _fetch("/applications/" + id + "/scan", { method: "POST" }); },
         getFinding: function (id) { return _fetch("/findings/" + id); },
         listFindings: function (params) {
-            var qs = Object.entries(params || {}).filter(function (e) { return e[1] !== null && e[1] !== undefined && e[1] !== ""; }).map(function (e) { return e[0] + "=" + encodeURIComponent(e[1]); }).join("&");
+            var qs = _qs(params);
             return _fetch("/findings" + (qs ? "?" + qs : ""));
         },
         findingsStats: function (appId) { return _fetch("/findings/stats" + (appId ? "?app_id=" + appId : "")); },
@@ -83,7 +95,7 @@ var AppSecAPI = (function () {
         updateMeasure: function (id, data) { return _fetch("/measures/" + id, { method: "PATCH", body: data }); },
         deleteMeasure: function (id) { return _fetch("/measures/" + id, { method: "DELETE" }); },
         listSBOM: function (params) {
-            var qs = Object.entries(params || {}).filter(function (e) { return e[1] !== null && e[1] !== undefined && e[1] !== ""; }).map(function (e) { return e[0] + "=" + encodeURIComponent(e[1]); }).join("&");
+            var qs = _qs(params);
             return _fetch("/sbom" + (qs ? "?" + qs : ""));
         },
     };

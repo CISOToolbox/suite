@@ -12,7 +12,7 @@ from src.auth import get_current_user, require_min_role
 from src.audit import log_action
 from src.database import get_db
 from src.models import Application, Finding, Measure, User
-from src.schemas import FindingResponse, FindingTriage, FindingsStats
+from src.schemas import _SCANNER_ALIASES, FindingResponse, FindingTriage, FindingsStats
 
 router = APIRouter(prefix="/api/findings", tags=["findings"])
 
@@ -20,12 +20,29 @@ router = APIRouter(prefix="/api/findings", tags=["findings"])
 _APPSEC_ROLES = ["viewer", "triager", "admin"]
 
 
+def _include_exclude(query, column, include: list[str] | None, exclude: list[str] | None):
+    """Filter row of the findings list: keep rows whose value is one of
+    `include` (when given) and none of `exclude`. A missing value is never
+    excluded, the way the browser filters."""
+    inc = [v for v in (include or []) if v]
+    exc = [v for v in (exclude or []) if v]
+    if inc:
+        query = query.where(column.in_(inc))
+    if exc:
+        query = query.where(or_(column.is_(None), column.not_in(exc)))
+    return query
+
+
 @router.get("")
 async def list_findings(
     app_id: uuid.UUID | None = Query(None),
-    severity: str | None = Query(None),
-    scanner: str | None = Query(None),
-    status: str | None = Query(None),
+    # Repeat a parameter to include several values; *_not excludes them.
+    severity: list[str] | None = Query(None),
+    scanner: list[str] | None = Query(None),
+    status: list[str] | None = Query(None),
+    severity_not: list[str] | None = Query(None),
+    scanner_not: list[str] | None = Query(None),
+    status_not: list[str] | None = Query(None),
     type: str | None = Query(None),
     q: str | None = Query(None),
     patch: str | None = Query(None),  # "available", "unavailable", None = all
@@ -40,13 +57,13 @@ async def list_findings(
     )
     if app_id:
         query = query.where(Finding.application_id == app_id)
-    if severity:
-        query = query.where(Finding.severity == severity)
-    if scanner:
-        from src.schemas import _SCANNER_ALIASES
-        query = query.where(Finding.scanner == _SCANNER_ALIASES.get(scanner, scanner))
-    if status:
-        query = query.where(Finding.status == status)
+    query = _include_exclude(query, Finding.severity, severity, severity_not)
+    query = _include_exclude(
+        query, Finding.scanner,
+        [_SCANNER_ALIASES.get(v, v) for v in scanner or []],
+        [_SCANNER_ALIASES.get(v, v) for v in scanner_not or []],
+    )
+    query = _include_exclude(query, Finding.status, status, status_not)
     if type:
         query = query.where(Finding.type == type)
     if patch == "available":
