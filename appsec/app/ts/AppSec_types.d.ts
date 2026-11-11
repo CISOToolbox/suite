@@ -138,9 +138,9 @@ type AppSecUser = { name?: string; email?: string; role?: string };
 
 type AppSecFindingsFilter = {
     app_id: string;
-    severity: string;
-    scanner: string;
-    status: string;
+    severity: CtPillFilter;
+    scanner: CtPillFilter;
+    status: CtPillFilter;
     q: string;
     patch: string;
 };
@@ -153,7 +153,8 @@ type AppSecSbomFilter = {
 };
 
 /** Generic query-string parameters (serialized by the list* helpers). */
-type AppSecQueryParams = Record<string, string | number | boolean | null | undefined>;
+// An array value is sent as a repeated parameter.
+type AppSecQueryParams = Record<string, string | number | boolean | string[] | null | undefined>;
 
 type AppSecAppPayload = {
     name: string;

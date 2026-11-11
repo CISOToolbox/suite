@@ -48,7 +48,13 @@ var _sbom: AppSecSbomEntry[] = [];
 var _stats: AppSecStats = {};
 var _selectedFinding: string | null = null;
 var _selectedApp: string | null = null;
-var _findingsFilter: AppSecFindingsFilter = { app_id: "", severity: "", scanner: "", status: "new", q: "", patch: "" };
+// Severity, status and scanner rows keep the values included / excluded
+// (ct_pillfilter). The Findings view opens on new findings.
+function _newFindingsFilter(over?: Partial<AppSecFindingsFilter>): AppSecFindingsFilter {
+    return Object.assign({ app_id: "", severity: ct_pillfilter.make(), scanner: ct_pillfilter.make(),
+                           status: ct_pillfilter.make(["new"]), q: "", patch: "" }, over || {});
+}
+var _findingsFilter: AppSecFindingsFilter = _newFindingsFilter();
 var _sbomFilter: AppSecSbomFilter = { app_id: "", ecosystem: "", q: "", vulnerable_only: false };
 
 // Applications page: tiles or table, and a text filter. The view is a
@@ -457,7 +463,7 @@ function _appsCardsHtml(apps: AppSecApp[]): string {
 
 function _openAppFindings(id: string | number): void {
     _selectedApp = String(id);
-    _appDetailFilter = { severity: "", scanner: "", status: "", q: "" };
+    _appDetailFilter = _newAppDetailFilter();
     _panel = "applications";
     _loadAndRender();
 }
@@ -466,13 +472,13 @@ window._backToApps = function() { _selectedApp = null; renderPanel(); };
 
 window._dashNav = function(panel: string) { selectPanel(panel); };
 window._dashNavSev = function(sev: string) {
-    _findingsFilter = { app_id: "", severity: sev, scanner: "", status: "new", q: "", patch: "" };
+    _findingsFilter = _newFindingsFilter({ severity: ct_pillfilter.make([sev]) });
     selectPanel("findings");
 };
 window._dashNavPatch = function() {
     // Jump straight to active CVEs that have a vendor patch available —
     // the high-leverage triage list (quick wins).
-    _findingsFilter = { app_id: "", severity: "", scanner: "", status: "new", q: "", patch: "available" };
+    _findingsFilter = _newFindingsFilter({ patch: "available" });
     selectPanel("findings");
 };
 
@@ -529,47 +535,7 @@ async function _renderAppDetail(c: HTMLElement): Promise<void> {
     h += '<h3>' + t("findings.title") + '</h3>';
     var adf = _appDetailFilter;
 
-    // Severity pills
-    h += '<div class="filter-pills-row filter-pills-sm">';
-    h += '<span class="filter-pills-lbl">' + esc(t("findings.filter_severity") || "Sévérité") + '</span>';
-    ["", "critical", "high", "medium", "low", "info"].forEach(function(sev) {
-        var label = sev ? t("misc." + sev) : t("findings.all_severities");
-        var active = adf.severity === sev ? " active" : "";
-        h += '<button class="filter-pill' + active + (sev ? " pill-" + sev : "") + '" data-click="_adSetSev" data-args=\'' + _da(sev) + '\'>' + esc(label) + '</button>';
-    });
-    h += '</div>';
-
-    // Status pills
-    h += '<div class="filter-pills-row filter-pills-sm">';
-    h += '<span class="filter-pills-lbl">' + esc(t("findings.filter_status") || "Statut") + '</span>';
-    [
-        { v: "",               l: t("findings.all_statuses") },
-        { v: "new",            l: t("findings.status_new") },
-        { v: "to_fix",        l: t("findings.status_to_fix") },
-        { v: "false_positive", l: t("findings.status_false_positive") },
-        { v: "fixed",          l: t("findings.status_fixed") },
-        { v: "derogated",      l: t("findings.status_derogated") }
-    ].forEach(function(o) {
-        var on = adf.status === o.v ? " active" : "";
-        h += '<button class="filter-pill status-pill-' + (o.v || "all") + on + '" data-click="_adSetStatus" data-args=\'' + _da(o.v) + '\'>' + esc(o.l) + '</button>';
-    });
-    h += '</div>';
-
-    // Scanner pills
-    h += '<div class="filter-pills-row filter-pills-sm">';
-    h += '<span class="filter-pills-lbl">' + esc(t("findings.filter_scanner") || "Scanner") + '</span>';
-    [
-        { v: "",             l: t("findings.all_scanners") },
-        { v: "trivy_fs",    l: _scannerLabel("trivy_fs") },
-        { v: "trivy_image", l: _scannerLabel("trivy_image") },
-        { v: "gitleaks",    l: _scannerLabel("gitleaks") },
-        { v: "sast",        l: _scannerLabel("sast") }
-    ].forEach(function(o) {
-        var scCls = o.v ? " scanner-pill-specific" : "";
-        var on = adf.scanner === o.v ? " active" : "";
-        h += '<button class="filter-pill scanner-pill' + scCls + on + '" data-click="_adSetScanner" data-args=\'' + _da(o.v) + '\'>' + esc(o.l) + '</button>';
-    });
-    h += '</div>';
+    h += _findingPillRows(adf, { sev: "_adSetSev", status: "_adSetStatus", scanner: "_adSetScanner" });
 
     // Search
     h += '<div class="appsec-filters">';
@@ -581,23 +547,63 @@ async function _renderAppDetail(c: HTMLElement): Promise<void> {
     _refreshAppDetailFindings();
 }
 
-var _appDetailFilter: { severity: string; scanner: string; status: string; q: string } = { severity: "", scanner: "", status: "", q: "" };
+type AppSecPillRows = { severity: CtPillFilter; scanner: CtPillFilter; status: CtPillFilter };
+function _newAppDetailFilter(): AppSecPillRows & { q: string } {
+    return { severity: ct_pillfilter.make(), scanner: ct_pillfilter.make(), status: ct_pillfilter.make(), q: "" };
+}
+var _appDetailFilter = _newAppDetailFilter();
+
+// The severity, status and scanner pill rows of a findings list. Each value
+// pill cycles neutral → included → excluded; the "All" pill (value "")
+// clears its row. `click` names the handler of each row.
+function _findingPillRows(f: AppSecPillRows, click: { sev: string; status: string; scanner: string }): string {
+    function row(label: string, pf: CtPillFilter, handler: string, allLabel: string, opts: { v: string; l: string; cls?: string }[], allCls?: string): string {
+        var r = '<div class="filter-pills-row filter-pills-sm">';
+        r += '<span class="filter-pills-lbl">' + esc(label) + '</span>';
+        r += '<button type="button" class="filter-pill' + (allCls || "") + (ct_pillfilter.isEmpty(pf) ? " active" : "") + '" data-click="' + handler + '" data-args=\'' + _da("") + '\'>' + esc(allLabel) + '</button>';
+        opts.forEach(function(o) { r += ct_pillfilter.pill(pf, o.v, o.l, { click: handler, cls: o.cls }); });
+        return r + '</div>';
+    }
+    var h = '<span class="ct-text-label ct-muted filter-pills-howto">' + esc(t("ct.pillfilter.hint")) + '</span>';
+    h += row(t("findings.filter_severity"), f.severity, click.sev, t("findings.all_severities"),
+        ["critical", "high", "medium", "low", "info"].map(function(sev) { return { v: sev, l: t("misc." + sev), cls: "pill-" + sev }; }));
+    h += row(t("findings.filter_status"), f.status, click.status, t("findings.all_statuses"), [
+        { v: "new",            l: t("findings.status_new") },
+        { v: "to_fix",         l: t("findings.status_to_fix") },
+        { v: "false_positive", l: t("findings.status_false_positive") },
+        { v: "fixed",          l: t("findings.status_fixed") },
+        { v: "derogated",      l: t("findings.status_derogated") }
+    ].map(function(o) { return { v: o.v, l: o.l, cls: "status-pill-" + o.v }; }), " status-pill-all");
+    h += row(t("findings.filter_scanner"), f.scanner, click.scanner, t("findings.all_scanners"),
+        ["trivy_fs", "trivy_image", "gitleaks", "sast"].map(function(v) { return { v: v, l: _scannerLabel(v), cls: "scanner-pill scanner-pill-specific" }; }), " scanner-pill");
+    return h;
+}
+
+// A pill click: "" clears the row, a value cycles its state.
+function _cyclePill(pf: CtPillFilter, v: string): void {
+    if (v) ct_pillfilter.cycle(pf, v); else ct_pillfilter.clear(pf);
+}
+
+// The pill rows as query parameters: included values, then *_not.
+function _pillParams(params: AppSecQueryParams, f: AppSecPillRows): AppSecQueryParams {
+    params.severity = f.severity.inc; params.severity_not = f.severity.exc;
+    params.status = f.status.inc;     params.status_not = f.status.exc;
+    params.scanner = f.scanner.inc;   params.scanner_not = f.scanner.exc;
+    return params;
+}
 
 // Pill-based filters re-render the full panel so .active updates.
-window._adSetSev = function(v: string) { _appDetailFilter.severity = v; renderPanel(); };
-window._adSetScanner = function(v: string) { _appDetailFilter.scanner = v; renderPanel(); };
-window._adSetStatus = function(v: string) { _appDetailFilter.status = v; renderPanel(); };
+window._adSetSev = function(v: string) { _cyclePill(_appDetailFilter.severity, v); renderPanel(); };
+window._adSetScanner = function(v: string) { _cyclePill(_appDetailFilter.scanner, v); renderPanel(); };
+window._adSetStatus = function(v: string) { _cyclePill(_appDetailFilter.status, v); renderPanel(); };
 // Search only refreshes the table body.
 window._adSetSearch = function(v: string) { _appDetailFilter.q = v; _refreshAppDetailFindings(); };
 
 async function _refreshAppDetailFindings(): Promise<void> {
     var el = document.getElementById("app-detail-findings");
     if (!el) return;
-    var params: AppSecQueryParams = { app_id: _selectedApp, limit: 300 };
     var adf = _appDetailFilter;
-    if (adf.severity) params.severity = adf.severity;
-    if (adf.scanner) params.scanner = adf.scanner;
-    if (adf.status) params.status = adf.status;
+    var params = _pillParams({ app_id: _selectedApp, limit: 300 }, adf);
     if (adf.q) params.q = adf.q;
     try {
         var data = await AppSecAPI.listFindings(params);
@@ -819,47 +825,7 @@ function _renderFindings(c: HTMLElement): void {
     h += '<h2 class="ct-m-0">' + t("findings.title") + '</h2><span class="ct-flex-1"></span>';
     h += '</div>';
 
-    // Filter pills — severity (with label for consistency with Surface)
-    h += '<div class="filter-pills-row filter-pills-sm">';
-    h += '<span class="filter-pills-lbl">' + esc(t("findings.filter_severity") || "Sévérité") + '</span>';
-    ["", "critical", "high", "medium", "low", "info"].forEach(function(sev) {
-        var label = sev ? t("misc." + sev) : t("findings.all_severities");
-        var active = f.severity === sev ? " active" : "";
-        h += '<button class="filter-pill' + active + (sev ? " pill-" + sev : "") + '" data-click="_setFSev" data-args=\'' + _da(sev) + '\'>' + esc(label) + '</button>';
-    });
-    h += '</div>';
-
-    // Status pills ("Tous" first)
-    h += '<div class="filter-pills-row filter-pills-sm">';
-    h += '<span class="filter-pills-lbl">' + esc(t("findings.filter_status") || "Statut") + '</span>';
-    [
-        { v: "",               l: t("findings.all_statuses") },
-        { v: "new",            l: t("findings.status_new") },
-        { v: "to_fix",        l: t("findings.status_to_fix") },
-        { v: "false_positive", l: t("findings.status_false_positive") },
-        { v: "fixed",          l: t("findings.status_fixed") },
-        { v: "derogated",      l: t("findings.status_derogated") }
-    ].forEach(function(o) {
-        var on = f.status === o.v ? " active" : "";
-        h += '<button class="filter-pill status-pill-' + (o.v || "all") + on + '" data-click="_setFStatus" data-args=\'' + _da(o.v) + '\'>' + esc(o.l) + '</button>';
-    });
-    h += '</div>';
-
-    // Scanner pills ("Tous" first)
-    h += '<div class="filter-pills-row filter-pills-sm">';
-    h += '<span class="filter-pills-lbl">' + esc(t("findings.filter_scanner") || "Scanner") + '</span>';
-    [
-        { v: "",             l: t("findings.all_scanners") },
-        { v: "trivy_fs",    l: _scannerLabel("trivy_fs") },
-        { v: "trivy_image", l: _scannerLabel("trivy_image") },
-        { v: "gitleaks",    l: _scannerLabel("gitleaks") },
-        { v: "sast",        l: _scannerLabel("sast") }
-    ].forEach(function(o) {
-        var on = f.scanner === o.v ? " active" : "";
-        var scCls = o.v ? " scanner-pill-specific" : "";
-        h += '<button class="filter-pill scanner-pill' + scCls + on + '" data-click="_setFScanner" data-args=\'' + _da(o.v) + '\'>' + esc(o.l) + '</button>';
-    });
-    h += '</div>';
+    h += _findingPillRows(f, { sev: "_setFSev", status: "_setFStatus", scanner: "_setFScanner" });
 
     // Patch pills
     h += '<div class="filter-pills-row filter-pills-sm">';
@@ -900,7 +866,8 @@ async function _refreshFindingsBody(): Promise<void> {
     var el = document.getElementById("findings-body");
     if (!el) return;
     try {
-        var params: AppSecQueryParams = Object.assign({ limit: 10000 }, _findingsFilter);
+        var ff = _findingsFilter;
+        var params = _pillParams({ limit: 10000, app_id: ff.app_id, q: ff.q, patch: ff.patch }, ff);
         var data = await AppSecAPI.listFindings(params);
         var items = data.items || [];
         _lastFindingsItems = items;
@@ -1099,9 +1066,9 @@ window._bulkAppsecFindingsFP = function(scope: string) {
 };
 
 // Pill-based filters re-render the full panel so the .active class updates.
-window._setFSev = function(v: string) { _findingsFilter.severity = v; renderPanel(); };
-window._setFScanner = function(v: string) { _findingsFilter.scanner = v; renderPanel(); };
-window._setFStatus = function(v: string) { _findingsFilter.status = v; renderPanel(); };
+window._setFSev = function(v: string) { _cyclePill(_findingsFilter.severity, v); renderPanel(); };
+window._setFScanner = function(v: string) { _cyclePill(_findingsFilter.scanner, v); renderPanel(); };
+window._setFStatus = function(v: string) { _cyclePill(_findingsFilter.status, v); renderPanel(); };
 // Dropdown/input filters only need to refresh the table body.
 window._setFApp = function(v: string) { _findingsFilter.app_id = v; _refreshFindingsBody(); };
 
