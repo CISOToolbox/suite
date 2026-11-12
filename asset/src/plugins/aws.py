@@ -70,7 +70,7 @@ class AwsAssetPlugin(AssetPlugin):
         region = config.get("region") or "eu-west-3"
         if not self._has_creds(config):
             logger.info("AWS asset plugin: no credentials configured")
-            return SyncResult(assets=[], errors=["Identifiants AWS non configurés."])
+            return SyncResult(assets=[], errors=["AWS credentials are not configured."])
 
         import asyncio
         try:
@@ -81,7 +81,7 @@ class AwsAssetPlugin(AssetPlugin):
         except ModuleNotFoundError:
             # Surface the misconfiguration instead of failing silently.
             logger.warning("AWS asset plugin: boto3 missing but credentials set")
-            return SyncResult(assets=[], errors=["boto3 non installé sur le serveur."])
+            return SyncResult(assets=[], errors=["boto3 is not installed on the server."])
         except Exception as e:  # noqa: BLE001 — report the failure, never mask it
             logger.warning("AWS asset plugin: live sync failed (%s)", e)
             return SyncResult(assets=[], errors=[str(e)])

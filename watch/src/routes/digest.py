@@ -204,8 +204,8 @@ async def get_run_body(
     if not body.strip():
         body = (
             "<p style='padding:24px;color:#888;font-family:sans-serif'>"
-            "Aucun contenu archivé pour ce digest "
-            "(envoi antérieur à la migration 013 ou statut non terminal)."
+            "No content was archived for this digest "
+            "(it was sent before archiving existed, or nothing was sent)."
             "</p>"
         )
     return HTMLResponse(body)
