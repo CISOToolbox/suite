@@ -99,7 +99,7 @@ class EntraIdPlugin(AccessPlugin):
             except httpx.HTTPStatusError as e:
                 logger.warning("Entra ID: signInActivity unavailable (%s) — fetching users without it", e)
                 errors.append(
-                    "Dernière connexion indisponible : nécessite Entra ID P1/P2 + permission AuditLog.Read.All"
+                    "Last sign-in unavailable: it requires Entra ID P1/P2 and the AuditLog.Read.All permission"
                 )
                 raw_users = await graph_get_all(
                     token, f"{GRAPH_BASE}/users?$select={users_select}&$top=999", client

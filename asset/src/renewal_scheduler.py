@@ -32,9 +32,9 @@ TICK_SECONDS = int(os.getenv("ASSET_RENEWAL_TICK_SECONDS", "3600"))
 INTERVAL_HOURS = int(os.getenv("ASSET_RENEWAL_INTERVAL_HOURS", "24"))
 
 _KIND_LABEL = {
-    "licence": "Licence logiciel",
-    "support": "Support matériel",
-    "vie": "Fin de vie",
+    "licence": "Software license",
+    "support": "Hardware support",
+    "vie": "End of life",
 }
 
 # The same deadlines as the generated measures name them: a measure is stored
@@ -96,10 +96,10 @@ def compute_due_echeances(assets, today: date) -> list[dict]:
 
 def _days_label(days: int) -> str:
     if days == 0:
-        return "aujourd'hui"
+        return "today"
     if days < 0:
-        return f"en retard de {-days} j"
-    return f"dans {days} j"
+        return f"{-days} day(s) overdue"
+    return f"in {days} day(s)"
 
 
 def build_digest_html(due: list[dict], today: date) -> str:
@@ -116,14 +116,14 @@ def build_digest_html(due: list[dict], today: date) -> str:
         )
     return (
         "<div style='font-family:Arial,sans-serif;color:#1e293b'>"
-        f"<h2 style='color:#0f172a'>Échéances à renouveler — {len(due)}</h2>"
-        f"<p style='color:#64748b'>Au {today.isoformat()}, les actifs suivants ont une "
-        "licence logiciel, un support matériel ou une fin de vie qui arrive à échéance "
-        "(ou est dépassée).</p>"
+        f"<h2 style='color:#0f172a'>Asset deadlines — {len(due)}</h2>"
+        f"<p style='color:#64748b'>As of {today.isoformat()}, the deadlines below — "
+        "software license renewal, end of hardware support, end of life — are coming up "
+        "or overdue.</p>"
         "<table style='border-collapse:collapse;font-size:14px'>"
         "<thead><tr style='background:#f1f5f9;text-align:left'>"
-        "<th style='padding:6px 10px'>Type</th><th style='padding:6px 10px'>Actif</th>"
-        "<th style='padding:6px 10px'>Date</th><th style='padding:6px 10px'>Échéance</th>"
+        "<th style='padding:6px 10px'>Type</th><th style='padding:6px 10px'>Asset</th>"
+        "<th style='padding:6px 10px'>Date</th><th style='padding:6px 10px'>Deadline</th>"
         f"</tr></thead><tbody>{rows}</tbody></table>"
         "<p style='color:#94a3b8;font-size:12px;margin-top:16px'>CISO Toolbox · Asset</p>"
         "</div>"
@@ -244,7 +244,7 @@ async def run_now(db) -> dict:
     if not recipients:
         return {"due_count": len(due), "sent": False, "reason": "no_recipients", "measures_created": measures_created}
     html = build_digest_html(due, today)
-    subject = f"[CISO Toolbox] {len(due)} échéance(s) à renouveler"
+    subject = f"[CISO Toolbox] {len(due)} asset deadline(s) due"
     sent_to, errors = [], []
     for r in recipients:
         ok, err = await asyncio.to_thread(send_smtp, r, subject, html)
