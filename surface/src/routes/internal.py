@@ -180,13 +180,15 @@ async def internal_stats(request: Request, db: AsyncSession = Depends(get_db)):
     if crit > 0:
         alerts.append({
             "level": "critical",
-            "text": f"{crit} finding(s) critique(s) ouvert(s)",
+            "text": f"{crit} open critical finding(s)",
+            "text_fr": f"{crit} finding(s) critique(s) ouvert(s)",
             "url": "/surface/",
         })
     if overdue > 0:
         alerts.append({
             "level": "warning",
-            "text": f"{overdue} mesure(s) en retard",
+            "text": f"{overdue} overdue measure(s)",
+            "text_fr": f"{overdue} mesure(s) en retard",
             "url": "/surface/",
         })
 
@@ -248,11 +250,11 @@ def _posture_label(score):
     if score is None:
         return ""
     if score < 40:
-        return "Faible"
+        return "Low"
     if score < 60:
-        return "Modéré"
+        return "Moderate"
     if score < 80:
-        return "Bon"
+        return "Good"
     return "Excellent"
 
 
@@ -269,7 +271,8 @@ async def internal_activity(request: Request, db: AsyncSession = Depends(get_db)
             "date": ts,
             "module": "surface",
             "type": "finding_created",
-            "label": f"Nouveau finding {f.severity or ''} — {(f.title or f.target or '')[:50]}",
+            "label": f"New {f.severity or ''} finding — {(f.title or f.target or '')[:50]}",
+            "label_fr": f"Nouveau finding {f.severity or ''} — {(f.title or f.target or '')[:50]}",
             "url": "/surface/",
         })
     return events[:10]

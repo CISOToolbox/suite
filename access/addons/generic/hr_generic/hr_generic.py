@@ -125,7 +125,7 @@ class HrGenericPlugin(AccessPlugin):
                 resp = await client.get(url, headers=self._headers(config))
                 resp.raise_for_status()
                 rows = _extract_list(resp.json(), (config.get("users_key") or "").strip())
-            return {"ok": True, "error": "", "details": f"{len(rows)} enregistrement(s) lus"}
+            return {"ok": True, "error": "", "details": f"{len(rows)} record(s) read"}
         except Exception as e:
             return {"ok": False, "error": str(e), "details": ""}
 

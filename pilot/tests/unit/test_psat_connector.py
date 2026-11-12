@@ -206,8 +206,8 @@ def test_live_campaigns_follow_list_filter_or_everything():
     # A filter is set: it drives the discovery even when a list exists.
     assert _live_campaigns({**cfg, "tracked_campaigns": ["X"], "campaign_filter": "phish"},
                            meta, "2026-10-04") == (["Phishing Q3"], "")
-    assert _live_campaigns(cfg, {}, "2026-10-04") == ([], "aucune formation en cours dans PSAT")
-    assert _live_campaigns({**cfg, "campaign_filter": "zz"}, meta, "2026-10-04")[1].startswith("aucune formation en cours ne correspond")
+    assert _live_campaigns(cfg, {}, "2026-10-04") == ([], "no current training in PSAT")
+    assert _live_campaigns({**cfg, "campaign_filter": "zz"}, meta, "2026-10-04")[1] == 'no current training matches the filter "zz"'
 
 
 async def test_purge_connector_data_clears_the_dashboard_footprint(db):

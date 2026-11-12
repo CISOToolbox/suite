@@ -188,9 +188,9 @@ async def internal_stats(request: Request, db: AsyncSession = Depends(get_db)):
 
     # Donut: green = closed, gray = in progress, orange = not started
     donut_segments = [
-        {"label": "Terminées", "value": closed_reviews, "color": "green"},
-        {"label": "En cours", "value": active_reviews, "color": "gray"},
-        {"label": "Non commencées", "value": planned_reviews, "color": "orange"},
+        {"label": "Closed", "label_fr": "Terminées", "value": closed_reviews, "color": "green"},
+        {"label": "In progress", "label_fr": "En cours", "value": active_reviews, "color": "gray"},
+        {"label": "Not started", "label_fr": "Non commencées", "value": planned_reviews, "color": "orange"},
     ]
 
     # Apps without any review or with an overdue review.
@@ -251,43 +251,50 @@ async def internal_stats(request: Request, db: AsyncSession = Depends(get_db)):
     if contracts_expired_active > 0:
         alerts.append({
             "level": "warning",
-            "text": f"{contracts_expired_active} contrat(s) échu(s) mais utilisateur encore actif",
+            "text": f"{contracts_expired_active} expired contract(s) with a user still active",
+            "text_fr": f"{contracts_expired_active} contrat(s) échu(s) mais utilisateur encore actif",
             "url": "/access/",
         })
     if contracts_expiring > 0:
         alerts.append({
             "level": "warning",
-            "text": f"{contracts_expiring} contrat(s) arrivent à échéance (≤30j)",
+            "text": f"{contracts_expiring} contract(s) ending within 30 days",
+            "text_fr": f"{contracts_expiring} contrat(s) arrivant à échéance sous 30 jours",
             "url": "/access/",
         })
     if apps_needing_review > 0:
         alerts.append({
             "level": "warning",
-            "text": f"{apps_needing_review} application(s) sans revue ou avec revue en retard",
+            "text": f"{apps_needing_review} application(s) with no review or an overdue review",
+            "text_fr": f"{apps_needing_review} application(s) sans revue ou avec revue en retard",
             "url": "/access/",
         })
     if overdue > 0:
         alerts.append({
             "level": "warning",
-            "text": f"{overdue} mesure(s) en retard",
+            "text": f"{overdue} overdue measure(s)",
+            "text_fr": f"{overdue} mesure(s) en retard",
             "url": "/access/",
         })
     if rotation_overdue_count > 0:
         alerts.append({
             "level": "warning",
-            "text": f"{rotation_overdue_count} compte(s) de service avec rotation en retard",
+            "text": f"{rotation_overdue_count} service account(s) with an overdue rotation",
+            "text_fr": f"{rotation_overdue_count} compte(s) de service avec rotation en retard",
             "url": "/access/",
         })
     if sa_expiring_soon > 0:
         alerts.append({
             "level": "warning",
-            "text": f"{sa_expiring_soon} compte(s) de service expirant sous 30 jours",
+            "text": f"{sa_expiring_soon} service account(s) expiring within 30 days",
+            "text_fr": f"{sa_expiring_soon} compte(s) de service expirant sous 30 jours",
             "url": "/access/",
         })
     if sa_expired > 0:
         alerts.append({
             "level": "critical",
-            "text": f"{sa_expired} compte(s) de service expiré(s)",
+            "text": f"{sa_expired} expired service account(s)",
+            "text_fr": f"{sa_expired} compte(s) de service expiré(s)",
             "url": "/access/",
         })
 
@@ -378,11 +385,11 @@ def _posture_label(score):
     if score is None:
         return ""
     if score < 40:
-        return "Faible"
+        return "Low"
     if score < 60:
-        return "Modéré"
+        return "Moderate"
     if score < 80:
-        return "Bon"
+        return "Good"
     return "Excellent"
 
 
@@ -398,7 +405,8 @@ async def internal_activity(request: Request, db: AsyncSession = Depends(get_db)
             "date": (r.updated_at or r.created_at).isoformat(),
             "module": "access",
             "type": "review_updated",
-            "label": f"Revue {r.id} — {r.status or 'mise à jour'}",
+            "label": f"Review {r.id} — {r.status or 'updated'}",
+            "label_fr": f"Revue {r.id} — {r.status or 'mise à jour'}",
             "url": "/access/",
         })
     return events[:10]
@@ -922,11 +930,11 @@ def _apply_awareness_trainings(su, trainings: list[dict], today: str) -> None:
     su.sensibilisation_date = (max(done_dates) if done_dates
                                else (su.sensibilisation_date or today))
     n_done = sum(1 for t in trainings if bool(t.get("completed")))
-    summary = f"PSAT : {n_done}/{len(trainings)} formation(s) terminée(s)"
+    summary = f"PSAT: {n_done}/{len(trainings)} training(s) completed"
     if incomplete:
-        summary += f" — {len(incomplete)} en cours"
+        summary += f" — {len(incomplete)} in progress"
         if overdue:
-            summary += " (en retard)"
+            summary += " (overdue)"
     su.sensibilisation_justification = summary
     su.sync_source = "connector"
 

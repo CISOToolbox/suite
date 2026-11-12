@@ -2721,7 +2721,7 @@ function showPluginModal(pluginId) {
         h += '<div id="plg-type-grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:var(--ct-s1);max-height:200px;overflow-y:auto">';
         _availablePlugins.forEach(function (ap) {
             h += '<div class="plg-type-card" data-click="_plgSelectType" data-args=\'' + _da(ap.type) + '\'>';
-            h += '<div class="ct-strong">' + esc(ap.label) + '</div>';
+            h += '<div class="ct-strong">' + esc(_rt(ap, "label")) + '</div>';
             h += '</div>';
         });
         h += '</div></div>';
@@ -2789,11 +2789,11 @@ function _renderConfigFields(schema, values) {
             var checked = (rawVal === true || rawVal === "true" || rawVal === "on" || rawVal === 1);
             h += '<div class="ct-mb-2"><label class="ct-text-label ct-inline-flex ct-items-center ct-gap-1 ct-clickable">';
             h += '<input type="checkbox" data-config-key="' + esc(f.key) + '" data-config-type="checkbox"' + (checked ? " checked" : "") + '> ';
-            h += esc(f.label || f.key) + (f.required ? ' *' : '') + '</label></div>';
+            h += esc(_rt(f, "label") || f.key) + (f.required ? ' *' : '') + '</label></div>';
             return;
         }
         if (f.type === "select" && Array.isArray(f.options)) {
-            h += '<div class="ct-mb-2"><label class="ct-text-label">' + esc(f.label || f.key) + (f.required ? ' *' : '') + '</label>';
+            h += '<div class="ct-mb-2"><label class="ct-text-label">' + esc(_rt(f, "label") || f.key) + (f.required ? ' *' : '') + '</label>';
             h += '<select data-config-key="' + esc(f.key) + '" class="ct-w-full ct-p-1 ct-mt-1 ct-bordered ct-r-sm ct-text-meta">';
             f.options.forEach(function (opt) {
                 var ov = opt.value !== undefined ? opt.value : opt;
@@ -2804,14 +2804,14 @@ function _renderConfigFields(schema, values) {
             return;
         }
         if (f.type === "textarea") {
-            h += '<div class="ct-mb-2"><label class="ct-text-label">' + esc(f.label || f.key) + (f.required ? ' *' : '') + '</label>';
-            h += '<textarea data-config-key="' + esc(f.key) + '" rows="' + (f.rows || 3) + '" placeholder="' + esc(f.placeholder || "") + '" class="ct-w-full ct-p-1 ct-mt-1 ct-bordered ct-r-sm ct-text-meta ct-font-inherit">' + esc(String(val)) + '</textarea></div>';
+            h += '<div class="ct-mb-2"><label class="ct-text-label">' + esc(_rt(f, "label") || f.key) + (f.required ? ' *' : '') + '</label>';
+            h += '<textarea data-config-key="' + esc(f.key) + '" rows="' + (f.rows || 3) + '" placeholder="' + esc(_rt(f, "placeholder")) + '" class="ct-w-full ct-p-1 ct-mt-1 ct-bordered ct-r-sm ct-text-meta ct-font-inherit">' + esc(String(val)) + '</textarea></div>';
             return;
         }
         // Default: text or password
-        h += '<div class="ct-mb-2"><label class="ct-text-label">' + esc(f.label || f.key) + (f.required ? ' *' : '') + '</label>';
+        h += '<div class="ct-mb-2"><label class="ct-text-label">' + esc(_rt(f, "label") || f.key) + (f.required ? ' *' : '') + '</label>';
         var inputType = f.type === "password" ? "password" : "text";
-        h += '<input type="' + inputType + '" data-config-key="' + esc(f.key) + '" value="' + esc(String(val)) + '" placeholder="' + esc(f.placeholder || "") + '" class="ct-w-full ct-p-1 ct-mt-1 ct-bordered ct-r-sm ct-text-meta"></div>';
+        h += '<input type="' + inputType + '" data-config-key="' + esc(f.key) + '" value="' + esc(String(val)) + '" placeholder="' + esc(_rt(f, "placeholder")) + '" class="ct-w-full ct-p-1 ct-mt-1 ct-bordered ct-r-sm ct-text-meta"></div>';
     });
     return h;
 }
@@ -2870,8 +2870,7 @@ window._plgTypeChanged = function () {
         guideWrap.innerHTML = ap ? _renderPluginGuide(ap) : "";
 };
 function _renderPluginGuide(ap) {
-    var lang = localStorage.getItem("ct_lang") || "fr";
-    var guide = (lang === "en" && ap.setup_guide_en) ? ap.setup_guide_en : (ap.setup_guide || ap.setup_guide_en || "");
+    var guide = _rt(ap, "setup_guide") || ap.setup_guide_en || "";
     if (!guide)
         return "";
     var lines = guide.split("\n").map(function (l) { return esc(l); }).join("<br>");

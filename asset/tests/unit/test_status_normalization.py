@@ -29,11 +29,11 @@ class TestStatusNormalization:
     def test_posture_label_thresholds(self):
         from routes.internal import _posture_label
         assert _posture_label(None) == ""
-        assert _posture_label(0) == "Faible"
-        assert _posture_label(39) == "Faible"
-        assert _posture_label(40) == "Modéré"
-        assert _posture_label(59) == "Modéré"
-        assert _posture_label(60) == "Bon"
-        assert _posture_label(79) == "Bon"
+        assert _posture_label(0) == "Low"
+        assert _posture_label(39) == "Low"
+        assert _posture_label(40) == "Moderate"
+        assert _posture_label(59) == "Moderate"
+        assert _posture_label(60) == "Good"
+        assert _posture_label(79) == "Good"
         assert _posture_label(80) == "Excellent"
         assert _posture_label(100) == "Excellent"

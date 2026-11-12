@@ -135,5 +135,5 @@ async def send_test(user: Optional[User] = Depends(get_current_user),
     status = await send_weekly_for_recipient(db, email, mine or apps, prefs, force=True)
     if status == "failed":
         raise HTTPException(status_code=502,
-                            detail="Envoi SMTP en échec — vérifier la configuration SMTP")
+                            detail="SMTP send failed: check the SMTP configuration")
     return {"results": {"appsec": status}}

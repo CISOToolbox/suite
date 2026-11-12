@@ -644,9 +644,9 @@ async def _sync_measures(reporting: dict, db: AsyncSession) -> int:
 
     for sid, c in active.items():
         data = {
-            "title": f"Sensibilisation : {c['overdue']} utilisateur(s) en retard — {c['name']}",
-            "description": f"{c['completed']}/{c['assigned']} ont complété « {c['name']} ». "
-                           "Relancer les utilisateurs en retard.",
+            "title": f"Awareness: {c['overdue']} overdue user(s) — {c['name']}",
+            "description": f"{c['completed']}/{c['assigned']} completed \"{c['name']}\". "
+                           "Remind the overdue users.",
             "status": "planifie",
             "due_date": due,
             "severity": "moyenne",
@@ -896,19 +896,19 @@ async def test_credentials(db: AsyncSession) -> tuple[bool, str]:
     cfg = await get_config(db)
     if not cfg["api_key"]:
         if await _demo_enabled(db):
-            return True, "Mode démo (aucune clé API PSAT) — données simulées sur l'annuaire Access."
-        return False, "Aucune clé API PSAT configurée."
+            return True, "Demo mode (no PSAT API key): simulated data on the Access directory."
+        return False, "No PSAT API key configured."
     try:
         async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT, headers=_headers(cfg["api_key"])) as client:
             resp = await client.get(_base_url(cfg["region"]) + "/training",
                                     params={"page[size]": 1, "page[number]": 1})
         if resp.status_code in (401, 403):
-            return False, "Clé API PSAT refusée (401/403)."
+            return False, "PSAT API key refused (401/403)."
         resp.raise_for_status()
-        return True, f"Connecté à PSAT ({cfg['region'].upper()})."
+        return True, f"Connected to PSAT ({cfg['region'].upper()})."
     except Exception as e:  # noqa: BLE001
         logger.warning("PSAT test failed: %s", e)
-        return False, "Échec de connexion à l'API PSAT (voir les logs serveur)."
+        return False, "Connection to the PSAT API failed (see the server logs)."
 
 
 def _live_campaigns(cfg: dict, meta: dict[str, dict], today: str) -> tuple[list[str], str]:
@@ -921,8 +921,8 @@ def _live_campaigns(cfg: dict, meta: dict[str, dict], today: str) -> tuple[list[
     if found:
         return found, ""
     if not cfg["campaign_filter"]:
-        return [], "aucune formation en cours dans PSAT"
-    return [], f"aucune formation en cours ne correspond au filtre « {cfg['campaign_filter']} »"
+        return [], "no current training in PSAT"
+    return [], f"no current training matches the filter \"{cfg['campaign_filter']}\""
 
 
 async def run_sync(db: AsyncSession) -> dict[str, Any]:
@@ -949,16 +949,16 @@ async def run_sync(db: AsyncSession) -> dict[str, Any]:
         except httpx.HTTPStatusError as e:
             code = e.response.status_code
             if code == 429:
-                msg = "Limite de débit de l'API PSAT atteinte (429). Réessayez dans quelques minutes."
+                msg = "PSAT API rate limit reached (429). Retry in a few minutes."
             elif code in (401, 403):
-                msg = "Clé API PSAT refusée (401/403)."
+                msg = "PSAT API key refused (401/403)."
             else:
-                msg = f"Échec de l'API PSAT (HTTP {code})."
+                msg = f"PSAT API failed (HTTP {code})."
             logger.warning("PSAT run live fetch failed: %s", e)
             return {"ok": False, "error": msg}
         except httpx.HTTPError as e:
             logger.warning("PSAT run live fetch error: %s", e)
-            return {"ok": False, "error": "Échec de connexion à l'API PSAT (voir les logs serveur)."}
+            return {"ok": False, "error": "Connection to the PSAT API failed (see the server logs)."}
         meta = _campaign_meta(records)
         effective, skipped = _live_campaigns(cfg, meta, today)
         if skipped:

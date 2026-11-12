@@ -46,7 +46,7 @@ class SalesforcePlugin(AccessPlugin):
         {"key": "client_secret", "label": "Client Secret", "label_en": "Client Secret", "type": "password", "secret": True, "required": True},
         {"key": "username", "label": "Nom d'utilisateur", "label_en": "Username", "type": "text", "required": True, "placeholder": "integration@example.com"},
         {"key": "password", "label": "Mot de passe", "label_en": "Password", "type": "password", "secret": True, "required": True},
-        {"key": "security_token", "label": "Jeton de sécurité", "label_en": "Security Token", "type": "password", "secret": True, "required": False, "placeholder": "(optionnel si IP de confiance)"},
+        {"key": "security_token", "label": "Jeton de sécurité", "label_en": "Security Token", "type": "password", "secret": True, "required": False, "placeholder": "(optionnel si IP de confiance)", "placeholder_en": "(optional from a trusted IP)"},
     ]
     setup_guide = (
         "1. Aller dans Setup > Apps > App Manager > New Connected App\n"

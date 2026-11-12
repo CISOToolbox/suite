@@ -191,16 +191,16 @@ async def resolve_metric(metric: str, db: AsyncSession) -> Optional[float]:
 async def test_credentials(db: AsyncSession) -> tuple[bool, str]:
     creds = await get_credentials(db)
     if creds is None:
-        return True, "Mode démo (aucune credential AWS configurée) — valeurs simulées."
+        return True, "Demo mode (no AWS credentials configured): simulated values."
     try:
         import asyncio
         session = _boto3_session(creds)
         ident = await asyncio.get_event_loop().run_in_executor(
             None, lambda: session.client("sts").get_caller_identity()
         )
-        return True, f"Connecté au compte AWS {ident.get('Account', '?')}."
+        return True, f"Connected to AWS account {ident.get('Account', '?')}."
     except ModuleNotFoundError:
-        return True, "boto3 non installé — mode démo (valeurs simulées)."
+        return True, "boto3 not installed: demo mode (simulated values)."
     except Exception as e:  # noqa: BLE001
         logger.warning("AWS connector test failed: %s", e)
-        return False, "Échec de connexion AWS (voir les logs serveur)."
+        return False, "AWS connection failed (see the server logs)."

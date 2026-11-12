@@ -8,6 +8,10 @@
  * top_items[], alerts[] }. Fields are optional on the front end because
  * Pilot falls back to a default for any field a module leaves out.
  *
+ * A text of the contract is English; a module that has it in French adds it
+ * under the same key suffixed `_fr` (`text_fr`, `entity_label_fr`, the
+ * `label_fr` of a breakdown segment or of an activity event).
+ *
  * Pure type file — no emit.
  */
 
@@ -38,6 +42,7 @@ interface PilotTopItem {
 interface PilotAlert {
     level?: string;   // info | warning | critical
     text?: string;
+    text_fr?: string;
     url?: string;
 }
 
@@ -45,6 +50,7 @@ interface PilotAlert {
 interface PilotStatsEnvelope {
     entity_count?: number;
     entity_label?: string;
+    entity_label_fr?: string;
     measures?: PilotMeasuresSummary;
     posture?: PilotPosture | null;
     /** breakdown.type ∈ donut | bar | gauge | heatmap_5x5 | timeline — rendered via _svgBreakdown. */
@@ -84,6 +90,7 @@ interface PilotUpcoming {
 interface PilotActivityEvent {
     module?: string;
     label?: string;
+    label_fr?: string;
     date?: string;
 }
 

@@ -69,7 +69,7 @@ class AccessPlugin(ABC):
     plugin_type: str = ""
     label: str = ""
     label_en: str = ""
-    # [{key, label, label_en, type, required, placeholder, secret}]
+    # [{key, label, label_en, type, required, placeholder, placeholder_en, secret}]
     # A credential field carries "secret": True: it is masked on every read
     # (plugin list, Pilot connectors API), whatever its key name or type.
     config_schema: list[dict] = []

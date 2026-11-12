@@ -210,6 +210,24 @@
     // ═══════════════════════════════════════════════════════════════
     // DASHBOARD
     // ═══════════════════════════════════════════════════════════════
+    /** A text a module writes for the dashboard: English under `key`, French
+     *  under `key + "_fr"` when the module provides it. Read at render time, so a
+     *  language switch redraws it. */
+    function _dashText(o, key) {
+        return (_locale === "fr" && o[key + "_fr"]) || o[key] || "";
+    }
+    /** The breakdown with its labels in the language of the interface. */
+    function _dashBreakdown(b) {
+        if (_locale !== "fr" || !b.data)
+            return b;
+        var data = Object.assign({}, b.data);
+        var relabel = function (s) { return Object.assign({}, s, { label: _dashText(s, "label") }); };
+        if (data.segments)
+            data.segments = data.segments.map(relabel);
+        if (data.buckets)
+            data.buckets = data.buckets.map(relabel);
+        return { type: b.type, data: data };
+    }
     function _renderDashboard(c) {
         if (!_dashData) {
             c.innerHTML = '<div class="ct-ta-c ct-p-8 ct-muted">' + t("pilot.common.loading") + '</div>';
@@ -224,7 +242,8 @@
         // slot; the local .dash-kpi-gauge wrapper is kept purely to centre the SVG.
         var postureVal = kpis.posture_global;
         // Label computed from the score frontend-side (translated, re-renders on
-        // language switch) rather than consuming the backend's fixed FR posture_label.
+        // language switch) rather than consuming the backend's posture label, which
+        // exists in English only.
         var postureLabel = _postureLabel(postureVal);
         // Conditional tone from the score itself (mirrors _postureColor's bands):
         // >=70 green (low), 40-69 amber (high), <40 red (critical), null → neutral.
@@ -369,7 +388,7 @@
                 var when = (ev.date || "").replace("T", " ").substring(0, 16);
                 h += '<li>';
                 h += '<span class="ct-ref" data-module="' + esc(ev.module || '') + '">' + esc(ev.module || '') + '</span>';
-                h += '<span class="dash-activity-label">' + esc(ev.label || '') + '</span>';
+                h += '<span class="dash-activity-label">' + esc(_dashText(ev, "label")) + '</span>';
                 h += '<span class="dash-activity-date">' + esc(when) + '</span>';
                 h += '</li>';
             });
@@ -400,18 +419,18 @@
         }
         // ── 2. Legend (entity count + label) above the chart ──
         h += '<div class="dash-module-legend">';
-        h += '<strong>' + (stats.entity_count || 0) + '</strong> ' + esc(stats.entity_label || '').toLowerCase();
+        h += '<strong>' + (stats.entity_count || 0) + '</strong> ' + esc(_dashText(stats, "entity_label")).toLowerCase();
         h += '</div>';
         // ── 3. Chart (donut or bar) centred ──
         h += '<div class="dash-module-viz">';
-        h += _svgBreakdown(stats.breakdown, { width: 260 });
+        h += _svgBreakdown(_dashBreakdown(stats.breakdown), { width: 260 });
         h += '</div>';
         // ── 4+5. Footer: alerts + measures, pushed to card bottom ──
         h += '<div class="dash-module-footer">';
         if (alerts.length) {
             h += '<div class="dash-module-alerts">';
             alerts.forEach(function (a) {
-                h += '<div class="dash-alert dash-alert--' + esc(a.level || 'info') + '">' + esc(a.text || '') + '</div>';
+                h += '<div class="dash-alert dash-alert--' + esc(a.level || 'info') + '">' + esc(_dashText(a, "text")) + '</div>';
             });
             h += '</div>';
         }

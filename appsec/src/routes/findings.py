@@ -352,14 +352,14 @@ async def bulk_triage(
     if body.status not in ("new", "false_positive", "to_fix", "fixed"):
         raise HTTPException(status_code=400, detail="Invalid status")
     if body.status == "to_fix" and not (body.measure_title or "").strip():
-        raise HTTPException(status_code=400, detail="Le nom de la mesure est obligatoire")
+        raise HTTPException(status_code=400, detail="The measure name is required")
 
     result = await db.execute(
         select(Finding).options(selectinload(Finding.application)).where(Finding.id.in_(body.ids))
     )
     findings = result.scalars().all()
     if not findings:
-        raise HTTPException(status_code=404, detail="Aucun finding trouvé pour les ids fournis")
+        raise HTTPException(status_code=404, detail="No finding found for the given ids")
 
     targets = [{"app": f.application.name if f.application else "?",
                 "finding": f.cve_id or f.title[:60]} for f in findings]

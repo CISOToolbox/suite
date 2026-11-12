@@ -173,10 +173,13 @@ type AccessData = {
 
 type AccessPluginConfigField = {
     key: string;
+    /** French; `label_en` and `placeholder_en` carry the English. */
     label?: string;
+    label_en?: string;
     type?: string;
     required?: boolean;
     placeholder?: string;
+    placeholder_en?: string;
     rows?: number;
     /** {value,label} objects or bare primitives — mixed formats backend-side. */
     options?: any[];
@@ -185,6 +188,7 @@ type AccessPluginConfigField = {
 type AccessAvailablePlugin = {
     type: string;
     label: string;
+    label_en?: string;
     config_schema?: AccessPluginConfigField[];
     setup_guide?: string;
     setup_guide_en?: string;

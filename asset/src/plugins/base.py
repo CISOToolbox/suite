@@ -105,7 +105,7 @@ class AssetPlugin(ABC):
     plugin_type: str = ""
     label: str = ""
     label_en: str = ""
-    # [{key, label, label_en, type, required, placeholder, secret}]
+    # [{key, label, label_en, type, required, placeholder, placeholder_en, secret}]
     # type ∈ {text, password, checkbox, select, textarea, number}
     # A credential field carries "secret": True: it is masked on every read
     # (plugin list, Pilot connectors API), whatever its key name or type.

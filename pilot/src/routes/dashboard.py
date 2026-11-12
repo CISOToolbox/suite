@@ -168,11 +168,11 @@ def _posture_label(score):
     if score is None:
         return ""
     if score < 40:
-        return "Faible"
+        return "Low"
     if score < 60:
-        return "Modéré"
+        return "Moderate"
     if score < 80:
-        return "Bon"
+        return "Good"
     return "Excellent"
 
 
@@ -409,7 +409,7 @@ async def get_dashboard(user: User = Depends(get_current_user), db: AsyncSession
         upcoming.append({
             "date": due,
             "module": mc.module,
-            "label": (d.get("title") or d.get("mesure") or "Mesure")[:80],
+            "label": (d.get("title") or d.get("mesure") or "Measure")[:80],
             "url": f"/{mc.module}/",
             "days_left": days_left,
         })

@@ -130,7 +130,7 @@ async def update_project(
     if body.expected_server_rev is not None and (project.server_rev or 0) > body.expected_server_rev:
         # Marked so the page tells this conflict apart from any other 409.
         raise HTTPException(status_code=409, headers={"X-CT-Conflict": "stale"},
-                            detail="Données modifiées côté serveur depuis le chargement (Pilot/scheduler) — rechargez avant une sauvegarde globale.")
+                            detail="Data changed on the server since it was loaded (Pilot or a scheduled task): reload before a full save.")
     if body.data is not None:
         project.data = _sanitize_blob(body.data)
         m_name, m_org, m_date = _meta_fields(project.data)
@@ -183,7 +183,7 @@ async def duplicate_project(
     if not src:
         raise HTTPException(status_code=404, detail="Audit not found")
     copy = Project(
-        name=(src.name + " (copie)")[:255],
+        name=(src.name + " (copy)")[:255],
         organization=src.organization,
         audit_date=src.audit_date,
         owner_id=user.id if user else None,
@@ -229,7 +229,7 @@ async def import_project(
     data = _sanitize_blob(parsed)
     m_name, m_org, m_date = _meta_fields(data)
     project = Project(
-        name=m_name or (file.filename or "Audit importé")[:255],
+        name=m_name or (file.filename or "Imported audit")[:255],
         organization=m_org or None,
         audit_date=m_date or None,
         owner_id=user.id if user else None,

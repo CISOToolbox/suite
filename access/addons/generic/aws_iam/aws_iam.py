@@ -98,7 +98,7 @@ class AwsIamPlugin(AccessPlugin):
 
     async def test_connection(self, config: dict) -> dict:
         if not self._has_creds(config):
-            return {"ok": True, "error": "", "details": "Mode démo (aucune credential AWS) — utilisateurs IAM simulés."}
+            return {"ok": True, "error": "", "details": "Demo mode (no AWS credentials): simulated IAM users."}
         import asyncio
         try:
             def _test():
@@ -112,7 +112,7 @@ class AwsIamPlugin(AccessPlugin):
             return {"ok": True, "error": "", "details": f"Connected to AWS account: {account}"}
         except Exception as e:
             logger.warning("AWS IAM test failed: %s", e)
-            return {"ok": False, "error": "Échec de connexion AWS (voir les logs serveur).", "details": ""}
+            return {"ok": False, "error": "AWS connection failed (see the server logs).", "details": ""}
 
     async def sync(self, config: dict, group_filters: list[str]) -> SyncResult:
         if not self._has_creds(config):

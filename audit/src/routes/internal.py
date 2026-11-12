@@ -66,12 +66,12 @@ def _posture_label(score) -> str:
     if score is None:
         return "N/A"
     if score >= 80:
-        return "Bon"
+        return "Good"
     if score >= 60:
-        return "Moyen"
+        return "Fair"
     if score >= 40:
-        return "Faible"
-    return "Critique"
+        return "Low"
+    return "Critical"
 
 
 @router.get("/internal/stats")
@@ -92,7 +92,7 @@ async def internal_stats(request: Request, db: AsyncSession = Depends(get_db)):
             total_counts[s] = total_counts.get(s, 0) + n
         if len(top_items) < 5:
             top_items.append({
-                "label": p.name or "(sans nom)",
+                "label": p.name or "(unnamed)",
                 "value": f"{score}%" if score is not None else "—",
                 "tone": "low" if (score or 0) >= 80 else ("high" if (score or 0) < 60 else "medium"),
             })
@@ -103,7 +103,7 @@ async def internal_stats(request: Request, db: AsyncSession = Depends(get_db)):
     if nc_maj:
         alerts.append({
             "severity": "high",
-            "message": f"{nc_maj} non-conformité(s) majeure(s) ouvertes sur l'ensemble des audits",
+            "message": f"{nc_maj} open major non-conformity(ies) across all audits",
         })
 
     m_rows = (await db.execute(select(Measure))).scalars().all()
@@ -128,11 +128,11 @@ async def internal_stats(request: Request, db: AsyncSession = Depends(get_db)):
         "breakdown": {
             "type": "bar",
             "data": [
-                {"label": "Conforme", "value": total_counts.get("c", 0), "tone": "low"},
-                {"label": "NC majeure", "value": nc_maj, "tone": "critical"},
-                {"label": "NC mineure", "value": total_counts.get("ncmin", 0), "tone": "high"},
-                {"label": "Point sensible", "value": total_counts.get("ps", 0), "tone": "medium"},
-                {"label": "Piste de progrès", "value": total_counts.get("pp", 0), "tone": "info"},
+                {"label": "Compliant", "label_fr": "Conforme", "value": total_counts.get("c", 0), "tone": "low"},
+                {"label": "Major NC", "label_fr": "NC majeure", "value": nc_maj, "tone": "critical"},
+                {"label": "Minor NC", "label_fr": "NC mineure", "value": total_counts.get("ncmin", 0), "tone": "high"},
+                {"label": "Point of concern", "label_fr": "Point sensible", "value": total_counts.get("ps", 0), "tone": "medium"},
+                {"label": "Improvement opportunity", "label_fr": "Piste de progrès", "value": total_counts.get("pp", 0), "tone": "info"},
             ],
         },
         "top_items": top_items,

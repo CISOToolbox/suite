@@ -47,11 +47,11 @@ def _posture_label(score):
     if score is None:
         return ""
     if score < 40:
-        return "Faible"
+        return "Low"
     if score < 60:
-        return "Modéré"
+        return "Moderate"
     if score < 80:
-        return "Bon"
+        return "Good"
     return "Excellent"
 
 
@@ -122,9 +122,9 @@ async def internal_stats(request: Request, db: AsyncSession = Depends(get_db)):
 
     alerts = []
     if crit > 0:
-        alerts.append({"level": "critical", "text": f"{crit} finding(s) critique(s) ouvert(s)", "url": "/appsec/"})
+        alerts.append({"level": "critical", "text": f"{crit} open critical finding(s)", "text_fr": f"{crit} finding(s) critique(s) ouvert(s)", "url": "/appsec/"})
     if overdue > 0:
-        alerts.append({"level": "warning", "text": f"{overdue} mesure(s) en retard", "url": "/appsec/"})
+        alerts.append({"level": "warning", "text": f"{overdue} overdue measure(s)", "text_fr": f"{overdue} mesure(s) en retard", "url": "/appsec/"})
 
     return {
         "entity_count": total_apps, "entity_label": "Applications",

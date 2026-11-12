@@ -2265,7 +2265,7 @@ window.showPluginModal = function(pluginId?: string) {
 
     // Available plugin types (for a new connector) — render as card grid
     var typeOpts = _availablePlugins.map(function(ap) {
-        return { value: ap.type, label: ap.label };
+        return { value: ap.type, label: _rt(ap, "label") };
     });
 
     var initialType = existing ? existing.plugin_type : (typeOpts[0] && typeOpts[0].value) || "";
@@ -2294,10 +2294,11 @@ window.showPluginModal = function(pluginId?: string) {
         h += '<input type="text" id="aplg-label" value="' + esc(existing ? existing.label : "") + '" placeholder="AD Corp" class="ct-w-full">';
 
         // Setup guide (collapsible)
-        if (tdef && tdef.setup_guide) {
+        var guide = tdef ? _rt(tdef, "setup_guide") || tdef.setup_guide_en || "" : "";
+        if (guide) {
             h += '<details style="margin:var(--ct-s2) 0;border:1px solid var(--ct-line);border-radius:var(--ct-r-sm);padding:var(--ct-s1);background:var(--ct-surface-2)">';
             h += '<summary class="ct-clickable ct-text-label ct-text-info">' + (t("plg.setup_guide") || "Guide de configuration") + '</summary>';
-            h += '<div style="margin-top:var(--ct-s1);font-size:var(--ct-text-label);line-height:1.5;white-space:pre-wrap">' + esc(tdef.setup_guide) + '</div>';
+            h += '<div style="margin-top:var(--ct-s1);font-size:var(--ct-text-label);line-height:1.5;white-space:pre-wrap">' + esc(guide) + '</div>';
             h += '</details>';
         }
 
@@ -2384,7 +2385,7 @@ function _renderPluginConfigFields(tdef: AssetPluginTypeDef | undefined, values?
     tdef.config_schema.forEach(function(f) {
         var id = "aplg-cfg-" + f.key;
         var val = values[f.key];
-        var label = esc(f.label || f.key) + (f.required ? ' <span class="ct-text-critical">*</span>' : '');
+        var label = esc(_rt(f, "label") || f.key) + (f.required ? ' <span class="ct-text-critical">*</span>' : '');
         if (f.type === "checkbox") {
             var checked = (val == null)
                 ? (f.default === true)
@@ -2398,7 +2399,7 @@ function _renderPluginConfigFields(tdef: AssetPluginTypeDef | undefined, values?
         } else {
             var inputType = f.type === "password" ? "password" : (f.type === "number" ? "number" : "text");
             h += '<label class="ct-block ct-text-label ct-mt-1">' + label + '</label>';
-            h += '<input type="' + inputType + '" id="' + id + '" data-aplg-key="' + esc(f.key) + '" value="' + esc(String(val == null ? "" : val)) + '" placeholder="' + esc(f.placeholder || "") + '" class="ct-w-full">';
+            h += '<input type="' + inputType + '" id="' + id + '" data-aplg-key="' + esc(f.key) + '" value="' + esc(String(val == null ? "" : val)) + '" placeholder="' + esc(_rt(f, "placeholder")) + '" class="ct-w-full">';
         }
     });
     return h;

@@ -37,6 +37,14 @@ _KIND_LABEL = {
     "vie": "Fin de vie",
 }
 
+# The same deadlines as the generated measures name them: a measure is stored
+# data, written in English like the rest of what the backend generates.
+_MEASURE_DEADLINE = {
+    "licence": "software licence",
+    "support": "hardware support",
+    "vie": "end-of-life",
+}
+
 
 def _lead(raw, default: int) -> int:
     try:
@@ -182,24 +190,24 @@ async def _ensure_measures(db, due: list[dict], assets) -> int:
         if pid not in next_num:
             next_num[pid] = await max_measure_num(db, pid)
         next_num[pid] += 1
-        kind_label = _KIND_LABEL.get(e["kind"], e["kind"])
+        deadline = _MEASURE_DEADLINE.get(e["kind"], e["kind"])
         nom = e["asset_nom"]
         titles = {
-            "licence": f"Renouveler la licence : {nom}",
-            "support": f"Anticiper la fin de support : {nom}",
-            "vie": f"Anticiper la fin de vie : {nom}",
+            "licence": f"Renew the licence: {nom}",
+            "support": f"Prepare for the end of support: {nom}",
+            "vie": f"Prepare for the end of life: {nom}",
         }
         note = {
             "at": datetime.now(timezone.utc).isoformat(),
-            "by": "système",
-            "text": f"Mesure générée automatiquement depuis l'échéance « {kind_label} » du {e['date']}.",
+            "by": "system",
+            "text": f"Measure generated automatically from the {deadline} deadline of {e['date']}.",
         }
         db.add(Measure(
             project_id=pid,
             id=measure_id(next_num[pid]),
             sort_order=next_num[pid],
-            title=titles.get(e["kind"], f"Échéance : {nom}"),
-            description=f"Échéance {kind_label} de l'actif {nom} ({e['asset_id']}) au {e['date']}.",
+            title=titles.get(e["kind"], f"Deadline: {nom}"),
+            description=f"The {deadline} deadline of asset {nom} ({e['asset_id']}) falls on {e['date']}.",
             statut="a_faire",
             responsable=responsable,
             echeance=e["date"],
