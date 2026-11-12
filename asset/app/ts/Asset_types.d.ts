@@ -154,10 +154,13 @@ interface AssetSortState {
 
 interface AssetPluginConfigField {
     key: string;
+    /** French; `label_en` and `placeholder_en` carry the English. */
     label?: string;
+    label_en?: string;
     type?: string;
     required?: boolean;
     placeholder?: string;
+    placeholder_en?: string;
     default?: boolean;
 }
 
@@ -165,7 +168,9 @@ interface AssetPluginConfigField {
 interface AssetPluginTypeDef {
     type: string;
     label: string;
+    label_en?: string;
     setup_guide?: string;
+    setup_guide_en?: string;
     config_schema?: AssetPluginConfigField[];
 }
 

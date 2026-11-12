@@ -123,7 +123,7 @@ async def update_settings(body: SettingsUpdate, user: User = Depends(get_current
         # The region is interpolated into the Bedrock hostname by every
         # module; refuse anything that isn't a region name at the source.
         if not _BEDROCK_REGION_RE.fullmatch(body.ai_region_bedrock.strip()):
-            raise HTTPException(status_code=400, detail="Region Bedrock invalide")
+            raise HTTPException(status_code=400, detail="Invalid Bedrock region")
         body.ai_region_bedrock = body.ai_region_bedrock.strip()
     # The proxy goes to every module as is: an exception httpx cannot parse
     # breaks every HTTP client of a module, a list in a proxy URL reaches
@@ -147,16 +147,16 @@ async def update_settings(body: SettingsUpdate, user: User = Depends(get_current
         valid, err = await _validate_ai_key("anthropic", body.ai_key_anthropic, proxies=proxies)
         validation["anthropic"] = {"valid": valid, "error": err}
         if not valid:
-            raise HTTPException(status_code=400, detail=f"Cle Anthropic invalide: {err}")
+            raise HTTPException(status_code=400, detail=f"Invalid Anthropic key: {err}")
     if body.ai_key_gemini:
         valid, err = await _validate_ai_key("gemini", body.ai_key_gemini, proxies=proxies)
         if not valid:
-            raise HTTPException(status_code=422, detail=f"Clé Gemini invalide : {err}")
+            raise HTTPException(status_code=422, detail=f"Invalid Gemini key: {err}")
     if body.ai_key_openai:
         valid, err = await _validate_ai_key("openai", body.ai_key_openai, proxies=proxies)
         validation["openai"] = {"valid": valid, "error": err}
         if not valid:
-            raise HTTPException(status_code=400, detail=f"Cle OpenAI invalide: {err}")
+            raise HTTPException(status_code=400, detail=f"Invalid OpenAI key: {err}")
     if body.ai_custom_endpoint:
         # C-3 fix: validate endpoint URL to prevent SSRF — through the proxy
         # being saved, which resolves the name when it applies.
@@ -181,7 +181,7 @@ async def update_settings(body: SettingsUpdate, user: User = Depends(get_current
                 "Custom LLM: it refuses a request without an API key; to remove the key, "
                 "clear the endpoint as well"))
         if not valid:
-            raise HTTPException(status_code=400, detail=f"LLM custom invalide: {err}")
+            raise HTTPException(status_code=400, detail=f"Invalid custom LLM: {err}")
 
     updates = body.model_dump(exclude_none=True)
     # If client re-sent the masked placeholder for smtp_password ("configured"),
@@ -284,7 +284,7 @@ _AI_CHECK_URLS = {
     "openai": "https://api.openai.com/v1/chat/completions",
     "gemini": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent",
 }
-_CUSTOM_KEY_REFUSED = "Cle invalide ou acces refuse"
+_CUSTOM_KEY_REFUSED = "Invalid key or access refused"
 
 
 def _check_proxies(proxies: dict[str, str]) -> dict[str, str]:
@@ -315,9 +315,9 @@ async def _validate_ai_key(provider: str, key: str, endpoint: str = "", model: s
     route = _check_proxies(proxies)
     if provider == "custom":
         if not endpoint:
-            return False, "Endpoint requis"
+            return False, "Endpoint is required"
         if not model:
-            return False, "Modele requis"
+            return False, "Model is required"
         target = endpoint.rstrip("/")
         if not target.endswith("/chat/completions"):
             target += "/chat/completions"
@@ -330,12 +330,12 @@ async def _validate_ai_key(provider: str, key: str, endpoint: str = "", model: s
             target, host_headers, extensions, proxy = resolve_safe_request(
                 target, require_https=not _ALLOW_INSECURE_LLM_ENDPOINT, proxies=route)
         except ValueError as e:
-            return False, f"Endpoint refuse: {e}"
+            return False, f"Endpoint refused: {e}"
     elif provider in _AI_CHECK_URLS:
         target = _AI_CHECK_URLS[provider]
         proxy = proxy_for(target, route)
     else:
-        return False, "Fournisseur inconnu"
+        return False, "Unknown provider"
     try:
         async with _check_client(proxy) as client:
             if provider == "anthropic":
@@ -345,7 +345,7 @@ async def _validate_ai_key(provider: str, key: str, endpoint: str = "", model: s
                     json={"model": "claude-sonnet-4-6", "max_tokens": 1, "messages": [{"role": "user", "content": "hi"}]},
                 )
                 if resp.status_code in (401, 403):
-                    return False, "Cle invalide ou expiree"
+                    return False, "Invalid or expired key"
                 return True, ""
             elif provider == "openai":
                 resp = await client.post(
@@ -354,7 +354,7 @@ async def _validate_ai_key(provider: str, key: str, endpoint: str = "", model: s
                     json={"model": "gpt-4o-mini", "max_tokens": 1, "messages": [{"role": "user", "content": "hi"}]},
                 )
                 if resp.status_code in (401, 403):
-                    return False, "Cle invalide ou expiree"
+                    return False, "Invalid or expired key"
                 return True, ""
             elif provider == "gemini":
                 resp = await client.post(
@@ -364,7 +364,7 @@ async def _validate_ai_key(provider: str, key: str, endpoint: str = "", model: s
                           "generationConfig": {"maxOutputTokens": 1}},
                 )
                 if resp.status_code in (401, 403):
-                    return False, "Cle invalide ou expiree"
+                    return False, "Invalid or expired key"
                 return True, ""
             else:  # custom
                 headers = {"Content-Type": "application/json", **host_headers}
@@ -377,14 +377,14 @@ async def _validate_ai_key(provider: str, key: str, endpoint: str = "", model: s
                 if resp.status_code in (401, 403):
                     return False, _CUSTOM_KEY_REFUSED
                 if resp.status_code >= 500:
-                    return False, f"Serveur erreur {resp.status_code}"
+                    return False, f"Server error {resp.status_code}"
                 if resp.status_code == 404:
-                    return False, f"Endpoint introuvable (404). Verifiez l'URL et le modele."
+                    return False, "Endpoint not found (404). Check the URL and the model."
                 return True, ""
     except httpx.ConnectError:
-        return False, "Impossible de se connecter a l'endpoint"
+        return False, "Cannot connect to the endpoint"
     except httpx.RequestError:
-        return False, "Erreur reseau lors de la validation"
+        return False, "Network error during validation"
 
 
 async def apply_own_proxy(db: AsyncSession) -> None:

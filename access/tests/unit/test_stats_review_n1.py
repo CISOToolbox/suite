@@ -84,7 +84,10 @@ async def test_apps_needing_review_count_after_n1_fix():
             out = await internal_stats(req, db)
 
         texts = " | ".join(a.get("text", "") for a in out.get("alerts", []))
-        assert "2 application(s) sans revue" in texts, texts
+        assert "2 application(s) with no review" in texts, texts
+        # The dashboard picks the language: the French text travels alongside.
+        french = " | ".join(a.get("text_fr", "") for a in out.get("alerts", []))
+        assert "2 application(s) sans revue" in french, french
     finally:
         async with _engine.begin() as conn:
             await conn.run_sync(Base.metadata.drop_all)

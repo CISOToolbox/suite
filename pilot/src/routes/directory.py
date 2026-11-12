@@ -203,7 +203,7 @@ async def update_personnel(person_id: uuid.UUID, body: dict, user: User = Depend
     if not p:
         raise HTTPException(status_code=404, detail="Person not found")
     if (p.sync_source or "") == "access":
-        raise HTTPException(status_code=403, detail="Cette personne est gérée par Access (connecteur RH) — édition désactivée dans Pilot.")
+        raise HTTPException(status_code=403, detail="This person is managed by Access (HR connector): editing is disabled in Pilot.")
     old_email = p.email
     for f in ("nom", "prenom", "email", "fonction", "departement", "statut", "telephone", "site", "manager_email"):
         if f in body:
@@ -232,7 +232,7 @@ async def delete_personnel(person_id: uuid.UUID, user: User = Depends(get_curren
     if not p:
         raise HTTPException(status_code=404, detail="Person not found")
     if (p.sync_source or "") == "access":
-        raise HTTPException(status_code=403, detail="Cette personne est gérée par Access (connecteur RH) — suppression désactivée dans Pilot.")
+        raise HTTPException(status_code=403, detail="This person is managed by Access (HR connector): deletion is disabled in Pilot.")
     snapshot = _to_dict(p)
     await db.delete(p)
     await db.commit()

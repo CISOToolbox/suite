@@ -53,18 +53,18 @@ class AwsAssetPlugin(AssetPlugin):
 
     async def test_connection(self, config: dict) -> dict:
         if not self._has_creds(config):
-            return {"ok": False, "error": "Renseignez Access Key ID et Secret Access Key.", "details": ""}
+            return {"ok": False, "error": "Enter the Access Key ID and the Secret Access Key.", "details": ""}
         import asyncio
         try:
             def _probe():
                 return self._session(config).client("sts").get_caller_identity().get("Account", "")
             account = await asyncio.get_event_loop().run_in_executor(None, _probe)
-            return {"ok": True, "error": "", "details": f"Connecté au compte AWS {account}."}
+            return {"ok": True, "error": "", "details": f"Connected to AWS account {account}."}
         except ModuleNotFoundError:
-            return {"ok": False, "error": "boto3 n'est pas installé sur le serveur.", "details": ""}
+            return {"ok": False, "error": "boto3 is not installed on the server.", "details": ""}
         except Exception as e:  # noqa: BLE001
             logger.warning("AWS asset plugin test failed: %s", e)
-            return {"ok": False, "error": "Échec de connexion AWS (voir les logs serveur).", "details": ""}
+            return {"ok": False, "error": "AWS connection failed (see the server logs).", "details": ""}
 
     async def sync(self, config: dict, filters: dict) -> SyncResult:
         region = config.get("region") or "eu-west-3"

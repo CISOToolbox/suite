@@ -94,12 +94,14 @@ async def internal_stats(request: Request, db: AsyncSession = Depends(get_db)):
     )
     per_crit = {int(row[0] or 0): row[1] for row in crit_result.all()}
     crit_colors = {4: "redMax", 3: "red", 2: "orange", 1: "yellow", 0: "green"}
-    crit_labels = {4: "Vitale", 3: "Critique", 2: "Importante", 1: "Standard", 0: "Faible"}
+    crit_labels = {4: "Vital", 3: "Critical", 2: "Important", 1: "Standard", 0: "Low"}
+    crit_labels_fr = {4: "Vitale", 3: "Critique", 2: "Importante", 1: "Standard", 0: "Faible"}
     donut_segments = []
     for c in [4, 3, 2, 1, 0]:
         v = per_crit.get(c, 0)
         if v:
-            donut_segments.append({"label": crit_labels[c], "value": v, "color": crit_colors[c]})
+            donut_segments.append({"label": crit_labels[c], "label_fr": crit_labels_fr[c],
+                                   "value": v, "color": crit_colors[c]})
 
     # ── Posture: % of assets with a proprietaire set ──
     owned = await db.scalar(
@@ -124,7 +126,8 @@ async def internal_stats(request: Request, db: AsyncSession = Depends(get_db)):
     if unowned > 0:
         alerts.append({
             "level": "warning" if unowned < max(1, total_assets * 0.2) else "critical",
-            "text": f"{unowned} actif(s) sans propriétaire",
+            "text": f"{unowned} asset(s) without an owner",
+            "text_fr": f"{unowned} actif(s) sans propriétaire",
             "url": "/asset/",
         })
 
@@ -148,13 +151,15 @@ async def internal_stats(request: Request, db: AsyncSession = Depends(get_db)):
     if m_overdue > 0:
         alerts.append({
             "level": "warning",
-            "text": f"{m_overdue} mesure(s) en retard",
+            "text": f"{m_overdue} overdue measure(s)",
+            "text_fr": f"{m_overdue} mesure(s) en retard",
             "url": "/asset/",
         })
 
     return {
         "entity_count": total_assets,
-        "entity_label": "Actifs",
+        "entity_label": "Assets",
+        "entity_label_fr": "Actifs",
         "measures": {
             "total": total_measures,
             "completed": m_completed,
@@ -172,7 +177,7 @@ async def internal_stats(request: Request, db: AsyncSession = Depends(get_db)):
             "data": {
                 "segments": donut_segments,
                 "center_label": str(total_assets),
-                "center_sublabel": "actifs",
+                "center_sublabel": "assets",
             },
         },
         "top_items": top_items,
@@ -190,11 +195,11 @@ def _posture_label(score):
     if score is None:
         return ""
     if score < 40:
-        return "Faible"
+        return "Low"
     if score < 60:
-        return "Modéré"
+        return "Moderate"
     if score < 80:
-        return "Bon"
+        return "Good"
     return "Excellent"
 
 
@@ -210,7 +215,8 @@ async def internal_activity(request: Request, db: AsyncSession = Depends(get_db)
             "date": (a.updated_at or a.created_at).isoformat(),
             "module": "asset",
             "type": "asset_updated",
-            "label": f"Actif « {(a.nom or a.id)[:50]} » mis à jour",
+            "label": f"Asset \"{(a.nom or a.id)[:50]}\" updated",
+            "label_fr": f"Actif « {(a.nom or a.id)[:50]} » mis à jour",
             "url": "/asset/",
         })
     return events[:10]

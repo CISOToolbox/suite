@@ -37,6 +37,8 @@ jobs:
         run: pytest tests/test_compose_isolation.py -q
       - name: project creation needs an editing role
         run: pytest tests/test_project_creation_roles.py -q
+      - name: API messages are written in English
+        run: pytest tests/test_api_messages_english.py -q
       - name: backup agent (recovery API)
         run: pytest backup-agent/tests -q
 

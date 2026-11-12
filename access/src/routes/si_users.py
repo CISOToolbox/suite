@@ -90,7 +90,7 @@ def _validate_contract_end(type_compte: str, date_fin_contrat: str) -> str:
     if type_compte != "salarie" and not v:
         raise HTTPException(
             status_code=422,
-            detail="Date de fin de contrat requise pour les non-salariés",
+            detail="A contract end date is required for non-employees",
         )
     return v
 
@@ -192,7 +192,7 @@ async def patch_si_user(project_id: uuid.UUID, si_user_id: str, body: dict, user
             and su.type_compte != "salarie" and not (su.date_fin_contrat or "").strip():
         raise HTTPException(
             status_code=422,
-            detail="Date de fin de contrat requise pour les non-salariés",
+            detail="A contract end date is required for non-employees",
         )
     if "sort_order" in body:
         su.sort_order = int(body["sort_order"])
@@ -469,11 +469,11 @@ async def sync_si_users_from_hr(project_id: uuid.UUID, user: Optional[User] = De
     if not instances:
         raise HTTPException(
             status_code=503,
-            detail="Aucun connecteur RH actif. Configurez un connecteur 'SIRH' dans Connecteurs et activez-le.",
+            detail="No active HR connector. Configure an 'HRIS' connector in Connectors and enable it.",
         )
     cls = PLUGIN_REGISTRY.get("hr_generic")
     if not cls:
-        raise HTTPException(status_code=400, detail="Plugin hr_generic indisponible dans ce déploiement")
+        raise HTTPException(status_code=400, detail="The hr_generic plugin is not available in this deployment")
 
     existing_result = await db.execute(select(SiUser).where(SiUser.project_id == project_id))
     existing = existing_result.scalars().all()

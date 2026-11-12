@@ -113,10 +113,10 @@ async def create_measure(
     try:
         proj_uuid = uuid.UUID(body.project_id)
     except (ValueError, AttributeError, TypeError):
-        raise HTTPException(status_code=422, detail="Une mesure Pilot doit être rattachée à un projet de remédiation.")
+        raise HTTPException(status_code=422, detail="A Pilot action must be attached to a remediation project.")
     project = await db.get(Project, proj_uuid)
     if not project:
-        raise HTTPException(status_code=422, detail="Projet de remédiation introuvable.")
+        raise HTTPException(status_code=422, detail="Remediation project not found.")
     source_id = f"MES-{uuid.uuid4().hex[:8].upper()}"
     data = {
         "source_id": source_id,

@@ -498,7 +498,7 @@ async def update_project(project_id: uuid.UUID, body: ProjectUpdate, user: Optio
     if body.expected_server_rev is not None and (project.server_rev or 0) > body.expected_server_rev:
         # Marked so the page tells this conflict apart from a refused change.
         raise HTTPException(status_code=409, headers={"X-CT-Conflict": "stale"},
-                            detail="Données modifiées côté serveur depuis le chargement (Pilot/scheduler) — rechargez avant une sauvegarde globale.")
+                            detail="Data changed on the server since it was loaded (Pilot or a scheduled task): reload before a full save.")
     if not _can("edit", project, user):
         raise HTTPException(status_code=403, detail="Access denied")
     if body.name is not None:

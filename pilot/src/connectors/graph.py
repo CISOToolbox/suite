@@ -339,7 +339,7 @@ async def test_credentials(db: AsyncSession) -> tuple[bool, str]:
     for ``Organization.Read.All`` just to validate the test."""
     creds = await get_credentials(db)
     if creds is None:
-        return True, "Mode démo (aucune credential M365 configurée) — valeurs simulées."
+        return True, "Demo mode (no M365 credentials configured): simulated values."
     async with httpx.AsyncClient(timeout=15.0) as client:
         token = await _acquire_token(client, creds)
         if not token:

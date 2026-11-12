@@ -204,5 +204,5 @@ async def send_test(user: Optional[User] = Depends(get_current_user),
     user = require_identity(user)
     results = await run_all_notification_tests(db, user)
     if all(str(v).startswith("failed") for v in results.values()):
-        raise HTTPException(status_code=502, detail="Tous les envois de test ont échoué — vérifier la configuration SMTP")
+        raise HTTPException(status_code=502, detail="Every test send failed: check the SMTP configuration")
     return {"results": results}

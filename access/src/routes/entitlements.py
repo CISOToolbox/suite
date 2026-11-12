@@ -115,14 +115,14 @@ async def create_entitlement(project_id: uuid.UUID, si_user_id: str, body: dict,
     su = await _get_user_or_404(db, project_id, si_user_id)
     by_email = await _users_by_email(db, project_id)
     if not _can_edit(user, su, by_email):
-        raise HTTPException(status_code=403, detail="Seul un admin ou un supérieur hiérarchique peut modifier les habilitations de cet utilisateur")
+        raise HTTPException(status_code=403, detail="Only an admin or a line manager can change this user's entitlements")
 
     perimetre_id = str(body.get("perimetre_id") or "").strip()
     if not perimetre_id:
-        raise HTTPException(status_code=422, detail="perimetre_id requis")
+        raise HTTPException(status_code=422, detail="perimetre_id is required")
     perim = await db.get(Application, (project_id, perimetre_id))
     if not perim:
-        raise HTTPException(status_code=422, detail="Périmètre inconnu")
+        raise HTTPException(status_code=422, detail="Unknown perimeter")
     role = str(body.get("role") or "").strip()[:500]
 
     existing = await db.execute(select(RequestedEntitlement.id).where(RequestedEntitlement.project_id == project_id))
@@ -153,10 +153,10 @@ async def patch_entitlement(project_id: uuid.UUID, si_user_id: str, ent_id: str,
     su = await _get_user_or_404(db, project_id, si_user_id)
     by_email = await _users_by_email(db, project_id)
     if not _can_edit(user, su, by_email):
-        raise HTTPException(status_code=403, detail="Seul un admin ou un supérieur hiérarchique peut modifier les habilitations de cet utilisateur")
+        raise HTTPException(status_code=403, detail="Only an admin or a line manager can change this user's entitlements")
     ent = await db.get(RequestedEntitlement, (project_id, ent_id))
     if not ent or ent.si_user_id != si_user_id:
-        raise HTTPException(status_code=404, detail="Habilitation introuvable")
+        raise HTTPException(status_code=404, detail="Entitlement not found")
 
     actor = _actor_email(user)
     changed = False
@@ -164,7 +164,7 @@ async def patch_entitlement(project_id: uuid.UUID, si_user_id: str, ent_id: str,
         new_p = str(body["perimetre_id"] or "").strip()
         if new_p and new_p != ent.perimetre_id:
             if not await db.get(Application, (project_id, new_p)):
-                raise HTTPException(status_code=422, detail="Périmètre inconnu")
+                raise HTTPException(status_code=422, detail="Unknown perimeter")
             _audit(db, project_id, si_user_id, ent_id, "modify", "perimetre_id", ent.perimetre_id, new_p, actor)
             ent.perimetre_id = new_p; changed = True
     if "role" in body:
@@ -192,10 +192,10 @@ async def delete_entitlement(project_id: uuid.UUID, si_user_id: str, ent_id: str
     su = await _get_user_or_404(db, project_id, si_user_id)
     by_email = await _users_by_email(db, project_id)
     if not _can_edit(user, su, by_email):
-        raise HTTPException(status_code=403, detail="Seul un admin ou un supérieur hiérarchique peut modifier les habilitations de cet utilisateur")
+        raise HTTPException(status_code=403, detail="Only an admin or a line manager can change this user's entitlements")
     ent = await db.get(RequestedEntitlement, (project_id, ent_id))
     if not ent or ent.si_user_id != si_user_id:
-        raise HTTPException(status_code=404, detail="Habilitation introuvable")
+        raise HTTPException(status_code=404, detail="Entitlement not found")
     _audit(db, project_id, si_user_id, ent_id, "remove", "", f"{ent.perimetre_id}:{ent.role}", "", _actor_email(user))
     await db.delete(ent)
     project.updated_at = datetime.now(timezone.utc)

@@ -120,7 +120,7 @@ def main():
     check("liste des audits", st == 200 and any(str(p["id"]) == str(pid) for p in items))
 
     st, dup = req("POST", f"/audit/api/projects/{pid}/duplicate")
-    check("duplication", st == 201 and dup["name"].endswith("(copie)"))
+    check("duplication", st == 201 and dup["name"].endswith("(copy)"))
     st, _ = req("DELETE", f"/audit/api/projects/{dup['id']}")
     check("suppression (admin)", st == 204)
 
