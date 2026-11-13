@@ -80,7 +80,7 @@ class PrefsUpdate(BaseModel):
     include_overdue: bool = True
     scope: str = "mine"
     modules: list[str] = []
-    lang: str = "fr"
+    lang: str = "en"
     subject_prefix: str = Field("[CISO Toolbox]", max_length=60)
     module_prefs: dict = {}
 
@@ -88,7 +88,7 @@ class PrefsUpdate(BaseModel):
 def _dict(p: NotificationPrefs | None) -> dict:
     if p is None:  # opt-in default: everything off
         return {"enabled": False, "day_of_week": 0, "upcoming_days": 14,
-                "include_overdue": True, "scope": "mine", "modules": [], "lang": "fr",
+                "include_overdue": True, "scope": "mine", "modules": [], "lang": "en",
                 "subject_prefix": "[CISO Toolbox]",
                 "module_prefs": normalize_module_prefs(None)}
     return {"enabled": bool(p.enabled), "day_of_week": p.day_of_week,
@@ -96,6 +96,15 @@ def _dict(p: NotificationPrefs | None) -> dict:
             "scope": p.scope, "modules": list(p.modules or []), "lang": p.lang,
             "subject_prefix": p.subject_prefix or "[CISO Toolbox]",
             "module_prefs": normalize_module_prefs(p.module_prefs)}
+
+
+def _lookup_dict(p: NotificationPrefs | None) -> dict:
+    """What a module's mailer is told about an account. Without a stored row
+    the account chose no language: the module applies its own."""
+    out = _dict(p)
+    if p is None:
+        out["lang"] = ""
+    return out
 
 
 async def _load(db: AsyncSession, user: User) -> Optional[NotificationPrefs]:

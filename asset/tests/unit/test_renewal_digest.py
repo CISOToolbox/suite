@@ -58,3 +58,26 @@ def test_days_label_phrasing():
 def test_digest_is_a_table_with_one_row_per_due():
     html = build_digest_html([_due(), _due(), _due()], TODAY)
     assert html.count("<tr>") == 3  # one row per deadline (header uses <thead>/<th>)
+
+
+def test_generated_texts_spell_license_like_the_interface():
+    """`licence` is a key of the data model; a text the scheduler writes — a
+    mail, the title and the note of a generated measure — reads "license"."""
+    import ast
+    import renewal_scheduler
+
+    tree = ast.parse(open(renewal_scheduler.__file__, encoding="utf-8").read())
+    docstrings = {
+        id(node.body[0].value)
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.body and isinstance(node.body[0], ast.Expr)
+        and isinstance(node.body[0].value, ast.Constant)
+    }
+    texts = [
+        node.value for node in ast.walk(tree)
+        if isinstance(node, ast.Constant) and isinstance(node.value, str)
+        and id(node) not in docstrings
+        and " " in node.value and "licence" in node.value.lower()
+    ]
+    assert not texts, texts

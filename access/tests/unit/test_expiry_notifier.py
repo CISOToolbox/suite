@@ -7,6 +7,8 @@ fallback) without a database, exactly like compliance's test_proof_notifier.
 from datetime import date
 from types import SimpleNamespace
 
+import pytest
+
 from src.expiry_notifier import (THRESHOLDS, build_alert_html,
                                  compute_expiry_hits, resolve_recipients)
 
@@ -142,36 +144,70 @@ def test_alert_html_lists_account_and_app():
     html = build_alert_html([{"sa": sa, "days_left": 5, "threshold": 7}], apps, TODAY)
     assert "SVC-001" in html
     assert "App APP-001" in html
-    assert "expire dans 5 jour(s)" in html  # default language: fr
+    assert "expires in 5 day(s)" in html  # default language: en
+    assert "about to expire" in html
 
 
-def test_alert_html_english(monkeypatch):
+def test_alert_html_french(monkeypatch):
     # Module-level language switch (ACCESS_MAIL_LANG) — same pattern as the
-    # Pilot deadline digest. English body and states.
+    # Pilot deadline digest. French body and states.
     import src.expiry_notifier as mod
-    monkeypatch.setattr(mod, "MAIL_LANG", "en")
+    monkeypatch.setattr(mod, "MAIL_LANG", "fr")
     sa = _sa(exp="2026-09-10")
     html = build_alert_html([{"sa": sa, "days_left": 5, "threshold": 7}],
                             {"APP-001": _app()}, TODAY)
-    assert "expires in 5 day(s)" in html
-    assert "about to expire" in html
-    assert "expire dans" not in html
+    assert "expire dans 5 jour(s)" in html
+    assert "arrivent à expiration" in html
+    assert "expires in" not in html
 
 
-def test_alert_html_unknown_lang_falls_back_to_french(monkeypatch):
+@pytest.mark.parametrize("setting, language", [
+    (None, "en"), ("", "en"), ("en", "en"), ("de", "en"),
+    ("fr", "fr"), ("FR", "fr"), ("fr-FR", "fr"), ("fr_FR", "fr"), (" fr ", "fr"),
+])
+def test_mail_language_is_read_whatever_its_spelling(monkeypatch, setting, language):
+    # `ACCESS_MAIL_LANG=FR` or `fr-FR` used to match no text and gave English.
+    import src.expiry_notifier as mod
+    if setting is None:
+        monkeypatch.delenv("ACCESS_MAIL_LANG", raising=False)
+    else:
+        monkeypatch.setenv("ACCESS_MAIL_LANG", setting)
+    assert mod._mail_language() == language
+
+
+def test_the_setting_reaches_the_mail(monkeypatch):
+    # The setting is read once, when the module is loaded: the mail built
+    # afterwards is in the language it names.
+    import importlib
+
+    import src.expiry_notifier as mod
+    monkeypatch.setenv("ACCESS_MAIL_LANG", "fr-FR")
+    try:
+        importlib.reload(mod)
+        html = mod.build_alert_html([{"sa": _sa(exp="2026-09-10"), "days_left": 5, "threshold": 7}],
+                                    {"APP-001": _app()}, TODAY)
+    finally:
+        monkeypatch.delenv("ACCESS_MAIL_LANG")
+        importlib.reload(mod)
+    assert "expire dans 5 jour(s)" in html
+    assert "expires in" not in html
+    assert mod.MAIL_LANG == "en"
+
+
+def test_alert_html_unknown_lang_falls_back_to_english(monkeypatch):
     import src.expiry_notifier as mod
     monkeypatch.setattr(mod, "MAIL_LANG", "de")
     sa = _sa(exp="2026-09-10")
     html = build_alert_html([{"sa": sa, "days_left": 5, "threshold": 7}],
                             {"APP-001": _app()}, TODAY)
-    assert "expire dans 5 jour(s)" in html
+    assert "expires in 5 day(s)" in html
 
 
 def test_alert_html_expired_state():
     sa = _sa(exp="2026-09-01")
     html = build_alert_html([{"sa": sa, "days_left": -4, "threshold": 1}],
                             {"APP-001": _app()}, TODAY)
-    assert "expiré" in html
+    assert ">expired<" in html
 
 
 def test_alert_html_escapes_user_controlled_names():

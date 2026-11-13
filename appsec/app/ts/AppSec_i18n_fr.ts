@@ -419,4 +419,36 @@ _registerTranslations("fr", {
         + "<tr><td>Exporter le SBOM</td><td>SBOM → bouton « Exporter CSV »</td></tr>"
         + "<tr><td>Retrouver qui utilise un package</td><td>SBOM → recherche par nom de package</td></tr></table>",
 
+    "dash.cve_with_patch": "{n} / {total} CVE avec patch éditeur",
+
+    "findings.remediation_created": "1 remédiation créée",
+
+    "findings.remediation_new": "Créer une remédiation",
+
+    "findings.remediation_create": "Créer la remédiation",
+
+    "findings.fp_bulk_intro": "{n} finding(s) seront marqués comme faux positifs.",
+
+    "ignore.retroactive_n": "{n} finding(s) auto-triés",
+
+    "measures.empty": "Aucune remédiation. Les remédiations sont créées depuis la vue Findings (bouton « À corriger »).",
+
+    "measures.selected_n": "{n} remédiation(s) sélectionnée(s)",
+
+    "measures.bulk_delete_confirm": "Supprimer {n} remédiation(s) ?",
+
+    "measures.delete_confirm": "Supprimer la remédiation",
+
+    "measures.irreversible": "Cette action est irréversible.",
+
+    "measures.bulk_done": "{n} remédiation(s) marquée(s) terminée(s)",
+
+    "measures.bulk_deleted": "{n} remédiation(s) supprimée(s)",
+
+    "measures.deleted": "Remédiation supprimée",
+
+    "measures.updated": "Remédiation mise à jour",
+
+    "findings.bulk_measure_title": "Mesure corrective ({n} findings)",
+    "findings.bulk_measure_covered": "Findings couverts ({n})",
 });

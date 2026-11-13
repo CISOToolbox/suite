@@ -73,16 +73,17 @@ async def _nvd_lookup(cve_id: str) -> str:
         return ""
 
 
-_LANG_NAMES = {"fr": "French", "en": "English"}
+def _lang_name(lang: str | None) -> str:
+    return "French" if (lang or "").strip().lower().startswith("fr") else "English"
 
 
-def _finding_analysis_system(lang: str = "fr") -> str:
+def _finding_analysis_system(lang: str = "en") -> str:
     """System prompt for the AppSec finding triage — methodology owned here.
     `lang` controls the language of the prose fields (summary/remediation);
     JSON keys and enum values stay in English so the response parses."""
     today = datetime.date.today().isoformat()
     year = today[:4]
-    lang_name = _LANG_NAMES.get((lang or "fr").lower(), "French")
+    lang_name = _lang_name(lang)
     return (
         "You are a senior application security engineer performing triage on findings "
         "from automated security scanners (Trivy, Gitleaks, Opengrep). "
@@ -106,7 +107,7 @@ def _finding_analysis_system(lang: str = "fr") -> str:
 
 class FindingAnalyzeRequest(BaseModel):
     finding_id: str
-    lang: str = "fr"
+    lang: str = "en"
     context: str = ""
     deep: bool = False
 

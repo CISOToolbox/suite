@@ -116,8 +116,8 @@
             return "";
         if (typeof obj === "string")
             return obj;
-        var l = lang || (window._locale || "fr");
-        return obj[l] || obj.fr || obj.en || "";
+        var l = lang || (window._locale || "en");
+        return obj[l] || obj.en || obj.fr || "";
     }
     // ── Form rendering ───────────────────────────────────────────────
     function _connRenderForm(schema, current, lang) {
@@ -181,8 +181,7 @@
         var guide = _connSetupGuide(schema, lang);
         if (!guide)
             return "";
-        var btnLabel = (lang || window._locale || "fr") === "en"
-            ? "How to configure this connector?" : "Comment configurer ce connecteur ?";
+        var btnLabel = t("conn.help_toggle");
         var h = '<div class="conn-help" style="margin-bottom:14px">';
         h += '<button type="button" data-click="_connToggleHelp" data-pass-el '
             + 'style="display:inline-flex;align-items:center;gap:6px;background:var(--ct-canvas);'

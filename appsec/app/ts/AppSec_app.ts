@@ -138,7 +138,7 @@ function _patchBadge(f?: AppSecFinding | null): string {
     if (!f || f.type !== "cve") return '<span class="text-muted">—</span>';
     var fx = (f.evidence && f.evidence.fixed_version) || "";
     if (!fx) {
-        return '<span class="ct-badge" data-tone="critical">' + (t("findings.patch_none") || "Sans patch") + '</span>';
+        return '<span class="ct-badge" data-tone="critical">' + (t("findings.patch_none")) + '</span>';
     }
     // A scanner returns the fixed version of EVERY maintained branch: up to
     // a score of them for a single CVE. Turning that into one string gave an
@@ -182,7 +182,7 @@ function _fmtDate(iso?: string | null): string {
     catch(e) { return d.toISOString().substring(0, 16).replace("T", " "); }
 }
 function _timeAgo(d?: string | null): string {
-    if (!d) return t("apps.never") || "—";
+    if (!d) return t("apps.never");
     var diff = (Date.now() - new Date(d).getTime()) / 1000;
     if (diff < 60) return Math.floor(diff) + "s";
     if (diff < 3600) return Math.floor(diff / 60) + "min";
@@ -291,9 +291,9 @@ function _renderDashboard(c: HTMLElement): void {
         // Patchable coverage is a health rate: higher is better. Amber under
         // 90%, red under 70% — a low patchable ratio means stuck remediation.
         var _patchTone = _kpiTone(pct, { dir: "up", amber: 90, red: 70 });
-        h += '<div class="ct-kpi ct-clickable" data-emphasis="value"' + (_patchTone ? ' data-tone="' + _patchTone + '"' : '') + ' data-click="_dashNavPatch" title="' + esc((s.cve_with_patch || 0) + " / " + s.cve_total + " CVE avec patch éditeur") + '">';
+        h += '<div class="ct-kpi ct-clickable" data-emphasis="value"' + (_patchTone ? ' data-tone="' + _patchTone + '"' : '') + ' data-click="_dashNavPatch" title="' + esc(t("dash.cve_with_patch").replace("{n}", String(s.cve_with_patch || 0)).replace("{total}", String(s.cve_total))) + '">';
         h += '<div class="ct-kpi-tone"></div><div class="ct-kpi-body">';
-        h += '<div class="ct-kpi-label">' + esc(t("dashboard.cve_patchable") || "CVE patchables") + ' <span class="fs-xs text-muted">(' + pct + '%)</span></div>';
+        h += '<div class="ct-kpi-label">' + esc(t("dashboard.cve_patchable")) + ' <span class="fs-xs text-muted">(' + pct + '%)</span></div>';
         h += '<div class="ct-kpi-value">' + (s.cve_with_patch || 0) + '<span class="ct-text-label ct-muted">/' + s.cve_total + '</span></div>';
         h += '</div></div>';
     }
@@ -622,7 +622,7 @@ async function _refreshAppDetailFindings(): Promise<void> {
                 columns: [
                     { key: "severity", label: "", width: "50px",
                       render: function(f) { return _sevBadge(f.severity); } },
-                    { key: "title", label: t("findings.col_title") || "Titre",
+                    { key: "title", label: t("findings.col_title"),
                       render: function(f) {
                           return esc(_findingTitle(f))
                               + (f.cve_id ? ' <span class="fs-xs text-muted">' + esc(f.cve_id) + '</span>' : '');
@@ -634,7 +634,7 @@ async function _refreshAppDetailFindings(): Promise<void> {
                       } },
                     { key: "scanner", label: "Scanner",
                       render: function(f) { return _scannerBadge(f.scanner); } },
-                    { key: "patch", label: t("findings.col_patch") || "Patch", width: "132px",
+                    { key: "patch", label: t("findings.col_patch"), width: "132px",
                       render: function(f) { return _patchBadge(f as AppSecFinding); } },
                     { key: "status", label: "Status",
                       render: function(f) { return _statusBadge(f.status); } },
@@ -829,11 +829,11 @@ function _renderFindings(c: HTMLElement): void {
 
     // Patch pills
     h += '<div class="filter-pills-row filter-pills-sm">';
-    h += '<span class="filter-pills-lbl">' + esc(t("findings.filter_patch") || "Patch") + '</span>';
+    h += '<span class="filter-pills-lbl">' + esc(t("findings.filter_patch")) + '</span>';
     [
-        { v: "",            l: t("findings.all_patches") || "Tous" },
-        { v: "available",   l: t("findings.patch_available") || "Avec patch" },
-        { v: "unavailable", l: t("findings.patch_unavailable") || "Sans patch" }
+        { v: "",            l: t("findings.all_patches") },
+        { v: "available",   l: t("findings.patch_available") },
+        { v: "unavailable", l: t("findings.patch_unavailable") }
     ].forEach(function(o) {
         var on = f.patch === o.v ? " active" : "";
         var cls = o.v === "available" ? " patch-pill-yes" : (o.v === "unavailable" ? " patch-pill-no" : "");
@@ -884,7 +884,7 @@ async function _refreshFindingsBody(): Promise<void> {
                 columns: [
                     { key: "severity", label: "", width: "50px",
                       render: function(f) { return _sevBadge(f.severity); } },
-                    { key: "title", label: t("findings.col_title") || "Titre",
+                    { key: "title", label: t("findings.col_title"),
                       render: function(f) {
                           return esc(_findingTitle(f))
                               + (f.cve_id ? ' <span class="fs-xs text-muted">' + esc(f.cve_id) + '</span>' : '');
@@ -898,7 +898,7 @@ async function _refreshFindingsBody(): Promise<void> {
                       render: function(f) { return esc(f.application_name || ""); } },
                     { key: "scanner", label: "Scanner",
                       render: function(f) { return _scannerBadge(f.scanner); } },
-                    { key: "patch", label: t("findings.col_patch") || "Patch", width: "132px",
+                    { key: "patch", label: t("findings.col_patch"), width: "132px",
                       render: function(f) { return _patchBadge(f as AppSecFinding); } },
                     { key: "status", label: "Status",
                       render: function(f) { return _statusBadge(f.status); } }
@@ -926,23 +926,16 @@ function _refreshCurrentFindings(): void {
     else _refreshFindingsBody();
 }
 
-// Resolve an i18n key but fall back to a literal when t() returns the
-// key verbatim (no translation registered).
-function _i18n(key: string, fallback: string): string {
-    var v = t(key);
-    return (v && v !== key) ? v : fallback;
-}
-
 function _setupFindingsBulkbar(): void {
     ct_bulkbar.attach({
         scope: "appsec-findings",
-        label: _i18n("findings.selected_n", "{n} finding(s) sélectionné(s)"),
+        label: t("findings.selected_n"),
         actions: [
-            { id: "to_fix", icon: "check", label: t("findings.status_to_fix") || "À corriger",
+            { id: "to_fix", icon: "check", label: t("findings.status_to_fix"),
               variant: "primary", onClick: "_bulkAppsecFindingsToFix" },
-            { id: "fixed", icon: "check", label: t("findings.status_fixed") || "Corrigé",
+            { id: "fixed", icon: "check", label: t("findings.status_fixed"),
               variant: "success", onClick: "_bulkAppsecFindingsFixed" },
-            { id: "fp", icon: "x", label: t("findings.status_false_positive") || "Faux positif",
+            { id: "fp", icon: "x", label: t("findings.status_false_positive"),
               variant: "muted", onClick: "_bulkAppsecFindingsFP" }
         ]
     });
@@ -953,7 +946,7 @@ function _bulkAppsecSetStatus(scope: string, status: string): void {
     if (!ids.length) return;
     AppSecAPI.bulkTriageFindings({ ids: ids, status: status }).then(function(r) {
         var msg = r.updated + " finding(s) → " + (t("findings.status_" + status) || status);
-        if (r.measures_created) msg += " (1 remédiation créée)";
+        if (r.measures_created) msg += " (" + t("findings.remediation_created") + ")";
         showStatus(msg);
         ct_bulkbar.clear(scope);
         _refreshCurrentFindings();
@@ -970,14 +963,14 @@ window._bulkAppsecFindingsToFix = function(scope: string) {
     var selected = (_lastFindingsItems || []).filter(function(f) { return ids.indexOf(f.id) >= 0; });
     var defaultTitle = selected.length === 1
         ? _findingTitle(selected[0])
-        : "Mesure corrective (" + ids.length + " findings)";
+        : t("findings.bulk_measure_title", { n: ids.length });
     var defaultDesc = selected.map(function(f) {
         return "- " + _findingTitle(f);
     }).join("\n");
 
     // Preview of covered findings injected as read-only HTML inside the modal
     var summary = '<div class="ct-text-label ct-muted ct-strong ct-mt-1">'
-                + esc("Findings couverts") + ' (' + ids.length + ')</div>'
+                + esc(t("findings.bulk_measure_covered", {n: ids.length})) + '</div>'
                 + '<div class="ct-maxh-150 ct-scroll-y ct-bordered ct-r-md ct-p-2">'
                 + selected.map(function(f) {
                       return '<div class="ct-py-1 ct-px-0">' + _sevBadge(f.severity) + ' '
@@ -986,8 +979,8 @@ window._bulkAppsecFindingsToFix = function(scope: string) {
                 + '</div>';
 
     ct_measure_modal.open({ title: defaultTitle, description: defaultDesc }, {
-        title: "Créer une remédiation",
-        saveLabel: "Créer la remédiation",
+        title: t("findings.remediation_new"),
+        saveLabel: t("findings.remediation_create"),
         hideFields: ["type", "statut"],
         ownerPicker: { pickerId: "appsec-bulk-owner", directoryUrl: "api/directory" },
         extraContent: summary
@@ -1001,12 +994,12 @@ window._bulkAppsecFindingsToFix = function(scope: string) {
             responsable: data.responsable,
             echeance: data.echeance
         }).then(function(r) {
-            var msg = r.updated + " finding(s) → À corriger";
-            if (r.measures_created) msg += " (1 remédiation créée)";
+            var msg = r.updated + " finding(s) → " + t("findings.status_to_fix");
+            if (r.measures_created) msg += " (" + t("findings.remediation_created") + ")";
             showStatus(msg);
             ct_bulkbar.clear(scope);
             _refreshCurrentFindings();
-        }).catch(function(e) { showStatus("Erreur : " + (e.message || e), true); });
+        }).catch(function(e) { showStatus(t("common.error") + ": " + (e.message || e), true); });
     });
 };
 
@@ -1020,26 +1013,26 @@ window._bulkAppsecFindingsFP = function(scope: string) {
     // explains WHY findings were dismissed as false positives.
     var h = '';
     h += '<p style="font-size:var(--ct-text-meta);color:var(--ct-ink-2);margin:0 0 var(--ct-s3)">'
-       + esc(ids.length + " finding(s) seront marqués comme faux positifs.")
+       + esc(t("findings.fp_bulk_intro").replace("{n}", String(ids.length)))
        + '</p>';
     h += '<label class="fs-sm ct-strong ct-block ct-mb-1">'
-       + (t("findings.fp_bulk_label") || "Justification (obligatoire)")
+       + (t("findings.fp_bulk_label"))
        + ' <span class="ct-text-critical">*</span></label>';
     h += '<textarea id="fp-bulk-reason" rows="4" class="ct-journal-body ct-py-1 ct-px-2 ct-text-meta ct-bordered ct-r-sm ct-box" placeholder="'
-       + esc(t("findings.fp_bulk_placeholder") || "Pourquoi ces findings sont-ils des faux positifs ?")
+       + esc(t("findings.fp_bulk_placeholder"))
        + '"></textarea>';
 
     ct_modal.open({
-        title: (t("findings.fp_bulk_title") || "Marquer en faux positif") + " (" + ids.length + ")",
+        title: (t("findings.fp_bulk_title")) + " (" + ids.length + ")",
         body: h,
         size: "md",
         buttons: [
-            { id: "cancel", label: t("btn_cancel") || "Annuler" },
-            { id: "save", primary: true, label: t("btn_confirm") || t("btn_save") || "Confirmer",
+            { id: "cancel", label: t("btn_cancel") },
+            { id: "save", primary: true, label: t("btn_confirm") || t("btn_save"),
               result: function() {
                   var reason = ((document.getElementById("fp-bulk-reason") as HTMLTextAreaElement).value || "").trim();
                   if (!reason) {
-                      showStatus(t("findings.fp_bulk_required") || "La justification est obligatoire", true);
+                      showStatus(t("findings.fp_bulk_required"), true);
                       return false;
                   }
                   return { triage_notes: reason };
@@ -1052,7 +1045,7 @@ window._bulkAppsecFindingsFP = function(scope: string) {
             status: "false_positive",
             triage_notes: data.triage_notes
         }).then(function(r) {
-            showStatus(r.updated + " finding(s) → " + (t("findings.status_false_positive") || "Faux positif"));
+            showStatus(r.updated + " finding(s) → " + (t("findings.status_false_positive")));
             ct_bulkbar.clear(scope);
             _refreshCurrentFindings();
             // Offer to create an ignore rule from the first finding as template.
@@ -1134,19 +1127,19 @@ async function _renderFindingDetail(c: HTMLElement): Promise<void> {
         var fx = (f.evidence && f.evidence.fixed_version) || "";
         if (fx) {
             extraRows.push({
-                label: t("findings.patch_available") || "Patch disponible",
+                label: t("findings.patch_available"),
                 valueHtml: '<span class="ct-badge" data-tone="low">&#10003; ' + esc(fx) + '</span>',
             });
         } else {
             extraRows.push({
-                label: t("findings.patch_status") || "Patch éditeur",
-                valueHtml: '<span class="ct-badge" data-tone="critical">' + (t("findings.patch_none") || "Aucun patch disponible") + '</span>',
+                label: t("findings.patch_status"),
+                valueHtml: '<span class="ct-badge" data-tone="critical">' + (t("findings.patch_none")) + '</span>',
             });
         }
         var inst = (f.evidence && f.evidence.installed_version) || "";
         if (inst) {
             extraRows.push({
-                label: t("findings.installed_version") || "Version installée",
+                label: t("findings.installed_version"),
                 value: inst,
             });
         }
@@ -1226,7 +1219,7 @@ function _ncOptions(): CtNcOptions {
             },
             create: function(draft) {
                 return ct_measure_modal.open({ title: draft.title, description: draft.description }, {
-                    title: t("measures.new_title") || "New measure",
+                    title: t("measures.new_title"),
                     hideFields: ["type", "statut"],
                     titleRequired: true,
                     ownerPicker: { pickerId: "appsec-nc-measure-owner", directoryUrl: "api/directory" }
@@ -1277,7 +1270,7 @@ function _runAppsecTriage(finding: AppSecFinding, status: string): Promise<void>
         if (payload.responsable != null) body.responsable = payload.responsable;
         if (payload.echeance != null) body.echeance = payload.echeance;
         return AppSecAPI.triageFinding(finding.id, body).then(function() {
-            showStatus(t("settings.saved") || "Enregistré");
+            showStatus(t("settings.saved"));
             // For false_positive: offer to create an ignore rule.
             if (payload.status === "false_positive") {
                 _offerIgnoreRuleFromFinding(finding, payload.triage_notes || payload.notes || "");
@@ -1299,10 +1292,10 @@ function _offerIgnoreRuleFromFinding(finding: AppSecFinding, reason: string): vo
     // on a 403.
     if (!document.body.classList.contains("ct-role-admin")) { _backToFindings(); return; }
     ct_modal.confirm({
-        title: t("ignore.offer_title") || "Créer une règle d'exclusion ?",
-        message: (t("ignore.offer_body") || "Ce finding a été déclaré faux positif. Souhaitez-vous créer une règle pour ignorer automatiquement les findings similaires lors des prochains scans ?"),
-        confirmLabel: t("ignore.offer_yes") || "Créer la règle",
-        cancelLabel: t("ignore.offer_no") || "Non merci",
+        title: t("ignore.offer_title"),
+        message: (t("ignore.offer_body")),
+        confirmLabel: t("ignore.offer_yes"),
+        cancelLabel: t("ignore.offer_no"),
     }).then(function(yes) {
         if (!yes) { _backToFindings(); return; }
         _openIgnoreRuleFromFinding(finding, reason);
@@ -1410,8 +1403,8 @@ window._deleteAppsecFinding = function() {
     if (!_selectedFindingObj) return;
     var f = _selectedFindingObj;
     ct_modal.confirm({
-        title: t("fd.delete") || "Supprimer",
-        message: t("fd.delete_confirm") || "Supprimer ce finding ? Cette action est irréversible.",
+        title: t("fd.delete"),
+        message: t("fd.delete_confirm"),
         danger: true
     }).then(function(ok) {
         if (!ok) return;
@@ -1419,7 +1412,7 @@ window._deleteAppsecFinding = function() {
         // falling back to a triage to "fixed" is the nearest semantic.
         // TODO: add DELETE /api/findings/{id} backend route.
         AppSecAPI.triageFinding(f.id, { status: "fixed" }).then(function() {
-            showStatus(t("fd.deleted") || "Finding marqué corrigé");
+            showStatus(t("fd.deleted"));
             _backToFindings();
         }).catch(function(e) { showStatus(e.message || t("common.error"), true); });
     });
@@ -1461,7 +1454,7 @@ window._aiTriageRun = async function() {
     var ctxEl = document.getElementById("appsec-ai-context") as HTMLTextAreaElement | null;
     var deepEl = document.getElementById("appsec-ai-deep") as HTMLInputElement | null;
     var opts: AppSecAnalyzeOpts = {
-        lang: localStorage.getItem("ct_lang") || "fr",
+        lang: _locale,
         context: ctxEl ? ctxEl.value : "",
         deep: !!(deepEl && deepEl.checked),
     };
@@ -1756,7 +1749,7 @@ function _irCriterionRow(idx: number): string {
     return '<div class="ir-crit-row" id="ir-crit-' + idx + '">'
         + '<div style="flex:0 0 160px">' + _irTypeSelect(idx) + '</div>'
         + '<input type="text" id="ir-val-' + idx + '" placeholder="CVE-2024-*, openssl*, test/*..." class="ct-flex-1 ct-p-1 ct-text-meta ct-bordered ct-r-sm">'
-        + '<button type="button" class="ct-bg-none ct-no-border ct-clickable ct-text-critical ct-text-section ct-py-1 ct-px-1" data-click="_irRemoveCrit" data-args=\'' + _da(idx) + '\' title="Supprimer">&#10005;</button>'
+        + '<button type="button" class="ct-bg-none ct-no-border ct-clickable ct-text-critical ct-text-section ct-py-1 ct-px-1" data-click="_irRemoveCrit" data-args=\'' + _da(idx) + '\' title="' + esc(t("btn_delete")) + '">&#10005;</button>'
         + '</div>';
 }
 
@@ -1801,18 +1794,18 @@ window._addIgnoreRule = function() {
 
     // Criteria — dynamic rows (AND)
     h += '<div>';
-    h += '<label class="fs-sm ct-strong">' + (t("ignore.col_criteria") || "Critères") + ' <span class="ct-text-critical">*</span></label>';
+    h += '<label class="fs-sm ct-strong">' + (t("ignore.col_criteria")) + ' <span class="ct-text-critical">*</span></label>';
     h += '<div id="ir-criteria-container" class="ct-mt-1">';
     h += _irCriterionRow(0);
     h += '</div>';
     h += '<button type="button" class="ct-btn ct-mt-1 ct-admin-only" data-write data-variant="primary" data-size="xs" data-click="_irAddCrit">'
-       + '+ ' + (t("ignore.add_criterion") || "Ajouter un critère (AND)") + '</button>';
+       + '+ ' + (t("ignore.add_criterion")) + '</button>';
     h += '</div>';
 
     // Reason
     h += '<div>';
     h += '<label class="fs-sm ct-strong">' + t("ignore.col_reason") + ' <span class="ct-text-critical">*</span></label>';
-    h += '<textarea id="ir-reason" class="ct-journal-body ct-py-1 ct-px-2 ct-text-meta ct-bordered ct-r-sm ct-box" rows="2" placeholder="' + (t("ignore.reason_placeholder") || "Faux positif confirmé / Risque accepté / Non applicable...") + '"></textarea>';
+    h += '<textarea id="ir-reason" class="ct-journal-body ct-py-1 ct-px-2 ct-text-meta ct-bordered ct-r-sm ct-box" rows="2" placeholder="' + (t("ignore.reason_placeholder")) + '"></textarea>';
     h += '</div>';
 
     h += '</div>';
@@ -1841,7 +1834,7 @@ window._addIgnoreRule = function() {
                       var v = (valEl.value || "").trim();
                       if (v) criteria.push({ type: typeEl.value, value: v });
                   }
-                  if (criteria.length === 0) { showStatus(t("ignore.err_no_criteria") || "Au moins un critère requis", true); return false; }
+                  if (criteria.length === 0) { showStatus(t("ignore.err_no_criteria"), true); return false; }
                   return { application_ids: appIds, criteria: criteria, reason: reason };
               } }
         ]
@@ -1849,7 +1842,7 @@ window._addIgnoreRule = function() {
         if (!data) return;
         AppSecAPI._fetch("/ignore-rules", { method: "POST", body: data }).then(function(resp) {
             var msg = t("ignore.created");
-            if (resp && resp.retroactive_count) msg += " (" + resp.retroactive_count + " finding(s) auto-triés)";
+            if (resp && resp.retroactive_count) msg += " (" + t("ignore.retroactive_n").replace("{n}", String(resp.retroactive_count)) + ")";
             showStatus(msg);
             _refreshIgnoreRules();
         }).catch(function(e) { showStatus(e.message, true); });
@@ -1912,7 +1905,7 @@ window._editIgnoreRule = function(ruleId: string) {
     h += '</div></div>';
 
     ct_modal.open({
-        title: t("ignore.edit") || "Modifier la règle",
+        title: t("ignore.edit"),
         body: h, size: "lg",
         buttons: [
             { id: "cancel", label: t("btn_cancel") },
@@ -1940,8 +1933,8 @@ window._editIgnoreRule = function(ruleId: string) {
     }).then(function(data) {
         if (!data) return;
         AppSecAPI._fetch("/ignore-rules/" + ruleId, { method: "PATCH", body: data }).then(function(resp) {
-            var msg = t("ignore.updated") || "Règle mise à jour";
-            if (resp && resp.retroactive_count) msg += " (" + resp.retroactive_count + " finding(s) auto-triés)";
+            var msg = t("ignore.updated");
+            if (resp && resp.retroactive_count) msg += " (" + t("ignore.retroactive_n").replace("{n}", String(resp.retroactive_count)) + ")";
             showStatus(msg);
             _refreshIgnoreRules();
         }).catch(function(e) { showStatus(e.message, true); });
@@ -1972,10 +1965,10 @@ async function _renderAuditLog(c: HTMLElement): Promise<void> {
     var retention = 365;
     try { var rd = await AppSecAPI._fetch("/audit-log/retention"); retention = rd.audit_retention_days || 365; } catch(e) {}
     var h = '<div class="ct-row ct-row-wrap ct-mb-3">';
-    h += '<h2 class="ct-m-0">' + (t("audit.title") || "Journal d'audit") + '</h2><span class="ct-flex-1"></span>';
-    h += '<label class="ct-text-meta ct-flex ct-items-center ct-gap-1">' + (t("audit.retention") || "Rétention") + ' <input type="number" class="ct-input ct-w-70" id="audit-retention" value="' + retention + '" min="30" max="3650"> ' + (t("audit.days") || "jours") + '</label>';
-    h += '<button class="ct-btn" data-size="xs" data-click="_saveAuditRetention">' + (t("audit.apply") || "Appliquer") + '</button>';
-    h += '<input type="search" class="appsec-filter ct-minw-200" placeholder="' + (t("audit.search") || "Rechercher...") + '" value="' + esc(_auditFilter.q || "") + '" data-input="_setAuditSearch" data-pass-value>';
+    h += '<h2 class="ct-m-0">' + (t("audit.title")) + '</h2><span class="ct-flex-1"></span>';
+    h += '<label class="ct-text-meta ct-flex ct-items-center ct-gap-1">' + (t("audit.retention")) + ' <input type="number" class="ct-input ct-w-70" id="audit-retention" value="' + retention + '" min="30" max="3650"> ' + (t("audit.days")) + '</label>';
+    h += '<button class="ct-btn" data-size="xs" data-click="_saveAuditRetention">' + (t("audit.apply")) + '</button>';
+    h += '<input type="search" class="appsec-filter ct-minw-200" placeholder="' + (t("audit.search")) + '" value="' + esc(_auditFilter.q || "") + '" data-input="_setAuditSearch" data-pass-value>';
     h += '</div>';
     h += '<div id="audit-body">' + t("ai.loading") + '</div>';
     c.innerHTML = h;
@@ -2001,14 +1994,14 @@ async function _refreshAuditBody(): Promise<void> {
         var items = data.items || [];
         var h = '';
         if (items.length === 0) {
-            h = '<p class="text-muted">' + (t("audit.empty") || "Aucune entrée") + '</p>';
+            h = '<p class="text-muted">' + (t("audit.empty")) + '</p>';
         } else {
             h = '<table class="ct-table"><thead><tr>';
-            h += '<th>' + (t("audit.col_date") || "Date") + '</th>';
-            h += '<th>' + (t("audit.col_user") || "Utilisateur") + '</th>';
-            h += '<th>' + (t("audit.col_action") || "Action") + '</th>';
-            h += '<th>' + (t("audit.col_target") || "Cible") + '</th>';
-            h += '<th>' + (t("audit.col_details") || "Détails") + '</th>';
+            h += '<th>' + (t("audit.col_date")) + '</th>';
+            h += '<th>' + (t("audit.col_user")) + '</th>';
+            h += '<th>' + (t("audit.col_action")) + '</th>';
+            h += '<th>' + (t("audit.col_target")) + '</th>';
+            h += '<th>' + (t("audit.col_details")) + '</th>';
             h += '<th>IP</th>';
             h += '</tr></thead><tbody>';
             for (var i = 0; i < items.length; i++) {
@@ -2027,7 +2020,7 @@ async function _refreshAuditBody(): Promise<void> {
                 h += '</tr>';
             }
             h += '</tbody></table>';
-            h += '<p class="fs-xs text-muted">' + data.total + ' ' + (t("audit.entries") || "entrées") + '</p>';
+            h += '<p class="fs-xs text-muted">' + data.total + ' ' + (t("audit.entries")) + '</p>';
         }
         el.innerHTML = h;
     } catch (e: any) {
@@ -2056,12 +2049,12 @@ async function _renderMeasures(c: HTMLElement): Promise<void> {
     try {
         _appsecMeasures = await AppSecAPI.listMeasures() || [];
     } catch (e: any) {
-        c.innerHTML = '<h2>' + t("nav.measures") + '</h2><p class="text-muted">Erreur : ' + esc(e.message) + '</p>';
+        c.innerHTML = '<h2>' + t("nav.measures") + '</h2><p class="text-muted">' + esc(t("common.error") + ": " + e.message) + '</p>';
         return;
     }
     var h = '<h2>' + t("nav.measures") + '</h2>';
     if (!_appsecMeasures.length) {
-        h += '<p class="text-muted">Aucune remédiation. Les remédiations sont créées depuis la vue Findings (bouton « À corriger »).</p>';
+        h += '<p class="text-muted">' + esc(t("measures.empty")) + '</p>';
         c.innerHTML = h;
         return;
     }
@@ -2072,18 +2065,18 @@ async function _renderMeasures(c: HTMLElement): Promise<void> {
         bulk: { scope: "appsec-measures" },
         columns: [
             { key: "id", label: "ID", width: "100px" },
-            { key: "title", label: "Titre",
+            { key: "title", label: t("measure.field.title"),
               render: function(m) { return esc(m.title || ""); } },
             { key: "finding_ids", label: "Findings", width: "100px",
               render: function(m) {
                   var n = (m.finding_ids && m.finding_ids.length) ? m.finding_ids.length : (m.finding_id ? 1 : 0);
                   return '<span class="fs-sm text-muted">' + n + '</span>';
               } },
-            { key: "statut", label: "Statut", width: "110px",
+            { key: "statut", label: t("measure.field.statut"), width: "110px",
               render: function(m) { return _measureStatusBadge(m.statut); } },
-            { key: "responsable", label: "Responsable",
+            { key: "responsable", label: t("measure.field.responsable"),
               render: function(m) { return esc(m.responsable || ""); } },
-            { key: "echeance", label: "Échéance", width: "120px",
+            { key: "echeance", label: t("measure.field.echeance"), width: "120px",
               render: function(m) { return esc(m.echeance || ""); } }
         ]
     });
@@ -2092,17 +2085,17 @@ async function _renderMeasures(c: HTMLElement): Promise<void> {
     // DELETE /measures is admin-only backend-side: do not offer the action
     // to a triager (they would end up on a 403).
     var measureActions: CtBulkbarAction[] = [
-        { id: "done", icon: "check", label: "Terminé", variant: "success",
+        { id: "done", icon: "check", label: t("measures.status_termine"), variant: "success",
           onClick: "_bulkAppsecMeasuresDone" }
     ];
     if (document.body.classList.contains("ct-role-admin")) {
-        measureActions.push({ id: "delete", icon: "trash", label: "Supprimer", danger: true,
+        measureActions.push({ id: "delete", icon: "trash", label: t("btn_delete"), danger: true,
             onClick: "_bulkAppsecMeasuresDelete",
-            confirm: { title: "Supprimer {n} remédiation(s) ?", message: "Cette action est irréversible." } });
+            confirm: { title: t("measures.bulk_delete_confirm"), message: t("measures.irreversible") } });
     }
     ct_bulkbar.attach({
         scope: "appsec-measures",
-        label: "{n} remédiation(s) sélectionnée(s)",
+        label: t("measures.selected_n"),
         actions: measureActions
     });
     ct_bulkbar.update("appsec-measures");
@@ -2113,23 +2106,23 @@ window._bulkAppsecMeasuresDone = function(scope: string) {
     if (!ids.length) return;
     Promise.all(ids.map(function(id) { return AppSecAPI.updateMeasure(id, { statut: "termine" }); }))
         .then(function() {
-            showStatus(ids.length + " remédiation(s) marquée(s) terminée(s)");
+            showStatus(t("measures.bulk_done").replace("{n}", String(ids.length)));
             ct_bulkbar.clear(scope);
             selectPanel("measures");
         })
-        .catch(function(e) { showStatus("Erreur : " + (e.message || e), true); });
+        .catch(function(e) { showStatus(t("common.error") + ": " + (e.message || e), true); });
 };
 
 window._editAppsecMeasureRow = function(row: any) {
     var m = _appsecMeasures.find(function(x) { return x.id === row.id; });
     if (!m) return;
     ct_measure_modal.open(m, {
-        title: m.id + " — " + (m.title || "Mesure"),
+        title: m.id + " — " + (m.title || t("measure.edit")),
         hideFields: ["type"],
         statusOptions: [
-            { value: "a_faire",  label: "À faire" },
-            { value: "en_cours", label: "En cours" },
-            { value: "termine",  label: "Terminé" }
+            { value: "a_faire",  label: t("measures.status_a_faire") },
+            { value: "en_cours", label: t("measures.status_en_cours") },
+            { value: "termine",  label: t("measures.status_termine") }
         ],
         defaultStatus: "a_faire",
         ownerPicker: { pickerId: "appsec-measure-owner", directoryUrl: "api/directory" },
@@ -2138,26 +2131,26 @@ window._editAppsecMeasureRow = function(row: any) {
             return AppSecAPI.updateMeasure(m!.id, { progress_log: fullLog } as any);
         },
         // DELETE /measures is admin-only: without onDelete the modal
-        // does not show the Supprimer button.
+        // does not show the Delete button.
         onDelete: !document.body.classList.contains("ct-role-admin") ? undefined : function() {
             ct_modal.confirm({
-                title: "Supprimer la remédiation",
-                message: "Cette action est irréversible.",
+                title: t("measures.delete_confirm"),
+                message: t("measures.irreversible"),
                 danger: true
             }).then(function(ok) {
                 if (!ok) return;
                 AppSecAPI.deleteMeasure(m!.id).then(function() {
-                    showStatus("Mesure supprimée");
+                    showStatus(t("measures.deleted"));
                     selectPanel("measures");
-                }).catch(function(e) { showStatus("Erreur : " + e.message, true); });
+                }).catch(function(e) { showStatus(t("common.error") + ": " + e.message, true); });
             });
         }
     }).then(function(result) {
         if (!result || result.__deleted) return;
         AppSecAPI.updateMeasure(m!.id, result).then(function() {
-            showStatus("Mesure mise à jour");
+            showStatus(t("measures.updated"));
             selectPanel("measures");
-        }).catch(function(e) { showStatus("Erreur : " + e.message, true); });
+        }).catch(function(e) { showStatus(t("common.error") + ": " + e.message, true); });
     });
 };
 
@@ -2166,11 +2159,11 @@ window._bulkAppsecMeasuresDelete = function(scope: string) {
     if (!ids.length) return;
     Promise.all(ids.map(function(id) { return AppSecAPI.deleteMeasure(id); }))
         .then(function() {
-            showStatus(ids.length + " remédiation(s) supprimée(s)");
+            showStatus(t("measures.bulk_deleted").replace("{n}", String(ids.length)));
             ct_bulkbar.clear(scope);
             selectPanel("measures");
         })
-        .catch(function(e) { showStatus("Erreur : " + e.message, true); });
+        .catch(function(e) { showStatus(t("common.error") + ": " + e.message, true); });
 };
 
 // ═══════════════════════════════════════════════════════════════

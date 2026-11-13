@@ -383,4 +383,21 @@ _registerTranslations("en", {
         + "<tr><td>Scan the whole portfolio</td><td>Applications → \"Scan All\" button</td></tr>"
         + "<tr><td>Export the SBOM</td><td>SBOM → \"Export CSV\" button</td></tr>"
         + "<tr><td>Find who uses a package</td><td>SBOM → search by package name</td></tr></table>",
+    "dash.cve_with_patch": "{n} / {total} CVE with a vendor patch",
+    "findings.remediation_created": "1 remediation created",
+    "findings.remediation_new": "Create a remediation",
+    "findings.remediation_create": "Create the remediation",
+    "findings.fp_bulk_intro": "{n} finding(s) will be marked as false positives.",
+    "ignore.retroactive_n": "{n} finding(s) triaged automatically",
+    "measures.empty": "No remediation. Remediations are created from the Findings view (\"To Fix\" button).",
+    "measures.selected_n": "{n} remediation(s) selected",
+    "measures.bulk_delete_confirm": "Delete {n} remediation(s)?",
+    "measures.delete_confirm": "Delete the remediation",
+    "measures.irreversible": "This cannot be undone.",
+    "measures.bulk_done": "{n} remediation(s) marked as done",
+    "measures.bulk_deleted": "{n} remediation(s) deleted",
+    "measures.deleted": "Remediation deleted",
+    "measures.updated": "Remediation updated",
+    "findings.bulk_measure_title": "Corrective action ({n} findings)",
+    "findings.bulk_measure_covered": "Findings covered ({n})",
 });

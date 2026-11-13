@@ -1411,6 +1411,7 @@ services:
       - SMTP_USER
       - SSL_CERT_FILE
       - WATCH_ANALYSIS_CONCURRENCY
+      - WATCH_DIGEST_LANG
       - WATCH_FIRST_RUN_LOOKBACK_DAYS
       - WATCH_TICK_SECONDS
     depends_on:

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -15,43 +15,43 @@
     <button class="btn-hamburger" data-click="_toggleSidebarMobile">&#9776;</button>
     <span class="ct-modulepicker" role="img" aria-label="Pilot"><span data-i18n="module.pilot">Pilot</span></span>
     <span class="ct-appbar-sep"></span>
-    <nav class="ct-appbar-context" aria-label="Contexte"><span class="ct-muted" id="header-subtitle"></span></nav>
+    <nav class="ct-appbar-context" aria-label="Context" data-i18n-aria-label="chrome.context"><span class="ct-muted" id="header-subtitle"></span></nav>
     <span class="ct-spacer"></span>
     <span class="ct-appbar-saved" id="status-msg"></span>
     <div class="ct-appbar-actions">
-        <button class="ct-iconaction" data-click="ct_toggleLang" data-icon="globe" aria-label="Langue" title="Langue FR / EN"></button>
-        <button class="ct-iconaction" data-click="ct_toggleTheme" data-icon="moon" aria-label="Thème" title="Thème clair / sombre"></button>
+        <button class="ct-iconaction" data-click="ct_toggleLang" data-icon="globe" aria-label="Language" data-i18n-aria-label="chrome.lang" title="Language FR / EN" data-i18n-title="chrome.lang_toggle"></button>
+        <button class="ct-iconaction" data-click="ct_toggleTheme" data-icon="moon" aria-label="Theme" data-i18n-aria-label="chrome.theme" title="Light / dark theme" data-i18n-title="chrome.theme_toggle"></button>
         <span class="ct-toolbar-right" id="toolbar-right"></span>
     </div>
 </header>
 
 <div class="ct-body">
 
-<nav class="ct-rail" id="sidebar" aria-label="Navigation du module">
+<nav class="ct-rail" id="sidebar" aria-label="Module navigation" data-i18n-aria-label="chrome.nav">
   <div class="ct-rail-scroll">
     <div class="ct-rail-section">
       <button class="ct-rail-group" aria-expanded="true" data-click="ct_toggleRailGroup" data-pass-el>
         <span class="ct-icon-btn-slot" data-icon="chevron-right"></span><span>Pilot</span>
       </button>
-      <button class="ct-rail-item" aria-current="page" data-click="selectPanel" data-args='["dashboard"]'><span class="ct-rail-item-label" data-i18n="pilot.nav.dashboard">Tableau de bord</span></button>
-      <button class="ct-rail-item" data-click="selectPanel" data-args='["projets"]'><span class="ct-rail-item-label" data-i18n="pilot.nav.projets">Projets</span></button>
-      <button class="ct-rail-item" data-click="selectPanel" data-args='["measures"]'><span class="ct-rail-item-label" data-i18n="pilot.nav.measures">Mesures</span></button>
-      <button class="ct-rail-item" data-click="selectPanel" data-args='["evidences"]'><span class="ct-rail-item-label" data-i18n="pilot.nav.evidences">Registre des preuves</span></button>
-      <button class="ct-rail-item" data-click="selectPanel" data-args='["nonconformities"]'><span class="ct-rail-item-label" data-i18n="nav.nonconformities">Non-conformités</span></button>
-      <button class="ct-rail-item" data-click="selectPanel" data-args='["kpis"]'><span class="ct-rail-item-label" data-i18n="pilot.nav.kpis">Indicateurs</span></button>
-      <button class="ct-rail-item" data-click="selectPanel" data-args='["directory"]'><span class="ct-rail-item-label" data-i18n="pilot.nav.directory">Utilisateurs</span></button>
-      <button class="ct-rail-item" data-click="selectPanel" data-args='["users"]'><span class="ct-rail-item-label" data-i18n="pilot.nav.users">Habilitations</span></button>
-      <button class="ct-rail-item" data-click="selectPanel" data-args='["backups"]'><span class="ct-rail-item-label" data-i18n="pilot.nav.backups">Sauvegardes</span></button>
-      <button class="ct-rail-item" data-click="selectPanel" data-args='["connectors"]'><span class="ct-rail-item-label" data-i18n="pilot.nav.connectors">Connecteurs</span></button>
-      <button class="ct-rail-item" data-click="selectPanel" data-args='["settings"]'><span class="ct-rail-item-label" data-i18n="pilot.nav.settings">Parametres</span></button>
+      <button class="ct-rail-item" aria-current="page" data-click="selectPanel" data-args='["dashboard"]'><span class="ct-rail-item-label" data-i18n="pilot.nav.dashboard">Dashboard</span></button>
+      <button class="ct-rail-item" data-click="selectPanel" data-args='["projets"]'><span class="ct-rail-item-label" data-i18n="pilot.nav.projets">Projects</span></button>
+      <button class="ct-rail-item" data-click="selectPanel" data-args='["measures"]'><span class="ct-rail-item-label" data-i18n="pilot.nav.measures">Actions</span></button>
+      <button class="ct-rail-item" data-click="selectPanel" data-args='["evidences"]'><span class="ct-rail-item-label" data-i18n="pilot.nav.evidences">Evidence registry</span></button>
+      <button class="ct-rail-item" data-click="selectPanel" data-args='["nonconformities"]'><span class="ct-rail-item-label" data-i18n="nav.nonconformities">Non-conformities</span></button>
+      <button class="ct-rail-item" data-click="selectPanel" data-args='["kpis"]'><span class="ct-rail-item-label" data-i18n="pilot.nav.kpis">Indicators</span></button>
+      <button class="ct-rail-item" data-click="selectPanel" data-args='["directory"]'><span class="ct-rail-item-label" data-i18n="pilot.nav.directory">Users</span></button>
+      <button class="ct-rail-item" data-click="selectPanel" data-args='["users"]'><span class="ct-rail-item-label" data-i18n="pilot.nav.users">Permissions</span></button>
+      <button class="ct-rail-item" data-click="selectPanel" data-args='["backups"]'><span class="ct-rail-item-label" data-i18n="pilot.nav.backups">Backups</span></button>
+      <button class="ct-rail-item" data-click="selectPanel" data-args='["connectors"]'><span class="ct-rail-item-label" data-i18n="pilot.nav.connectors">Connectors</span></button>
+      <button class="ct-rail-item" data-click="selectPanel" data-args='["settings"]'><span class="ct-rail-item-label" data-i18n="pilot.nav.settings">Settings</span></button>
     </div>
 
     <div class="ct-rail-section">
       <button class="ct-rail-group" aria-expanded="true" data-click="ct_toggleRailGroup" data-pass-el>
-        <span class="ct-icon-btn-slot" data-icon="chevron-right"></span><span data-i18n="pilot.sidebar.section_aide">Aide</span>
+        <span class="ct-icon-btn-slot" data-icon="chevron-right"></span><span data-i18n="pilot.sidebar.section_aide">Help</span>
       </button>
-      <button class="ct-rail-item" data-click="toggleHelp" data-args='["methodo"]'><span class="ct-rail-item-label" data-i18n="pilot.sidebar.methodo">Méthodologie</span></button>
-      <button class="ct-rail-item" data-click="toggleHelp" data-args='["usage"]'><span class="ct-rail-item-label" data-i18n="pilot.sidebar.usage">Utilisation</span></button>
+      <button class="ct-rail-item" data-click="toggleHelp" data-args='["methodo"]'><span class="ct-rail-item-label" data-i18n="pilot.sidebar.methodo">Methodology</span></button>
+      <button class="ct-rail-item" data-click="toggleHelp" data-args='["usage"]'><span class="ct-rail-item-label" data-i18n="pilot.sidebar.usage">How to use</span></button>
     </div>
   </div>
 
@@ -66,20 +66,20 @@
 
 <input type="file" id="csv-import-input" accept=".csv,.txt" class="ct-hidden">
 
-<!-- Panel d'aide -->
+<!-- Help panel -->
 <div class="help-overlay" id="help-overlay" data-click-self="toggleHelp">
 <div class="help-panel">
 <button class="close-help" data-click="toggleHelp">&times;</button>
 
 <div class="help-tabs">
-    <div class="help-tab active" id="help-tab-methodo" data-click="switchHelpTab" data-args='["methodo"]' data-i18n="pilot.help.tab_methodo">Méthodologie Pilot</div>
-    <div class="help-tab" id="help-tab-usage" data-click="switchHelpTab" data-args='["usage"]' data-i18n="pilot.help.tab_usage">Utilisation de l'application</div>
+    <div class="help-tab active" id="help-tab-methodo" data-click="switchHelpTab" data-args='["methodo"]' data-i18n="pilot.help.tab_methodo">Pilot methodology</div>
+    <div class="help-tab" id="help-tab-usage" data-click="switchHelpTab" data-args='["usage"]' data-i18n="pilot.help.tab_usage">How to use the application</div>
 </div>
 
-<!-- Onglet Méthodologie -->
+<!-- Methodology tab -->
 <div class="help-content" id="help-content-methodo" data-i18n-html="pilot.help.methodo"></div>
 
-<!-- Onglet Utilisation -->
+<!-- Usage tab -->
 <div class="help-content ct-hidden" id="help-content-usage" data-i18n-html="pilot.help.usage"></div>
 
 </div>

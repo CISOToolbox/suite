@@ -1068,7 +1068,7 @@ async function _refreshAlertsRows() {
     if (window.ct_bulkbar) {
         ct_bulkbar.attach({
             scope: "watch-alerts",
-            label: t("alerts.bulk.selected_n") || "{n} alerte(s) sélectionnée(s)",
+            label: t("alerts.bulk.selected_n"),
             actions: [
                 { id: "ack", icon: "check", label: t("alerts.status.ack"),
                     variant: "primary", onClick: "_watchAlertsBulkSetStatus" },
@@ -1115,16 +1115,16 @@ window._watchAlertsBulkSetStatus = function (scope, status) {
         return;
     WatchAPI.bulkSetAlertStatus({ ids: ids, status: status }).then(function (r) {
         var label = t("alerts.status." + status) || status;
-        var msg = (r.updated || 0) + " " + (t("alerts.bulk.applied") || "alerte(s) → ") + label;
+        var msg = (r.updated || 0) + " " + (t("alerts.bulk.applied")) + label;
         if (r.skipped)
-            msg += " (" + r.skipped + " " + (t("alerts.bulk.skipped") || "ignorée(s)") + ")";
+            msg += " (" + r.skipped + " " + (t("alerts.bulk.skipped")) + ")";
         if (typeof showStatus === "function")
             showStatus(msg);
         ct_bulkbar.clear(scope);
         _refreshAlertsRows();
     }).catch(function (e) {
         if (typeof showStatus === "function")
-            showStatus("Erreur: " + (e.message || e), true);
+            showStatus(t("misc.error") + ": " + (e.message || e), true);
     });
 };
 function setAlertFilter(field, val) {

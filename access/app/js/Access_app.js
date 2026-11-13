@@ -263,9 +263,9 @@ function _accessTone(v) {
 // IdP account active/disabled badge. undefined/null = unknown (connector didn't report).
 function _accountTag(enabled) {
     if (enabled === true)
-        return '<span class="ct-badge" data-tone="low">' + (t("user.account_active") || "Actif") + '</span>';
+        return '<span class="ct-badge" data-tone="low">' + (t("user.account_active")) + '</span>';
     if (enabled === false)
-        return '<span class="ct-badge" data-tone="critical">' + (t("user.account_disabled") || "Désactivé") + '</span>';
+        return '<span class="ct-badge" data-tone="critical">' + (t("user.account_disabled")) + '</span>';
     return '<span class="text-muted">—</span>';
 }
 function _statusLabel(s) { return t("user.statut." + s) || s; }
@@ -458,20 +458,20 @@ var _userFilter = "";
 function renderUserList() {
     var h = '<div class="ct-row ct-row-wrap ct-mb-3">';
     h += '<h2 class="ct-m-0">' + t("nav.users") + ' (' + D.si_users.length + ')</h2>';
-    h += '<input type="text" id="user-search" placeholder="' + esc(t("user.search") || "Rechercher...") + '" value="' + esc(_userFilter) + '" class="ct-flex-1 ct-maxw-300 ct-py-1 ct-px-2 ct-bordered ct-r-sm ct-text-meta" data-input="_filterUsers" data-pass-value>';
+    h += '<input type="text" id="user-search" placeholder="' + esc(t("user.search")) + '" value="' + esc(_userFilter) + '" class="ct-flex-1 ct-maxw-300 ct-py-1 ct-px-2 ct-bordered ct-r-sm ct-text-meta" data-input="_filterUsers" data-pass-value>';
     // When an HR connector is active, HR (via Access) is the source of
     // identities and self-syncs to Pilot — pulling FROM Pilot is the wrong
     // direction, so the "Sync Pilot" button is hidden (no bidirectional sync).
     var _hrActive = (_pluginList || []).some(function (p) { return p.plugin_type === "hr_generic" && p.enabled; });
     if (!_hrActive) {
-        h += '<button class="ct-btn mt-8 access-link" data-write data-click="syncUsersFromPilot" title="' + esc(t("user.sync_pilot_tooltip") || "Importer/mettre a jour depuis l'annuaire Pilot") + '">' + (t("user.sync_pilot") || "Sync Pilot") + '</button>';
+        h += '<button class="ct-btn mt-8 access-link" data-write data-click="syncUsersFromPilot" title="' + esc(t("user.sync_pilot_tooltip")) + '">' + (t("user.sync_pilot")) + '</button>';
     }
     // Sync RH only when an HR connector (hr_generic) is actually configured.
     if ((_pluginList || []).some(function (p) { return p.plugin_type === "hr_generic"; })) {
-        h += '<button class="ct-btn mt-8" data-write data-click="syncUsersFromHr" title="' + esc(t("user.sync_hr_tooltip") || "Importer/mettre a jour depuis le connecteur RH") + '">' + (t("user.sync_hr") || "Sync RH") + '</button>';
+        h += '<button class="ct-btn mt-8" data-write data-click="syncUsersFromHr" title="' + esc(t("user.sync_hr_tooltip")) + '">' + (t("user.sync_hr")) + '</button>';
     }
-    h += '<button class="ct-btn mt-8" data-write data-click="importUsersCsv">' + (t("user.import_csv") || "Importer CSV") + '</button>';
-    h += '<a href="javascript:void(0)" class="access-link" data-click="downloadUsersCsvTemplate" style="font-size:var(--ct-text-label);align-self:center;text-decoration:underline">' + (t("user.csv_template") || "Modèle CSV") + '</a>';
+    h += '<button class="ct-btn mt-8" data-write data-click="importUsersCsv">' + (t("user.import_csv")) + '</button>';
+    h += '<a href="javascript:void(0)" class="access-link" data-click="downloadUsersCsvTemplate" style="font-size:var(--ct-text-label);align-self:center;text-decoration:underline">' + (t("user.csv_template")) + '</a>';
     h += '<button class="ct-btn mt-8" data-write data-variant="primary" data-click="addUser">' + t("user.add") + '</button></div>';
     if (!D.si_users.length) {
         h += '<div class="ct-empty-state">' + t("user.empty") + '</div>';
@@ -484,7 +484,7 @@ function renderUserList() {
         return ((u.id || "") + " " + (u.nom || "") + " " + (u.prenom || "") + " " + (u.email || "") + " " + (u.fonction || "")).toLowerCase().indexOf(q) >= 0;
     });
     if (!filtered.length) {
-        h += '<div class="ct-empty-state">' + (t("user.no_results") || "Aucun résultat") + '</div>';
+        h += '<div class="ct-empty-state">' + (t("user.no_results")) + '</div>';
         return h;
     }
     h += ct_table.render({
@@ -505,7 +505,7 @@ function renderUserList() {
                 render: function (u) { return esc(_statusLabel(u.statut)); } },
             { key: "fonction", label: t("user.fonction"),
                 render: function (u) { return '<span>' + esc(u.fonction) + '</span>'; } },
-            { key: "last_login_at", label: t("user.last_login") || "Dernière connexion", width: "150px",
+            { key: "last_login_at", label: t("user.last_login"), width: "150px",
                 render: function (u) {
                     if (!u.last_login_at)
                         return '<span>—</span>';
@@ -527,11 +527,11 @@ function renderUserList() {
             return;
         ct_bulkbar.attach({
             scope: "access-users",
-            label: t("user.selected_n") || "{n} utilisateur(s) sélectionné(s)",
+            label: t("user.selected_n"),
             actions: [
-                { id: "delete", icon: "trash", label: t("btn_delete") || "Supprimer", danger: true,
+                { id: "delete", icon: "trash", label: t("btn_delete"), danger: true,
                     onClick: "_bulkDeleteUsers",
-                    confirm: { title: "Supprimer {n} utilisateur(s) ?", message: "Cette action est irréversible." } }
+                    confirm: { title: t("user.bulk_delete_confirm"), message: t("confirm.irreversible") } }
             ]
         });
         ct_bulkbar.update("access-users");
@@ -548,12 +548,11 @@ window.syncUsersFromPilot = function () {
         showStatus("Backend not available", true);
         return;
     }
-    _ctConfirm(t("user.sync_pilot_confirm_title") || "Synchroniser depuis Pilot", t("user.sync_pilot_confirm_body") || "Les utilisateurs de l'annuaire Pilot seront importes ou mis a jour (nom, prenom, fonction). Les flags de conformite existants ne sont pas ecrases. Continuer ?", function () {
+    _ctConfirm(t("user.sync_pilot_confirm_title"), t("user.sync_pilot_confirm_body"), function () {
         _syncPilotInFlight = true;
-        showStatus(t("user.sync_pilot_running") || "Synchronisation Pilot en cours...");
+        showStatus(t("user.sync_pilot_running"));
         AccessAPI.syncSiUsersFromPilot(pid).then(function (r) {
-            var base = t("user.sync_pilot_ok") ||
-                "Sync Pilot : {created} cree(s), {updated} mis a jour, {skipped} ignore(s) (sur {total} dans Pilot)";
+            var base = t("user.sync_pilot_ok");
             showStatus(base
                 .replace("{created}", String(r.created))
                 .replace("{updated}", String(r.updated))
@@ -563,7 +562,7 @@ window.syncUsersFromPilot = function () {
             // concurrent live-reload (focus/polling).
             _reloadProjectData();
         }).catch(function (e) {
-            showStatus((t("user.sync_pilot_fail") || "Erreur sync Pilot : ") + (e.message || e), true);
+            showStatus((t("user.sync_pilot_fail")) + (e.message || e), true);
         }).finally(function () { _syncPilotInFlight = false; });
     });
 };
@@ -584,8 +583,7 @@ window.importUsersCsv = function () {
             return;
         }
         AccessAPI.importSiUsersCsv(pid, el.files[0]).then(function (r) {
-            var base = t("user.csv_imported") ||
-                "Import CSV : {created} cree(s), {updated} mis a jour, {skipped} ignore(s)";
+            var base = t("user.csv_imported");
             showStatus(base
                 .replace("{created}", String(r.created))
                 .replace("{updated}", String(r.updated))
@@ -598,14 +596,14 @@ window.importUsersCsv = function () {
 // Download a ready-to-fill CSV template for the user referential import.
 window.downloadUsersCsvTemplate = function () {
     var header = "prenom;nom;email;fonction;equipe;type_compte;date_fin_contrat;manager;statut";
-    var example = "Claire;Dubois;claire.dubois@example.com;Responsable Qualité;Qualité;salarie;;;actif\n"
-        + "Marc;Lefevre;marc.lefevre@example.com;Ingénieur DevOps;Plateforme;prestataire;2026-12-31;claire.dubois@example.com;actif\n"
-        + "Sofia;Nguyen;sofia.nguyen@example.com;Stagiaire SOC;Sécurité;stagiaire;2026-08-31;marc.lefevre@example.com;recrutement";
+    var example = "Claire;Dubois;claire.dubois@example.com;Quality Manager;Quality;salarie;;;actif\n"
+        + "Marc;Lefevre;marc.lefevre@example.com;DevOps Engineer;Platform;prestataire;2026-12-31;claire.dubois@example.com;actif\n"
+        + "Sofia;Nguyen;sofia.nguyen@example.com;SOC Intern;Security;stagiaire;2026-08-31;marc.lefevre@example.com;recrutement";
     var csv = header + "\n" + example + "\n";
     var blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });
     var link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = "modele_utilisateurs.csv";
+    link.download = "users_template.csv";
     link.click();
     URL.revokeObjectURL(link.href);
 };
@@ -619,17 +617,16 @@ window.syncUsersFromHr = function () {
         return;
     }
     _syncPilotInFlight = true;
-    showStatus(t("user.sync_hr_running") || "Synchronisation RH en cours...");
+    showStatus(t("user.sync_hr_running"));
     AccessAPI.syncSiUsersFromHr(pid).then(function (r) {
-        var base = t("user.sync_hr_ok") ||
-            "Sync RH : {created} cree(s), {updated} mis a jour, {skipped} ignore(s)";
+        var base = t("user.sync_hr_ok");
         showStatus(base
             .replace("{created}", String(r.created))
             .replace("{updated}", String(r.updated))
             .replace("{skipped}", String(r.skipped)));
         _reloadProjectData();
     }).catch(function (e) {
-        showStatus((t("user.sync_hr_fail") || "Erreur sync RH : ") + (e.message || e), true);
+        showStatus((t("user.sync_hr_fail")) + (e.message || e), true);
     }).finally(function () { _syncPilotInFlight = false; });
 };
 window._openUserRow = function (row) {
@@ -751,7 +748,7 @@ function renderUserDetail() {
     h += '<button class="ct-btn" data-variant="ghost" data-size="sm" data-click="backToUsers">&laquo; ' + t("nav.users") + '</button>';
     h += '<h2 class="ct-m-0">' + esc((u.prenom + " " + u.nom).trim() || t("user.new")) + '</h2>';
     if (lockedByPilot) {
-        h += '<span title="' + esc(t("user.managed_by_pilot_tooltip") || "Ces champs d\'identite sont synchronises depuis Pilot et ne peuvent pas etre modifies ici") + '" style="display:inline-flex;align-items:center;gap:var(--ct-s1);padding:var(--ct-s1) var(--ct-s2);border-radius:var(--ct-r-xl);background:var(--ct-accent-tint);color:var(--ct-accent);font-size:var(--ct-text-label);font-weight:600">🔒 ' + (t("user.managed_by_pilot") || "Géré par Pilot") + '</span>';
+        h += '<span title="' + esc(t("user.managed_by_pilot_tooltip")) + '" style="display:inline-flex;align-items:center;gap:var(--ct-s1);padding:var(--ct-s1) var(--ct-s2);border-radius:var(--ct-r-xl);background:var(--ct-accent-tint);color:var(--ct-accent);font-size:var(--ct-text-label);font-weight:600">🔒 ' + (t("user.managed_by_pilot")) + '</span>';
     }
     h += '<span class="ct-flex-1"></span>';
     h += '<button class="ct-btn mt-8" data-write data-variant="danger" data-click="deleteUser">' + t("btn_delete") + '</button></div>';
@@ -763,19 +760,19 @@ function renderUserDetail() {
     h += _field("fonction", t("user.fonction"), "text", u.fonction, lockedByPilot);
     h += '</div><div class="ct-form-grid">';
     h += _sel("statut", t("user.statut_label"), ["actif", "ancien", "recrutement"].map(function (s) { return { v: s, l: _statusLabel(s) }; }), u.statut, lockedByPilot);
-    h += _sel("type_compte", t("user.type_compte_label") || "Type", ["salarie", "prestataire", "stagiaire", "alternant"].map(function (s) {
+    h += _sel("type_compte", t("user.type_compte_label"), ["salarie", "prestataire", "stagiaire", "alternant"].map(function (s) {
         return { v: s, l: t("user.type_compte." + s) || s };
     }), u.type_compte || "salarie");
     h += '</div><div class="ct-form-grid">';
-    h += _field("equipe", t("user.equipe") || "Équipe", "text", u.equipe);
+    h += _field("equipe", t("user.equipe"), "text", u.equipe);
     // Manager — shared user picker (ct_userpicker), mounted post-render on the
     // slot below. Stores the selected user's email in manager_email.
-    h += '<div class="ct-form-row"><label>' + esc(t("user.manager") || "Manager") + '</label><div id="user-manager-slot"></div></div>';
+    h += '<div class="ct-form-row"><label>' + esc(t("user.manager")) + '</label><div id="user-manager-slot"></div></div>';
     h += '</div>';
     // Contract end date — required/relevant for every type except salarie.
     if ((u.type_compte || "salarie") !== "salarie") {
         h += '<div class="ct-form-grid">';
-        h += _field("date_fin_contrat", t("user.date_fin_contrat") || "Date de fin de contrat", "date", u.date_fin_contrat);
+        h += _field("date_fin_contrat", t("user.date_fin_contrat"), "date", u.date_fin_contrat);
         h += '</div>';
     }
     // Compliance proofs — a control turns green only when both a date and a
@@ -786,22 +783,22 @@ function renderUserDetail() {
     h += _proofCard("politique", t("user.politique_validee"), u.politique_validee, u.politique_date, u.politique_justification, "politique_validee", "politique_date", "politique_justification");
     h += _proofCard("mfa", t("user.mfa_active"), u.mfa_active, u.mfa_date, u.mfa_justification, "mfa_active", "mfa_date", "mfa_justification");
     h += _sensibilisationCard(u);
-    h += _proofCard("background_check", t("user.background_check") || "Background check", u.background_check, u.background_check_date, u.background_check_justification, "background_check", "background_check_date", "background_check_justification");
+    h += _proofCard("background_check", t("user.background_check"), u.background_check, u.background_check_date, u.background_check_justification, "background_check", "background_check_date", "background_check_justification");
     // NDA — mandatory for prestataires, displayed only then to keep the UI tidy.
     if ((u.type_compte || "salarie") === "prestataire") {
-        h += _proofCard("nda", t("user.nda") || "NDA signé", u.nda_signed, u.nda_date, u.nda_justification, "nda_signed", "nda_date", "nda_justification");
+        h += _proofCard("nda", t("user.nda"), u.nda_signed, u.nda_date, u.nda_justification, "nda_signed", "nda_date", "nda_justification");
     }
     h += '</div>';
     // Legacy background-check URL — kept editable when present, hidden otherwise.
     if (u.background_check_url) {
         h += '<div>';
-        h += _field("background_check_url", (t("user.background_check_url") || "Background check (URL legacy)"), "url", u.background_check_url);
+        h += _field("background_check_url", (t("user.background_check_url")), "url", u.background_check_url);
         h += '</div>';
     }
     h += '</div>';
     // Requested entitlements (loaded async from a dedicated API, never blob).
     h += '<div class="form-section">' + t("user.entitlements") + '</div>';
-    h += '<div id="user-entitlements">' + esc(t("user.ent_loading") || "Chargement…") + '</div>';
+    h += '<div id="user-entitlements">' + esc(t("user.ent_loading")) + '</div>';
     setTimeout(_mountManagerPicker, 0);
     setTimeout(_loadEntitlements, 0);
     return h;
@@ -822,7 +819,7 @@ function _mountManagerPicker() {
         slotId: "user-manager-slot",
         pickerId: "access-user-manager",
         value: initLabel,
-        placeholder: t("user.manager_search") || "Rechercher un utilisateur…",
+        placeholder: t("user.manager_search"),
         directoryUrl: "api/directory",
     }).then(function (handle) {
         _mgrHandle = handle;
@@ -984,7 +981,7 @@ function _loadEntitlements() {
     }).catch(function (e) {
         var s = document.getElementById("user-entitlements");
         if (s)
-            s.textContent = (e && e.message) || "Erreur";
+            s.textContent = (e && e.message) || t("error");
     });
 }
 function _perimLabel(pid) {
@@ -1008,21 +1005,21 @@ function _renderEntitlements() {
         // Perimeter — plain search combobox: filtered list, shows the name as
         // text once picked (no tag chip).
         h += '<div class="ct-userpicker ct-minw-220 ct-flex-1">';
-        h += '<input type="text" id="ent-perim-search" autocomplete="off" value="' + esc(_entDraftPerim ? _perimLabel(_entDraftPerim) : "") + '" placeholder="' + esc(t("user.ent_search_perim") || "Rechercher un périmètre...") + '" class="ct-input" data-input="_entPerimSearch" data-pass-value data-click="_entPerimOpen" data-stop>';
+        h += '<input type="text" id="ent-perim-search" autocomplete="off" value="' + esc(_entDraftPerim ? _perimLabel(_entDraftPerim) : "") + '" placeholder="' + esc(t("user.ent_search_perim")) + '" class="ct-input" data-input="_entPerimSearch" data-pass-value data-click="_entPerimOpen" data-stop>';
         h += '<div id="ent-perim-dd" hidden style="position:absolute;left:0;right:0;top:100%;background:var(--ct-surface);border:1px solid var(--ct-line);border-radius:0 0 4px 4px;max-height:220px;overflow-y:auto;z-index:30;box-shadow:0 4px 12px rgba(0,0,0,0.12)">';
         D.applications.forEach(function (a) {
             h += '<div class="ent-perim-item ct-py-1 ct-px-2 ct-clickable ct-text-meta" data-click="_entPickPerim" data-args=\'' + _da(a.id) + '\' data-stop>' + esc(a.nom || a.id) + '</div>';
         });
         if (!D.applications.length)
-            h += '<div class="ct-py-1 ct-px-2 ct-muted ct-text-label">' + esc(t("app.empty") || "Aucun périmètre") + '</div>';
+            h += '<div class="ct-py-1 ct-px-2 ct-muted ct-text-label">' + esc(t("app.empty")) + '</div>';
         h += '</div></div>';
         // Roles — multi-select with search (chips are fine here).
-        h += '<div class="ct-minw-220 ct-flex-1">' + (window.ctRefSelect ? window.ctRefSelect("ent-roles", "", roleOpts, { hideId: true, placeholder: t("user.ent_search_role") || "Rechercher un rôle...", emptyText: roleOpts.length ? (t("user.ent_select_roles") || "Rôles...") : (t("user.ent_no_roles") || "(aucun rôle défini)") }) : "") + '</div>';
-        h += '<button class="ct-btn mt-8" data-write data-variant="primary" data-size="xs" data-click="addEntitlement"' + (_entDraftPerim ? "" : " disabled") + '>' + esc(t("user.ent_add") || "Ajouter") + '</button>';
+        h += '<div class="ct-minw-220 ct-flex-1">' + (window.ctRefSelect ? window.ctRefSelect("ent-roles", "", roleOpts, { hideId: true, placeholder: t("user.ent_search_role"), emptyText: roleOpts.length ? (t("user.ent_select_roles")) : (t("user.ent_no_roles")) }) : "") + '</div>';
+        h += '<button class="ct-btn mt-8" data-write data-variant="primary" data-size="xs" data-click="addEntitlement"' + (_entDraftPerim ? "" : " disabled") + '>' + esc(t("user.ent_add")) + '</button>';
         h += '</div>';
     }
     if (!_entitlements.length) {
-        h += '<div class="ct-empty-state ct-py-2 ct-px-0">' + esc(t("user.ent_empty") || "Aucune habilitation demandée") + '</div>';
+        h += '<div class="ct-empty-state ct-py-2 ct-px-0">' + esc(t("user.ent_empty")) + '</div>';
     }
     else {
         h += '<table class="ct-w-full ct-text-meta ct-mb-2"><thead><tr>';
@@ -1038,7 +1035,7 @@ function _renderEntitlements() {
         h += '</tbody></table>';
     }
     if (_entAudit.length) {
-        h += '<details><summary class="ct-clickable ct-text-label ct-muted">' + esc(t("user.ent_audit_title") || "Journal des habilitations") + ' (' + _entAudit.length + ')</summary>';
+        h += '<details><summary class="ct-clickable ct-text-label ct-muted">' + esc(t("user.ent_audit_title")) + ' (' + _entAudit.length + ')</summary>';
         h += '<table class="ct-w-full ct-text-label ct-mt-1"><tbody>';
         _entAudit.forEach(function (a) {
             var act = t("user.ent_action." + a.action) || a.action;
@@ -1076,7 +1073,7 @@ window.addEntitlement = function () {
         return chain.then(function () { return AccessAPI.createEntitlement(pid, uid, { perimetre_id: perimId, role: r }); });
     }, Promise.resolve())
         .then(function () { _entDraftPerim = ""; _loadEntitlements(); })
-        .catch(function (e) { showStatus((e && e.message) || "Erreur", true); });
+        .catch(function (e) { showStatus((e && e.message) || t("error"), true); });
 };
 window.removeEntitlement = function (eid) {
     if (_selectedUser === null)
@@ -1088,7 +1085,7 @@ window.removeEntitlement = function (eid) {
     if (!pid || !window.AccessAPI)
         return;
     AccessAPI.deleteEntitlement(pid, u.id, eid).then(function () { _loadEntitlements(); })
-        .catch(function (e) { showStatus((e && e.message) || "Erreur", true); });
+        .catch(function (e) { showStatus((e && e.message) || t("error"), true); });
 };
 function _field(name, label, type, val, disabled) {
     var extra = disabled ? ' disabled style="background:var(--ct-surface-2);color:var(--ct-ink-1);cursor:not-allowed"' : '';
@@ -1114,7 +1111,7 @@ function _proofCard(id, label, _checked, dateVal, justif, fieldBool, fieldDate, 
     h += esc(label) + '</span>';
     h += '<input type="date" class="proof-card__date" value="' + esc(String(dateVal || "")) + '" data-change="saveUserField" data-args=\'["' + esc(fieldDate) + '"]\' data-pass-value>';
     h += '</div>';
-    h += '<textarea class="proof-card__justif" rows="2" placeholder="' + esc(t("user.justification_placeholder") || "Justification, lien, référence…") + '" data-change="saveUserField" data-args=\'["' + esc(fieldJustif) + '"]\' data-pass-value>' + esc(String(justif || "")) + '</textarea>';
+    h += '<textarea class="proof-card__justif" rows="2" placeholder="' + esc(t("user.justification_placeholder")) + '" data-change="saveUserField" data-args=\'["' + esc(fieldJustif) + '"]\' data-pass-value>' + esc(String(justif || "")) + '</textarea>';
     h += '</div>';
     return h;
 }
@@ -1125,7 +1122,7 @@ var _appFilter = "";
 function renderAppList() {
     var h = '<div class="ct-row ct-row-wrap ct-mb-3">';
     h += '<h2 class="ct-m-0">' + t("nav.apps") + ' (' + D.applications.length + ')</h2>';
-    h += '<input type="text" id="app-search" placeholder="' + esc(t("app.search") || "Rechercher...") + '" value="' + esc(_appFilter) + '" style="flex:1;max-width:280px;padding:var(--ct-s1) var(--ct-s2);border:1px solid var(--ct-line);border-radius:var(--ct-r-sm);font-size:var(--ct-text-meta)" data-input="_filterApps" data-pass-value>';
+    h += '<input type="text" id="app-search" placeholder="' + esc(t("app.search")) + '" value="' + esc(_appFilter) + '" style="flex:1;max-width:280px;padding:var(--ct-s1) var(--ct-s2);border:1px solid var(--ct-line);border-radius:var(--ct-r-sm);font-size:var(--ct-text-meta)" data-input="_filterApps" data-pass-value>';
     h += '<div class="ct-flex ct-gap-1">';
     h += '<button class="ct-btn mt-8" data-write data-variant="primary" data-click="addApp">' + t("app.add") + '</button>';
     h += '<button class="ct-btn mt-8" data-write data-click="importAppsCsv">' + t("app.import_csv") + '</button>';
@@ -1158,7 +1155,7 @@ function renderAppList() {
         return ((a.id || "") + " " + (a.nom || "") + " " + (a.url || "") + " " + (a.__reviewer_names || "")).toLowerCase().indexOf(q) >= 0;
     });
     if (!rows.length) {
-        h += '<div class="ct-empty-state">' + (t("app.no_results") || "Aucune application trouvée") + '</div>';
+        h += '<div class="ct-empty-state">' + (t("app.no_results")) + '</div>';
         return h;
     }
     h += ct_table.render({
@@ -1186,11 +1183,11 @@ function renderAppList() {
             return;
         ct_bulkbar.attach({
             scope: "access-apps",
-            label: t("app.selected_n") || "{n} application(s) sélectionnée(s)",
+            label: t("app.selected_n"),
             actions: [
-                { id: "delete", icon: "trash", label: t("btn_delete") || "Supprimer", danger: true,
+                { id: "delete", icon: "trash", label: t("btn_delete"), danger: true,
                     onClick: "_bulkDeleteApps",
-                    confirm: { title: "Supprimer {n} application(s) ?", message: "Les revues liées resteront orphelines. Action irréversible." } }
+                    confirm: { title: t("app.bulk_delete_confirm"), message: t("app.bulk_delete_confirm_body") } }
             ]
         });
         ct_bulkbar.update("access-apps");
@@ -1275,7 +1272,7 @@ function renderAppDetail() {
     h += '<button class="ct-btn" data-variant="ghost" data-size="sm" data-click="backToApps">&laquo; ' + t("nav.apps") + '</button>';
     h += '<h2 class="ct-m-0">' + esc(a.nom || t("app.new")) + '</h2>';
     if (a.url)
-        h += '<a href="' + esc(a.url) + '" target="_blank" rel="noopener noreferrer" class="access-link ct-text-label ct-no-underline" title="Ouvrir l\'application">&#x2197;</a>';
+        h += '<a href="' + esc(a.url) + '" target="_blank" rel="noopener noreferrer" class="access-link ct-text-label ct-no-underline" title="' + esc(t("apps.open_link")) + '">&#x2197;</a>';
     h += '<span class="ct-flex-1"></span>';
     // BUG-24: no mt-8 inside a .ct-row (flex align-center) and one data-size
     // for both buttons — otherwise they sit at different heights/offsets.
@@ -1284,11 +1281,11 @@ function renderAppDetail() {
     // Stat cards
     h += '<div class="app-stats">';
     h += _card(appReviews.length, t("review.entries"));
-    h += _card(activeReviews.length, "en cours", activeReviews.length ? "warning" : "");
+    h += _card(activeReviews.length, t("review.en_cours"), activeReviews.length ? "warning" : "");
     h += _card(closedReviews.length, "cloturees");
     h += _card((a.reviewers || []).length, t("app.reviewers"));
     if (lastClosed) {
-        h += _card(esc(lastClosed.closed_at || "—"), "derniere revue");
+        h += _card(esc(lastClosed.closed_at || "—"), t("app.last_review"));
     }
     h += '</div>';
     // Two-column layout: form on left, reviews on right
@@ -1297,7 +1294,7 @@ function renderAppDetail() {
     h += '<div>';
     // Section Identite
     h += '<div>';
-    h += '<div class="app-section-title">Informations</div>';
+    h += '<div class="app-section-title">' + t("app.section_info") + '</div>';
     h += '<div class="app-field"><label class="app-field-lbl">' + t("app.nom") + '</label>';
     h += '<input type="text" class="app-field-input" value="' + esc(a.nom || "") + '" data-change="saveAppField" data-args=\'["nom"]\' data-pass-value placeholder="' + esc(t("app.nom")) + '"></div>';
     h += '<div class="app-field"><label class="app-field-lbl">' + t("app.type") + '</label>';
@@ -1344,13 +1341,13 @@ function renderAppDetail() {
                 if (su && su.email)
                     h += '<span class="app-reviewer-email">' + esc(su.email) + '</span>';
                 h += '</span>';
-                h += '<button class="ct-btn" data-variant="danger" data-size="xs" data-icon title="Retirer" data-click="removeAppReviewer" data-args=\'' + _da(rid) + '\'>' + _icon("trash", 14) + '</button>';
+                h += '<button class="ct-btn" data-variant="danger" data-size="xs" data-icon title="' + t("app.reviewer_remove") + '" data-click="removeAppReviewer" data-args=\'' + _da(rid) + '\'>' + _icon("trash", 14) + '</button>';
                 h += '</div>';
             });
             h += '</div>';
         }
         else {
-            h += '<div class="app-empty-hint">Aucun reviseur assigne</div>';
+            h += '<div class="app-empty-hint">' + esc(t("app.no_reviewer")) + '</div>';
         }
         h += '<select class="app-field-input" data-change="addAppReviewer" data-pass-value>';
         h += '<option value="">+ ' + t("app.add_reviewer") + '</option>';
@@ -1365,13 +1362,13 @@ function renderAppDetail() {
     h += '</div>';
     // Right: reviews list
     h += '<div class="app-detail-col">';
-    h += '<h3 style="font-size:var(--ct-text-ui);margin:0 0 var(--ct-s2)">Revues d\'acces</h3>';
+    h += '<h3 style="font-size:var(--ct-text-ui);margin:0 0 var(--ct-s2)">' + esc(t("review.section_title")) + '</h3>';
     if (!appReviews.length) {
-        h += '<div class="ct-empty-state ct-p-5">Aucune revue. Cliquez sur "' + t("review.start") + '" pour en demarrer une.</div>';
+        h += '<div class="ct-empty-state ct-p-5">' + esc(t("review.none_hint").replace("{action}", t("review.start"))) + '</div>';
     }
     else {
         if (activeReviews.length) {
-            h += '<div style="font-size:var(--ct-text-label);font-weight:600;color:var(--ct-ink-2);margin:var(--ct-s2) 0 var(--ct-s1);text-transform:uppercase">En cours</div>';
+            h += '<div style="font-size:var(--ct-text-label);font-weight:600;color:var(--ct-ink-2);margin:var(--ct-s2) 0 var(--ct-s1);text-transform:uppercase">' + esc(t("review.en_cours")) + '</div>';
             activeReviews.forEach(function (r) {
                 var origIdx = D.reviews.indexOf(r);
                 var total = (r.entries || []).length;
@@ -1384,12 +1381,12 @@ function renderAppDetail() {
                 if (total)
                     h += '<div class="progress-bar ct-mt-1"><div class="progress-bar-fill" style="width:' + pct + '%"></div></div>';
                 h += '</div>';
-                h += '<button class="app-review-del" title="Supprimer cette revue" data-click="deleteReviewFromApp" data-args=\'' + _da(r.id) + '\' data-stop>' + _icon("trash", 14) + '</button>';
+                h += '<button class="app-review-del" title="' + esc(t("review.delete_tooltip")) + '" data-click="deleteReviewFromApp" data-args=\'' + _da(r.id) + '\' data-stop>' + _icon("trash", 14) + '</button>';
                 h += '</div>';
             });
         }
         if (closedReviews.length) {
-            h += '<div style="font-size:var(--ct-text-label);font-weight:600;color:var(--ct-ink-2);margin:var(--ct-s3) 0 var(--ct-s1);text-transform:uppercase">Historique</div>';
+            h += '<div style="font-size:var(--ct-text-label);font-weight:600;color:var(--ct-ink-2);margin:var(--ct-s3) 0 var(--ct-s1);text-transform:uppercase">' + esc(t("review.history")) + '</div>';
             closedReviews.slice().sort(function (a, b) { return (b.closed_at || "").localeCompare(a.closed_at || ""); }).forEach(function (r) {
                 var origIdx = D.reviews.indexOf(r);
                 var nc = (r.entries || []).filter(function (e) { return e.decision === "non_conforme"; }).length;
@@ -1464,7 +1461,7 @@ function _mountOwnerPicker() {
         slotId: "app-owner-slot",
         pickerId: "access-app-owner",
         value: initLabel,
-        placeholder: t("app.owner_search") || "Rechercher un utilisateur…",
+        placeholder: t("app.owner_search"),
         directoryUrl: "api/directory",
     }).then(function (handle) {
         _ownerHandle = handle;
@@ -1496,7 +1493,7 @@ function _commitOwner() {
     });
     var val = su ? (su.email || "") : label;
     if (val && !_OWNER_EMAIL_RE.test(val)) {
-        showStatus(t("app.owner_invalid") || "Propriétaire : email introuvable", true);
+        showStatus(t("app.owner_invalid"), true);
         return;
     }
     if ((a.owner_email || "") === val)
@@ -1596,12 +1593,12 @@ function renderReviewList() {
             + esc(label) + ' <span class="review-filter-count">' + n + '</span></button>';
     };
     h += '<div class="review-filter-bar">';
-    h += chip("en_cours", t("review.f_active") || "En cours", active.length);
-    h += chip("a_demarrer", t("review.f_to_start") || "À démarrer", toStart.length);
-    h += chip("closed", t("review.f_closed") || "Clôturées", closed.length);
+    h += chip("en_cours", t("review.f_active"), active.length);
+    h += chip("a_demarrer", t("review.f_to_start"), toStart.length);
+    h += chip("closed", t("review.f_closed"), closed.length);
     h += '</div>';
     if (f.a_demarrer && toStart.length) {
-        h += '<h3 style="font-size:var(--ct-text-data);margin:var(--ct-s3) 0 var(--ct-s2);color:var(--ct-critical)">' + (t("review.to_start") || "À démarrer (échéance dépassée)") + '</h3>';
+        h += '<h3 style="font-size:var(--ct-text-data);margin:var(--ct-s3) 0 var(--ct-s2);color:var(--ct-critical)">' + (t("review.to_start")) + '</h3>';
         toStart.forEach(function (app) {
             h += '<div class="ct-groupe-card ct-flex ct-items-center ct-gap-2">';
             h += '<div class="ct-flex-1 ct-minw-0"><strong>' + esc(app.nom || app.id) + '</strong> <span class="ct-badge" data-tone="info">' + esc(_freqLabel(app.frequence_revue)) + '</span></div>';
@@ -1616,7 +1613,7 @@ function renderReviewList() {
             var app = _findApp(r.application_id);
             var total = (r.entries || []).length, decided = (r.entries || []).filter(function (e) { return e.decision !== "pending"; }).length;
             h += '<div class="ct-groupe-card ct-userpicker" data-click="openReview" data-args=\'' + _da(origIdx) + '\'>';
-            h += '<button class="app-review-del" style="position:absolute;top:8px;right:8px" title="Supprimer cette revue" data-click="deleteReviewFromApp" data-args=\'' + _da(r.id) + '\' data-stop>' + _icon("trash", 14) + '</button>';
+            h += '<button class="app-review-del" style="position:absolute;top:8px;right:8px" title="' + esc(t("review.delete_tooltip")) + '" data-click="deleteReviewFromApp" data-args=\'' + _da(r.id) + '\' data-stop>' + _icon("trash", 14) + '</button>';
             h += '<div class="ct-flex ct-items-center ct-gap-2"><strong>' + esc(app ? app.nom : r.application_id) + '</strong> <span class="ct-badge" data-tone="info">' + t("review.en_cours") + '</span></div>';
             h += '<div class="ct-text-label ct-muted ct-mt-1">' + t("review.started") + ' ' + esc(r.started_at) + ' — ' + decided + '/' + total + ' ' + t("review.decided") + '</div>';
             if (total) {
@@ -1716,35 +1713,35 @@ function _findServiceAccount(identifier) {
 function _getEntryWarnings(e, su) {
     var warnings = [];
     if (_hasAdminRights(e)) {
-        warnings.push({ code: "admin", label: "ADMIN", title: "Compte avec droits d'administration (admin/root/manager detecte dans les groupes ou roles)" });
+        warnings.push({ code: "admin", label: "ADMIN", title: t("warn.admin_title") });
     }
     // Service account declared → no need to flag it as "personnel orphan".
     // Tag it with a neutral badge showing it's a recognised service account.
     var sa = _findServiceAccount(e.email_or_login);
     if (sa) {
-        warnings.push({ code: "service", label: "COMPTE SERVICE", title: "Compte de service declare (" + (sa.name || sa.identifier) + ")" });
+        warnings.push({ code: "service", label: t("warn.service"), title: t("warn.service_title").replace("{name}", sa.name || sa.identifier) });
     }
     if (su) {
         var statut = (su.statut || "").toLowerCase();
         if (statut === "ancien") {
-            warnings.push({ code: "ancien", label: "ANCIEN", title: "Ancien collaborateur (statut=ancien) — le compte aurait du etre supprime" });
+            warnings.push({ code: "ancien", label: t("warn.former"), title: t("warn.former_title") });
         }
         if (statut === "prestataire") {
-            warnings.push({ code: "externe", label: "EXTERNE", title: "Prestataire externe — duree limitee a verifier" });
+            warnings.push({ code: "externe", label: t("warn.external"), title: t("warn.external_title") });
         }
         if (su.mfa_active === false) {
-            warnings.push({ code: "nomfa", label: "NO MFA", title: "MFA non active dans l'annuaire" });
+            warnings.push({ code: "nomfa", label: "NO MFA", title: t("warn.nomfa_title") });
         }
         if (su.sensibilisation === false) {
-            warnings.push({ code: "nosensi", label: "NO SENSI", title: "Sensibilisation a la securite non signee" });
+            warnings.push({ code: "nosensi", label: "NO SENSI", title: t("warn.nosensi_title") });
         }
         if (su.politique_validee === false) {
-            warnings.push({ code: "nopol", label: "NO POL", title: "Politique de securite non validee" });
+            warnings.push({ code: "nopol", label: "NO POL", title: t("warn.nopol_title") });
         }
     }
     else if (e.email_or_login && !sa) {
         // No HR match AND not a declared service account → real orphan
-        warnings.push({ code: "orphan", label: "ORPHELIN", title: "Compte non trouve dans l'annuaire RH — verifier sa legitimite" });
+        warnings.push({ code: "orphan", label: t("warn.orphan"), title: t("warn.orphan_title") });
     }
     return warnings;
 }
@@ -1774,8 +1771,8 @@ function renderReviewDetail() {
             var enabled = linkedPlugins.filter(function (p) { return p.enabled; });
             var pluginToUse = enabled[0] || linkedPlugins[0];
             var plgLabel = pluginToUse.label || pluginToUse.plugin_type;
-            h += '<button class="ct-btn mt-8" data-write data-variant="primary" data-click="importReviewFromConnector" title="' + esc((t("review.import_connector_tooltip") || "Importer depuis") + " " + plgLabel) + '">'
-                + (t("review.import_connector") || "Import connecteur") + ' &#x2699;</button>';
+            h += '<button class="ct-btn mt-8" data-write data-variant="primary" data-click="importReviewFromConnector" title="' + esc((t("review.import_connector_tooltip")) + " " + plgLabel) + '">'
+                + (t("review.import_connector")) + ' &#x2699;</button>';
         }
         h += '<button class="ct-btn mt-8" data-write data-click="importReviewCsv">' + t("review.import_csv") + '</button>';
         h += '<a href="javascript:void(0)" class="access-link" data-click="downloadCsvTemplate" style="font-size:var(--ct-text-label);margin-left:var(--ct-s2);text-decoration:underline;align-self:center">' + t("review.csv_template") + '</a>';
@@ -1793,7 +1790,7 @@ function renderReviewDetail() {
     if (nc)
         h += '<span class="ct-text-critical count">' + nc + ' NC</span>';
     if (warnedCount)
-        h += '<span class="count admin-count" title="Entrees avec au moins une alerte (admin, ancien collaborateur, MFA inactif, etc.)">&#9888; ' + warnedCount + ' alerte' + (warnedCount > 1 ? 's' : '') + '</span>';
+        h += '<span class="count admin-count" title="' + esc(t("warn.count_title")) + '">&#9888; ' + esc(t("warn.count").replace("{n}", String(warnedCount))) + '</span>';
     h += '</div>';
     if (!entries.length) {
         h += '<div class="ct-empty-state">' + t("review.no_entries") + '</div>';
@@ -1842,17 +1839,17 @@ function renderReviewDetail() {
             + esc(label) + ' <strong style="opacity:0.85">' + count + '</strong></button>';
     };
     h += '<div style="display:flex;gap:var(--ct-s1);flex-wrap:wrap;margin:var(--ct-s2) 0 var(--ct-s3);align-items:center">';
-    h += '<span style="font-size:var(--ct-text-label);color:var(--ct-ink-2);margin-right:var(--ct-s1)">' + (t("review.filter_label") || "Filtres :") + '</span>';
-    h += pill("admin", t("review.filter_admin") || "Droits admin", nAdmin, "var(--ct-critical)");
-    h += pill("stale90", t("review.filter_stale") || "Derniere connexion > 90 j", nStale90, "var(--ct-medium)");
-    h += pill("never_logged", t("review.filter_never") || "Jamais connecte / inconnu", nNeverLogged, "var(--ct-ink-2)");
-    h += pill("alerts", t("review.filter_alerts") || "Avec alertes", nAlerts, "#b45309");
+    h += '<span style="font-size:var(--ct-text-label);color:var(--ct-ink-2);margin-right:var(--ct-s1)">' + (t("review.filter_label")) + '</span>';
+    h += pill("admin", t("review.filter_admin"), nAdmin, "var(--ct-critical)");
+    h += pill("stale90", t("review.filter_stale"), nStale90, "var(--ct-medium)");
+    h += pill("never_logged", t("review.filter_never"), nNeverLogged, "var(--ct-ink-2)");
+    h += pill("alerts", t("review.filter_alerts"), nAlerts, "#b45309");
     if (!isClosed)
-        h += pill("pending", t("review.filter_pending") || "En attente de decision", nPending, "var(--ct-ink-2)");
+        h += pill("pending", t("review.filter_pending"), nPending, "var(--ct-ink-2)");
     var anyActive = Object.keys(_reviewFilters).some(function (k) { return _reviewFilters[k]; });
     if (anyActive) {
         h += '<button data-click="_clearReviewFilters" style="background:transparent;border:none;color:var(--ct-ink-2);font-size:var(--ct-text-label);cursor:pointer;text-decoration:underline;padding:var(--ct-s1) var(--ct-s1)">'
-            + (t("review.filter_clear") || "Reinitialiser") + '</button>';
+            + (t("review.filter_clear")) + '</button>';
     }
     h += '</div>';
     // Apply filters
@@ -1870,13 +1867,13 @@ function renderReviewDetail() {
         return true;
     });
     if (!visible.length) {
-        h += '<div class="ct-empty-state">' + (t("review.no_matches") || "Aucune entree ne correspond aux filtres actifs.") + '</div>';
+        h += '<div class="ct-empty-state">' + (t("review.no_matches")) + '</div>';
         return h;
     }
     if (visible.length !== entries.length) {
-        h += '<div class="ct-text-label ct-muted ct-mb-2">' + visible.length + ' / ' + entries.length + ' ' + (t("review.entries_filtered") || "entrees affichees") + '</div>';
+        h += '<div class="ct-text-label ct-muted ct-mb-2">' + visible.length + ' / ' + entries.length + ' ' + (t("review.entries_filtered")) + '</div>';
     }
-    h += '<table><thead><tr><th class="ct-w-60">#</th><th>' + t("review.type_compte") + '</th><th>' + t("review.email_login") + '</th><th>' + (t("review.name") || "Nom Prénom") + '</th><th>' + t("review.matched_user") + '</th><th>' + t("review.roles") + '</th><th>' + t("review.groups") + '</th><th class="ct-w-140">' + (t("user.last_login") || "Derniere connexion") + '</th><th class="ct-w-90">' + (t("user.account_enabled") || "Compte") + '</th><th class="ct-w-160">' + t("review.decision_label") + '</th></tr></thead><tbody>';
+    h += '<table><thead><tr><th class="ct-w-60">#</th><th>' + t("review.type_compte") + '</th><th>' + t("review.email_login") + '</th><th>' + (t("review.name")) + '</th><th>' + t("review.matched_user") + '</th><th>' + t("review.roles") + '</th><th>' + t("review.groups") + '</th><th class="ct-w-140">' + (t("user.last_login")) + '</th><th class="ct-w-90">' + (t("user.account_enabled")) + '</th><th class="ct-w-160">' + t("review.decision_label") + '</th></tr></thead><tbody>';
     visible.forEach(function (x) {
         var e = x.entry, su = x.su, warnings = x.warnings;
         var rowCls = "entry-row";
@@ -2010,15 +2007,14 @@ function _openNonConformeMeasureModal(r, entry, idx) {
     var app = _findApp(r.application_id);
     var appName = app ? app.nom : r.application_id;
     var accountName = entry.email_or_login || entry.id;
-    var prefilledTitle = "Correction non conformité habilitation " + accountName
-        + " sur application " + appName;
+    var prefilledTitle = t("review.measure_prefill").replace("{account}", accountName).replace("{app}", appName);
     ct_measure_modal.open({ id: "", title: prefilledTitle, description: "", statut: "a_faire", responsable: "", echeance: "" }, {
-        title: t("measure.add") || "Nouvelle action",
+        title: t("measure.add"),
         hideFields: ["type"],
         statusOptions: [
-            { value: "a_faire", label: t("measure.s.a_faire") || "À faire" },
-            { value: "en_cours", label: t("measure.s.en_cours") || "En cours" },
-            { value: "termine", label: t("measure.s.termine") || "Terminé" }
+            { value: "a_faire", label: t("measure.s.a_faire") },
+            { value: "en_cours", label: t("measure.s.en_cours") },
+            { value: "termine", label: t("measure.s.termine") }
         ],
         defaultStatus: "a_faire",
         ownerPicker: { pickerId: "access-nc-measure-owner", directoryUrl: "api/directory" },
@@ -2070,10 +2066,10 @@ function _openNonConformeMeasureModal(r, entry, idx) {
             }
             _save();
         }).then(function () {
-            showStatus(t("review.measure_created") || "Mesure de correction créée");
+            showStatus(t("review.measure_created"));
             renderPanel();
         }).catch(function (e) {
-            showStatus((t("review.measure_create_fail") || "Erreur : ") + (e.message || e), true);
+            showStatus((t("review.measure_create_fail")) + (e.message || e), true);
         });
     });
 }
@@ -2091,14 +2087,14 @@ function importReviewCsv() {
 window.importReviewCsv = importReviewCsv;
 function downloadCsvTemplate() {
     var header = "type_compte;email;roles;groups";
-    var example = "personnel;jean.dupont@example.com;Admin,Lecteur;Direction,Finance\n"
-        + "personnel;marie.martin@example.com;Lecteur;RH\n"
+    var example = "personnel;john.smith@example.com;Admin,Reader;Management,Finance\n"
+        + "personnel;mary.jones@example.com;Reader;HR\n"
         + "service;svc-backup@local;;Batch";
     var csv = header + "\n" + example + "\n";
     var blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
     var link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = "modele_revue_droits.csv";
+    link.download = "access_review_template.csv";
     link.click();
     URL.revokeObjectURL(link.href);
 }
@@ -2121,8 +2117,7 @@ function _doImportCsv(file) {
 var _importReviewInFlight = false;
 // Shared handling of a connector import result (API or file-based).
 function _onConnectorImportResult(result) {
-    var base = t("review.import_connector_ok") ||
-        "Import connecteur : {imported} entrée(s) ({matched} rattaché(s), {unmatched} sans correspondance, {duplicates} ignoré(s), {disabled} désactivé(s) retiré(s))";
+    var base = t("review.import_connector_ok");
     var msg = base
         .replace("{imported}", String(result.imported))
         .replace("{matched}", String(result.matched))
@@ -2131,7 +2126,7 @@ function _onConnectorImportResult(result) {
         .replace("{disabled}", String(result.removed_disabled || 0));
     showStatus(msg);
     if (result.connector_errors_count && result.connector_errors_count > 0) {
-        showStatus(result.connector_errors_count + " erreur(s) connecteur — voir les logs serveur", true);
+        showStatus(t("plg.connector_errors").replace("{n}", String(result.connector_errors_count)), true);
     }
     _reloadProjectData();
 }
@@ -2162,11 +2157,11 @@ window.importReviewFromConnector = function () {
         _importReviewFromConnectorFile(pid, r.id, pc);
         return;
     }
-    _ctConfirm(t("review.import_connector_confirm_title") || "Importer depuis le connecteur", t("review.import_connector_confirm_body") || "La synchronisation peut prendre quelques secondes. Continuer ?", function () {
+    _ctConfirm(t("review.import_connector_confirm_title"), t("review.import_connector_confirm_body"), function () {
         _importReviewInFlight = true;
-        showStatus(t("review.import_connector_running") || "Synchronisation en cours...");
+        showStatus(t("review.import_connector_running"));
         AccessAPI.importReviewFromConnector(pid, r.id).then(_onConnectorImportResult).catch(function (e) {
-            showStatus((t("review.import_connector_fail") || "Erreur import : ") + (e.message || e), true);
+            showStatus((t("review.import_connector_fail")) + (e.message || e), true);
         }).finally(function () { _importReviewInFlight = false; });
     });
 };
@@ -2186,12 +2181,12 @@ function _importReviewFromConnectorFile(pid, rid, pc) {
             return;
         }
         _importReviewInFlight = true;
-        showStatus(t("review.import_connector_running") || "Synchronisation en cours...");
+        showStatus(t("review.import_connector_running"));
         AccessAPI.importReviewFromConnectorFile(pid, rid, file, pc.id).then(_onConnectorImportResult).catch(function (e) {
-            showStatus((t("review.import_connector_fail") || "Erreur import : ") + (e.message || e), true);
+            showStatus((t("review.import_connector_fail")) + (e.message || e), true);
         }).finally(function () { _importReviewInFlight = false; });
     };
-    showStatus(t("review.import_connector_pick_file") || "Sélectionnez le fichier d'export à importer");
+    showStatus(t("review.import_connector_pick_file"));
     el.click();
 }
 function closeReview() {
@@ -2233,7 +2228,7 @@ function closeReview() {
             renderPanel();
             showStatus(t("review.closed_ok"));
         }
-    }, t("review.confirm_close_btn") || "Valider", t("btn_cancel") || "Annuler");
+    }, t("review.confirm_close_btn"), t("btn_cancel"));
 }
 window.closeReview = closeReview;
 // ═══════════════════════════════════════════════════════════════
@@ -2440,7 +2435,7 @@ function renderMeasureList() {
     var h = '<div class="ct-row ct-row-between ct-mb-3">';
     h += '<h2>' + t("nav.measures") + '</h2>';
     h += '<div class="ct-flex ct-gap-2">';
-    h += '<button class="ct-btn mt-8" data-write data-click="_refreshMeasures" title="' + esc(t("measure.refresh") || "Rafraîchir") + '">&#x21bb;</button>';
+    h += '<button class="ct-btn mt-8" data-write data-click="_refreshMeasures" title="' + esc(t("measure.refresh")) + '">&#x21bb;</button>';
     h += '<button class="ct-btn mt-8" data-write data-variant="primary" data-click="addMeasure">' + t("measure.add") + '</button>';
     h += '</div></div>';
     if (!D.measures.length) {
@@ -2469,13 +2464,13 @@ function renderMeasureList() {
             return;
         ct_bulkbar.attach({
             scope: "access-measures",
-            label: t("measure.selected_n") || "{n} action(s) sélectionnée(s)",
+            label: t("measure.selected_n"),
             actions: [
-                { id: "done", icon: "check", label: t("measure.s.termine") || "Terminé", variant: "success",
+                { id: "done", icon: "check", label: t("measure.s.termine"), variant: "success",
                     onClick: "_bulkAccessMeasuresDone" },
-                { id: "delete", icon: "trash", label: t("btn_delete") || "Supprimer", danger: true,
+                { id: "delete", icon: "trash", label: t("btn_delete"), danger: true,
                     onClick: "_bulkAccessMeasuresDelete",
-                    confirm: { title: "Supprimer {n} action(s) ?", message: "Cette action est irréversible." } }
+                    confirm: { title: t("measure.bulk_delete_confirm"), message: t("confirm.irreversible") } }
             ]
         });
         ct_bulkbar.update("access-measures");
@@ -2487,9 +2482,9 @@ window._refreshMeasures = function () {
     if (pid && window.AccessAPI && AccessAPI.listMeasures) {
         AccessAPI.listMeasures(pid).then(function (list) {
             D.measures = list || [];
-            showStatus("Mesures rafraîchies (" + D.measures.length + ")");
+            showStatus(t("measure.refreshed").replace("{n}", String(D.measures.length)));
             renderPanel();
-        }).catch(function (e) { showStatus("Erreur : " + (e.message || e), true); });
+        }).catch(function (e) { showStatus(t("error.with_msg").replace("{msg}", e.message || e), true); });
     }
     else {
         window.location.reload();
@@ -2505,9 +2500,9 @@ window._editAccessMeasureRow = function (row) {
         title: m.id + " — " + (m.title || t("measure.add")),
         hideFields: ["type"],
         statusOptions: [
-            { value: "a_faire", label: t("measure.s.a_faire") || "À faire" },
-            { value: "en_cours", label: t("measure.s.en_cours") || "En cours" },
-            { value: "termine", label: t("measure.s.termine") || "Terminé" }
+            { value: "a_faire", label: t("measure.s.a_faire") },
+            { value: "en_cours", label: t("measure.s.en_cours") },
+            { value: "termine", label: t("measure.s.termine") }
         ],
         defaultStatus: "a_faire",
         ownerPicker: { pickerId: "access-measure-owner", directoryUrl: "api/directory" },
@@ -2519,8 +2514,8 @@ window._editAccessMeasureRow = function (row) {
         },
         onDelete: function () {
             ct_modal.confirm({
-                title: "Supprimer l'action",
-                message: "Cette action est irréversible.",
+                title: t("measure.delete_confirm"),
+                message: t("confirm.irreversible"),
                 danger: true
             }).then(function (ok) {
                 if (!ok)
@@ -2535,7 +2530,7 @@ window._editAccessMeasureRow = function (row) {
                 };
                 if (pid && window.AccessAPI) {
                     AccessAPI.deleteMeasure(pid, m.id).then(doLocal)
-                        .catch(function (e) { showStatus("Erreur : " + (e.message || e), true); });
+                        .catch(function (e) { showStatus(t("error.with_msg").replace("{msg}", e.message || e), true); });
                 }
                 else {
                     doLocal();
@@ -2571,14 +2566,14 @@ window._bulkAccessMeasuresDone = function (scope) {
         return m;
     }).filter(Boolean);
     var done = function () {
-        showStatus(ids.length + " action(s) marquée(s) terminée(s)");
+        showStatus(t("measure.bulk_done").replace("{n}", String(ids.length)));
         ct_bulkbar.clear(scope);
         _save();
         renderPanel();
     };
     if (pid && window.AccessAPI) {
         Promise.all(ids.map(function (id) { return AccessAPI.patchMeasure(pid, id, { statut: "termine" }); }))
-            .then(done).catch(function (e) { showStatus("Erreur : " + (e.message || e), true); });
+            .then(done).catch(function (e) { showStatus(t("error.with_msg").replace("{msg}", e.message || e), true); });
     }
     else {
         done();
@@ -2591,14 +2586,14 @@ window._bulkAccessMeasuresDelete = function (scope) {
     var pid = window.getActiveProjectId ? getActiveProjectId() : null;
     var doLocal = function () {
         D.measures = D.measures.filter(function (m) { return ids.indexOf(m.id) < 0; });
-        showStatus(ids.length + " action(s) supprimée(s)");
+        showStatus(t("measure.bulk_deleted").replace("{n}", String(ids.length)));
         ct_bulkbar.clear(scope);
         _save();
         renderPanel();
     };
     if (pid && window.AccessAPI) {
         Promise.all(ids.map(function (id) { return AccessAPI.deleteMeasure(pid, id); }))
-            .then(doLocal).catch(function (e) { showStatus("Erreur : " + (e.message || e), true); });
+            .then(doLocal).catch(function (e) { showStatus(t("error.with_msg").replace("{msg}", e.message || e), true); });
     }
     else {
         doLocal();
@@ -2613,9 +2608,9 @@ function addMeasure() {
         title: t("measure.add"),
         hideFields: ["type"],
         statusOptions: [
-            { value: "a_faire", label: t("measure.s.a_faire") || "À faire" },
-            { value: "en_cours", label: t("measure.s.en_cours") || "En cours" },
-            { value: "termine", label: t("measure.s.termine") || "Terminé" }
+            { value: "a_faire", label: t("measure.s.a_faire") },
+            { value: "en_cours", label: t("measure.s.en_cours") },
+            { value: "termine", label: t("measure.s.termine") }
         ],
         defaultStatus: "a_faire",
         ownerPicker: { pickerId: "access-measure-owner", directoryUrl: "api/directory" }
@@ -2637,7 +2632,7 @@ function addMeasure() {
                 if (created && created.id)
                     m.id = created.id;
                 finish();
-            }).catch(function (e) { showStatus("Erreur : " + (e.message || e), true); });
+            }).catch(function (e) { showStatus(t("error.with_msg").replace("{msg}", e.message || e), true); });
         }
         else {
             finish();
@@ -3020,17 +3015,17 @@ function showPluginHistory(pluginId) {
         var h = '<div style="max-height:85vh;overflow-y:auto">';
         h += '<div class="ct-pwd-title ct-mb-4">' + t("plg.history") + '</div>';
         if (!jobs.length) {
-            h += '<div class="ct-empty-state">' + (t("plg.history_empty") || "Aucun historique de synchronisation pour ce connecteur.") + '</div>';
+            h += '<div class="ct-empty-state">' + (t("plg.history_empty")) + '</div>';
         }
         else {
             h += '<table class="ct-w-full ct-text-meta">'
                 + '<thead><tr>'
-                + '<th class="ct-ta-l ct-py-1 ct-px-2 ct-border-bottom">' + (t("plg.history_date") || "Date") + '</th>'
-                + '<th class="ct-ta-l ct-py-1 ct-px-2 ct-border-bottom ct-w-110">' + (t("plg.history_status") || "Statut") + '</th>'
-                + '<th class="ct-ta-r ct-py-1 ct-px-2 ct-border-bottom ct-w-90">' + (t("plg.history_found") || "Trouvés") + '</th>'
-                + '<th class="ct-ta-r ct-py-1 ct-px-2 ct-border-bottom ct-w-90">' + (t("plg.history_created") || "Créés") + '</th>'
-                + '<th class="ct-ta-r ct-py-1 ct-px-2 ct-border-bottom ct-w-90">' + (t("plg.history_updated") || "MAJ") + '</th>'
-                + '<th class="ct-ta-l ct-py-1 ct-px-2 ct-border-bottom">' + (t("plg.history_error") || "Erreur") + '</th>'
+                + '<th class="ct-ta-l ct-py-1 ct-px-2 ct-border-bottom">' + (t("plg.history_date")) + '</th>'
+                + '<th class="ct-ta-l ct-py-1 ct-px-2 ct-border-bottom ct-w-110">' + (t("plg.history_status")) + '</th>'
+                + '<th class="ct-ta-r ct-py-1 ct-px-2 ct-border-bottom ct-w-90">' + (t("plg.history_found")) + '</th>'
+                + '<th class="ct-ta-r ct-py-1 ct-px-2 ct-border-bottom ct-w-90">' + (t("plg.history_created")) + '</th>'
+                + '<th class="ct-ta-r ct-py-1 ct-px-2 ct-border-bottom ct-w-90">' + (t("plg.history_updated")) + '</th>'
+                + '<th class="ct-ta-l ct-py-1 ct-px-2 ct-border-bottom">' + (t("plg.history_error")) + '</th>'
                 + '</tr></thead><tbody>';
             jobs.forEach(function (j) {
                 var statusCls = j.status === "success" ? "ok" : (j.status === "error" ? "ko" : "");
@@ -3048,7 +3043,7 @@ function showPluginHistory(pluginId) {
             });
             h += '</tbody></table>';
         }
-        h += '<div class="ct-flex ct-justify-end ct-mt-4"><button class="ct-btn" data-click="_plgCancel">' + (t("btn_close") || t("btn_cancel") || "Fermer") + '</button></div>';
+        h += '<div class="ct-flex ct-justify-end ct-mt-4"><button class="ct-btn" data-click="_plgCancel">' + (t("btn_close") || t("btn_cancel")) + '</button></div>';
         h += '</div>';
         panel.innerHTML = h;
         ov.style.display = "flex";
@@ -3079,8 +3074,8 @@ function _ctConfirm(title, body, onYes, okLabel, cancelLabel) {
     document.getElementById("confirm-body").textContent = body;
     ov.style.display = "flex";
     var btnOui = document.getElementById("confirm-oui"), btnNon = document.getElementById("confirm-non");
-    btnOui.textContent = okLabel || t("btn_yes") || "Oui";
-    btnNon.textContent = cancelLabel || t("btn_no") || "Non";
+    btnOui.textContent = okLabel || t("btn_yes");
+    btnNon.textContent = cancelLabel || t("btn_no");
     function close() { ov.style.display = "none"; btnOui.onclick = null; btnNon.onclick = null; }
     btnOui.onclick = function () { close(); onYes(); };
     btnNon.onclick = close;
@@ -3168,7 +3163,7 @@ function _ncOptions() {
             },
             create: function (draft) {
                 return ct_measure_modal.open({ title: draft.title, description: draft.description }, {
-                    title: t("measure.new") || "New measure",
+                    title: t("measure.new"),
                     hideFields: ["type", "statut"],
                     titleRequired: true,
                     ownerPicker: { pickerId: "access-nc-measure-owner", directoryUrl: "api/directory" }

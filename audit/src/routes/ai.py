@@ -73,7 +73,7 @@ class AuditReportRequest(BaseModel):
     A name typed into free text (scope, findings) is data like the rest; the
     system prompt asks for it to be replaced.
     """
-    lang: Literal["fr", "en"] = "fr"
+    lang: Literal["fr", "en"] = "en"
     ref: Short = ""
     date: Annotated[str, StringConstraints(max_length=40)] = ""
     scope: Long = ""

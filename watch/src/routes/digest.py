@@ -25,6 +25,7 @@ from src.ai_proxy_common import _check_ai_access
 from src.auth import get_current_user, require_admin
 from src.database import get_db
 from src.digest import (
+    _DIGEST_LANGUAGE,
     _alerts_for_scope,
     _render_threat_brief,
     _user_scopes,
@@ -112,7 +113,7 @@ async def preview_digest(
         # for the scheduled cadence.
         if scope in with_brief:
             brief_html, citations = await _render_threat_brief(
-                db, scope, since, language="fr",
+                db, scope, since, language=_DIGEST_LANGUAGE,
             )
         else:
             brief_html, citations = "", []
@@ -124,7 +125,7 @@ async def preview_digest(
             threat_brief_html=brief_html,
             threat_citations=citations,
             user_name=(user.name or "") if user else "", since=since,
-            language="fr", threat_skipped=skipped.get(scope.id, ""),
+            language=_DIGEST_LANGUAGE, threat_skipped=skipped.get(scope.id, ""),
         ))
     return HTMLResponse("<hr/>".join(parts))
 

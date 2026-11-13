@@ -74,9 +74,116 @@ def _public_base() -> str:
 # spam with months-old advisories the recipient probably already triaged.
 _FIRST_RUN_LOOKBACK_DAYS = int(os.getenv("WATCH_FIRST_RUN_LOOKBACK_DAYS", "7"))
 
-# Digest output language for v2. The analysis module already supports
-# "en" for when we add a per-scope locale.
-_DIGEST_LANGUAGE = "fr"
+# Language of the digests and of the analyses they carry. The recipients are
+# plain addresses with no stored preference, so the setting is module-level,
+# like the other suite mailers: English, or French with WATCH_DIGEST_LANG=fr.
+def _is_french(language: str) -> bool:
+    return (language or "").strip().lower().startswith("fr")
+
+
+def _digest_language() -> str:
+    return "fr" if _is_french(os.getenv("WATCH_DIGEST_LANG", "")) else "en"
+
+
+_DIGEST_LANGUAGE = _digest_language()
+
+_L = {
+    "en": {
+        "sev": {"critical": "CRITICAL", "high": "HIGH", "medium": "MEDIUM", "low": "LOW"},
+        "sev_unknown": "UNKNOWN",
+        "urgency": {
+            "PATCH_IMMEDIATELY": "PATCH IMMEDIATELY",
+            "PATCH_WITHIN_24H": "PATCH WITHIN 24 H",
+            "PATCH_WITHIN_72H": "PATCH WITHIN 72 H",
+            "PATCH_THIS_WEEK": "PATCH THIS WEEK",
+            "PATCH_THIS_MONTH": "PATCH THIS MONTH",
+            "NEXT_CYCLE": "NEXT CYCLE",
+        },
+        "kev": "KEV — exploited", "ransomware": "RANSOMWARE", "risk": "risk",
+        "view": "View in Watch →",
+        "tl_nvd": "NVD published:", "tl_kev": "Added to KEV:",
+        "tl_lag": "NVD→KEV lag:", "tl_days": "{n} d", "tl_ransomware": "Ransomware:",
+        "sec_summary": "Executive summary", "sec_technical": "Technical detail",
+        "sec_exploitation": "Exploitation status", "sec_affected": "Affected components",
+        "sec_impact": "Business impact", "sec_actions": "Recommended actions",
+        "sec_references": "References",
+        "footer": ("CISO Toolbox · Watch — digest sent automatically. "
+                   "Thresholds are set in the scope settings."),
+        "hello": "Hello,", "hello_name": "Hello {name},",
+        "since_start": "since the watch started",
+        "intro_vuln": ("Here is the <strong>Vulnerabilities</strong> digest of the scope "
+                       "<strong>{scope}</strong> since the previous digest ({since})."),
+        "intro_threat": ("Here is the <strong>threat watch</strong> of the scope "
+                         "<strong>{scope}</strong> since the previous digest ({since})."),
+        "intro_preview": ("Preview of the Watch digest of the scope <strong>{scope}</strong>"
+                          " — critical vulnerabilities and threats noted since the previous "
+                          "digest ({since})."),
+        "vuln_title": "Critical vulnerabilities",
+        "vuln_none": ("No critical vulnerability was published in your scope since the "
+                      "previous digest."),
+        "threat_title": "Threat watch",
+        "skipped_no_ai": ("Threat brief not generated in the preview: your account has no "
+                          "AI access."),
+        "skipped_rate_limited": ("Threat brief not generated in the preview: preview limit "
+                                 "reached, retry in a few minutes."),
+        "no_brief": ("The threat brief could not be generated (missing Anthropic "
+                     "key or API error). The watch context is still saved for the "
+                     "next run."),
+        "subject_vuln_one": "[Watch] {scope} — 1 critical vulnerability",
+        "subject_vuln_many": "[Watch] {scope} — {n} critical vulnerabilities",
+        "subject_threat": "[Watch] {scope} — Threat watch",
+    },
+    "fr": {
+        "sev": {"critical": "CRITIQUE", "high": "ÉLEVÉ", "medium": "MOYEN", "low": "FAIBLE"},
+        "sev_unknown": "INCONNU",
+        "urgency": {
+            "PATCH_IMMEDIATELY": "PATCHER IMMÉDIATEMENT",
+            "PATCH_WITHIN_24H": "PATCHER SOUS 24 H",
+            "PATCH_WITHIN_72H": "PATCHER SOUS 72 H",
+            "PATCH_THIS_WEEK": "PATCHER CETTE SEMAINE",
+            "PATCH_THIS_MONTH": "PATCHER CE MOIS",
+            "NEXT_CYCLE": "PROCHAIN CYCLE",
+        },
+        "kev": "KEV — exploité", "ransomware": "RANÇONGICIEL", "risk": "risque",
+        "view": "Voir dans Watch →",
+        "tl_nvd": "Publié NVD :", "tl_kev": "Ajout KEV :",
+        "tl_lag": "Délai NVD→KEV :", "tl_days": "{n} j", "tl_ransomware": "Rançongiciel :",
+        "sec_summary": "Synthèse", "sec_technical": "Détail technique",
+        "sec_exploitation": "Exploitation", "sec_affected": "Composants affectés",
+        "sec_impact": "Impact métier", "sec_actions": "Actions recommandées",
+        "sec_references": "Références",
+        "footer": ("CISO Toolbox · Watch — digest envoyé automatiquement. "
+                   "Seuils configurables dans les paramètres du périmètre."),
+        "hello": "Bonjour,", "hello_name": "Bonjour {name},",
+        "since_start": "depuis le démarrage de la veille",
+        "intro_vuln": ("Voici le digest <strong>Vulnérabilités</strong> du périmètre "
+                       "<strong>{scope}</strong> depuis le précédent digest ({since})."),
+        "intro_threat": ("Voici la <strong>veille menaces</strong> du périmètre "
+                         "<strong>{scope}</strong> depuis le précédent digest ({since})."),
+        "intro_preview": ("Aperçu du digest Watch du périmètre <strong>{scope}</strong>"
+                          " — vulnérabilités critiques et menaces relevées depuis le "
+                          "précédent digest ({since})."),
+        "vuln_title": "Vulnérabilités critiques",
+        "vuln_none": ("Aucune vulnérabilité critique n'a été publiée dans votre périmètre "
+                      "depuis le précédent digest."),
+        "threat_title": "Veille menaces",
+        "skipped_no_ai": ("Veille menaces non générée dans l'aperçu : votre compte n'a pas "
+                          "accès à l'IA."),
+        "skipped_rate_limited": ("Veille menaces non générée dans l'aperçu : limite d'aperçus "
+                                 "atteinte, réessayez dans quelques minutes."),
+        "no_brief": ("La veille menaces n'a pas pu être générée (clé Anthropic absente "
+                     "ou erreur API). Le contexte de veille reste enregistré pour le "
+                     "prochain envoi."),
+        "subject_vuln_one": "[Watch] {scope} — 1 vuln. critique",
+        "subject_vuln_many": "[Watch] {scope} — {n} vuln. critiques",
+        "subject_threat": "[Watch] {scope} — Veille menaces",
+    },
+}
+
+
+def _texts(language: str) -> dict:
+    """The texts of a digest: French when asked for, English otherwise."""
+    return _L["fr"] if _is_french(language) else _L["en"]
 
 _DEFAULT_FROM = "watch@cisotoolbox.local"
 
@@ -276,23 +383,12 @@ def _sev_color(s: str) -> str:
             "low": "#95a5a6"}.get((s or "").lower(), "#bdc3c7")
 
 
-def _sev_label_fr(s: str) -> str:
-    return {"critical": "CRITIQUE", "high": "ÉLEVÉ",
-            "medium": "MOYEN", "low": "FAIBLE"}.get((s or "").lower(), "INCONNU")
+def _sev_label(s: str, L: dict) -> str:
+    return L["sev"].get((s or "").lower(), L["sev_unknown"])
 
 
-_URGENCY_LABEL_FR = {
-    "PATCH_IMMEDIATELY": "PATCHER IMMÉDIATEMENT",
-    "PATCH_WITHIN_24H": "PATCHER SOUS 24 H",
-    "PATCH_WITHIN_72H": "PATCHER SOUS 72 H",
-    "PATCH_THIS_WEEK": "PATCHER CETTE SEMAINE",
-    "PATCH_THIS_MONTH": "PATCHER CE MOIS",
-    "NEXT_CYCLE": "PROCHAIN CYCLE",
-}
-
-
-def _urgency_label_fr(u: str) -> str:
-    return _URGENCY_LABEL_FR.get(u or "", "—")
+def _urgency_label(u: str, L: dict) -> str:
+    return L["urgency"].get(u or "", "—")
 
 
 def _alert_link(alert_id: uuid.UUID) -> str:
@@ -301,28 +397,28 @@ def _alert_link(alert_id: uuid.UUID) -> str:
 
 
 def _render_group_card(
-    group: AlertGroup, analysis: AlertAnalysis | None
+    group: AlertGroup, analysis: AlertAnalysis | None, L: dict,
 ) -> str:
     """Render one vulnerability card (severity bandeau + analysis sections)."""
     a = group.primary
     sev_bg = _sev_color(group.severity)
-    sev_label = _sev_label_fr(group.severity)
+    sev_label = _sev_label(group.severity, L)
     kev_chip = (
         ' <span style="background:#fff;color:#c0392b;padding:1px 8px;'
         'border-radius:10px;font-size:11px;font-weight:600;'
-        'margin-left:8px;border:1px solid #fff">KEV — exploité</span>'
+        f'margin-left:8px;border:1px solid #fff">{h_esc(L["kev"])}</span>'
     ) if group.kev_listed else ""
     # M13 — ransomware-campaign flag (CISA-curated, "Known" on KEV row).
     ransomware_chip = (
         ' <span style="background:#000;color:#fff;padding:1px 8px;'
         'border-radius:10px;font-size:11px;font-weight:700;'
-        'margin-left:8px;border:1px solid #000">RANÇONGICIEL</span>'
+        f'margin-left:8px;border:1px solid #000">{h_esc(L["ransomware"])}</span>'
     ) if group.ransomware_known else ""
     urgency_chip = (
         f' <span style="background:rgba(255,255,255,0.18);color:#fff;'
         f'padding:1px 8px;border-radius:10px;font-size:11px;font-weight:600;'
         f'margin-left:8px;border:1px solid rgba(255,255,255,0.4)">'
-        f'{h_esc(_urgency_label_fr(group.urgency))} · risque {group.risk_score:.0f}'
+        f'{h_esc(_urgency_label(group.urgency, L))} · {h_esc(L["risk"])} {group.risk_score:.0f}'
         f'</span>'
     )
     cvss = f"{group.max_cvss:.1f}" if group.max_cvss is not None else "—"
@@ -334,7 +430,7 @@ def _render_group_card(
     link = _alert_link(a.id)
     link_html = (
         f'<a href="{h_esc(link)}" '
-        'style="color:#fff;text-decoration:underline">Voir dans Watch →</a>'
+        f'style="color:#fff;text-decoration:underline">{h_esc(L["view"])}</a>'
     ) if link else ""
 
     sections = (analysis.sections if analysis else {}) or {}
@@ -372,19 +468,19 @@ def _render_group_card(
     tl_items: list[str] = []
     if tl.nvd_published is not None:
         tl_items.append(
-            f'<span><b>Publié NVD :</b> {h_esc(tl.nvd_published.strftime("%Y-%m-%d"))}</span>'
+            f'<span><b>{h_esc(L["tl_nvd"])}</b> {h_esc(tl.nvd_published.strftime("%Y-%m-%d"))}</span>'
         )
     if tl.kev_date_added is not None:
         tl_items.append(
-            f'<span><b>Ajout KEV :</b> {h_esc(tl.kev_date_added.strftime("%Y-%m-%d"))}</span>'
+            f'<span><b>{h_esc(L["tl_kev"])}</b> {h_esc(tl.kev_date_added.strftime("%Y-%m-%d"))}</span>'
         )
     if tl.patch_lag_days is not None:
         tl_items.append(
-            f'<span><b>Délai NVD→KEV :</b> {tl.patch_lag_days} j</span>'
+            f'<span><b>{h_esc(L["tl_lag"])}</b> {h_esc(L["tl_days"].format(n=tl.patch_lag_days))}</span>'
         )
     if tl.ransomware_label:
         tl_items.append(
-            f'<span><b>Rançongiciel :</b> {h_esc(tl.ransomware_label)}</span>'
+            f'<span><b>{h_esc(L["tl_ransomware"])}</b> {h_esc(tl.ransomware_label)}</span>'
         )
     timeline_html = ""
     if tl_items:
@@ -397,13 +493,13 @@ def _render_group_card(
         )
 
     body_html = "".join([
-        _sec("Synthèse", "executive_summary"),
-        _sec("Détail technique", "technical_detail"),
-        _sec("Exploitation", "exploitation_status"),
-        _sec("Composants affectés", "affected_components"),
-        _sec("Impact métier", "business_impact"),
-        _sec("Actions recommandées", "recommended_actions"),
-        _sec("Références", "references_curated"),
+        _sec(L["sec_summary"], "executive_summary"),
+        _sec(L["sec_technical"], "technical_detail"),
+        _sec(L["sec_exploitation"], "exploitation_status"),
+        _sec(L["sec_affected"], "affected_components"),
+        _sec(L["sec_impact"], "business_impact"),
+        _sec(L["sec_actions"], "recommended_actions"),
+        _sec(L["sec_references"], "references_curated"),
     ])
     if not body_html:
         # No analysis yet — render the raw summary as a fallback so the
@@ -445,7 +541,7 @@ def _render_group_card(
 
 
 
-def _wrap_html(greeting: str, intro: str, section: str) -> str:
+def _wrap_html(greeting: str, intro: str, section: str, footer: str) -> str:
     """Common email shell (greeting + intro + one section + footer)."""
     return f"""<!doctype html><html><body style="font-family:Arial,sans-serif;color:#222;line-height:1.5;background:#f5f5f5;margin:0;padding:0">
 <div style="max-width:760px;margin:0 auto;padding:24px;background:#f5f5f5">
@@ -453,20 +549,42 @@ def _wrap_html(greeting: str, intro: str, section: str) -> str:
 <p>{intro}</p>
 {section}
 <p style="color:#888;font-size:12px;margin-top:32px;border-top:1px solid #ddd;padding-top:14px">
-CISO Toolbox · Watch — digest envoyé automatiquement. Seuils configurables dans les paramètres du périmètre.
+{h_esc(footer)}
 </p>
 </div>
 </body></html>"""
 
 
-def _greeting(user_name: str) -> str:
-    return f"Bonjour {h_esc(user_name)}," if user_name else "Bonjour,"
+def _greeting(user_name: str, L: dict) -> str:
+    return L["hello_name"].format(name=h_esc(user_name)) if user_name else L["hello"]
 
 
-def _since_txt(since: datetime | None) -> str:
+def _since_txt(since: datetime | None, L: dict) -> str:
     return (
         since.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-        if since else "depuis le démarrage de la veille"
+        if since else L["since_start"]
+    )
+
+
+def _intro(key: str, scope_name: str, since: datetime | None, L: dict) -> str:
+    return L[key].format(scope=h_esc(scope_name), since=h_esc(_since_txt(since, L)))
+
+
+def _vuln_section(groups: list[AlertGroup],
+                  analyses: dict[uuid.UUID, AlertAnalysis], L: dict) -> str:
+    """The "Critical vulnerabilities" section: one card per group, or a line
+    saying there is none."""
+    heading = ('<h2 style="color:#2c3e50;border-bottom:2px solid #c0392b;'
+               'padding-bottom:6px;margin-top:28px">')
+    if groups:
+        cards = "".join(
+            _render_group_card(g, analyses.get(g.primary.id), L) for g in groups
+        )
+        return f'{heading}{h_esc(L["vuln_title"])} ({len(groups)})</h2>{cards}'
+    return (
+        f'{heading}{h_esc(L["vuln_title"])}</h2>'
+        f'<div style="padding:14px;color:#7f8c8d;background:#fafafa;'
+        f'border:1px dashed #ddd;border-radius:6px">{h_esc(L["vuln_none"])}</div>'
     )
 
 
@@ -476,52 +594,27 @@ def render_vuln_digest_html(
     analyses: dict[uuid.UUID, AlertAnalysis],
     user_name: str = "",
     since: datetime | None = None,
+    language: str = "en",
 ) -> str:
     """Vulnerability-only digest body (M18).
 
     Independent of the threat digest — fires on the legacy ``digest_*``
-    cadence and only contains the "Vulnérabilités critiques" section.
+    cadence and only contains the "Critical vulnerabilities" section.
     """
-    intro = (
-        f"Voici le digest <strong>Vulnérabilités</strong> du périmètre "
-        f"<strong>{h_esc(scope_name)}</strong> depuis le précédent digest "
-        f"({h_esc(_since_txt(since))})."
-    )
-    if groups:
-        cards = "".join(
-            _render_group_card(g, analyses.get(g.primary.id))
-            for g in groups
-        )
-        section = (
-            f'<h2 style="color:#2c3e50;border-bottom:2px solid #c0392b;'
-            f'padding-bottom:6px;margin-top:28px">'
-            f'Vulnérabilités critiques ({len(groups)})</h2>'
-            f'{cards}'
-        )
-    else:
-        section = (
-            f'<h2 style="color:#2c3e50;border-bottom:2px solid #c0392b;'
-            f'padding-bottom:6px;margin-top:28px">Vulnérabilités critiques</h2>'
-            f'<div style="padding:14px;color:#7f8c8d;background:#fafafa;'
-            f'border:1px dashed #ddd;border-radius:6px">'
-            f'Aucune vulnérabilité critique n\'a été publiée dans votre périmètre depuis le précédent digest.'
-            f'</div>'
-        )
-    return _wrap_html(_greeting(user_name), intro, section)
+    L = _texts(language)
+    return _wrap_html(_greeting(user_name, L), _intro("intro_vuln", scope_name, since, L),
+                      _vuln_section(groups, analyses, L), L["footer"])
 
 
 # System prompts for the threat-brief LLM call.
 #
-# The FR prompt is the canonical "threat-watch-rssi" skill methodology
-# (sector-mandatory queries, source authority grid, supply-chain checks,
-# honest triage). It is stored as a Markdown file in src/prompts/ so it
-# can be edited without touching the Python module, and so the user can
-# diff it directly against the .skill zip at watch/threat-watch-rssi.skill.
-#
-# The EN prompt remains inlined below — keep it in sync with the FR
-# skill on output format (HTML structure, allowed tags, source rules);
-# the methodology rules carry less weight in EN since the skill itself
-# is French-only.
+# The prompt is a methodology (sector-mandatory queries, source authority
+# grid, supply-chain checks, honest triage) written once per language. Each
+# is stored as a Markdown file in src/prompts/ so it can be edited without
+# touching the Python module. The two files follow the same method, section
+# for section: a change to one is a change to the other. They differ on one
+# point, the first source to read: the French file names CERT-FR, the
+# English one the national CERT of the reader's country.
 
 _PROMPTS_DIR = pathlib.Path(__file__).parent / "prompts"
 
@@ -542,84 +635,52 @@ def _load_prompt(name: str) -> str:
 _THREAT_BRIEF_SYSTEM_FR = _load_prompt("threat_brief_skill_fr.md")
 
 
-_THREAT_BRIEF_SYSTEM_EN = """You are a cyber threat-intelligence analyst writing
-a weekly watch note for a CISO.
-
-You receive:
-  - the CISO's CONTEXT (stack, sector, constraints)
-  - the CURRENT DATE and a time WINDOW (in days) to cover
-  - the ``web_search`` tool to fetch up-to-date information
-
-You produce an operational note in simple HTML. Each item should be readable
-in 20 seconds and end on a dated action. Mandatory structure:
-
-  <h2 style="color:#c0392b;margin-top:24px">🔴 Priority 1 — Immediate action (24-48h)</h2>
-  <h3><b>Short title</b> — short reason it matters in this context</h3>
-  <p>2-4 sentence description: what happened, mechanism, concrete impact on the CISO's stack.</p>
-  <ul>
-    <li><b>CVE:</b> CVE-YYYY-NNNN (CVSS X.X) — when applicable</li>
-    <li><b>IOC:</b> concrete file paths / domains / IPs / hashes when known</li>
-    <li><b>Action:</b> 1-3 concrete actions with deadlines (e.g. "audit lockfiles today")</li>
-  </ul>
-  <p style="margin:6px 0 14px;font-size:11px;color:#666">Sources: <a href="URL1">domain1</a>, <a href="URL2">domain2</a></p>
-
-  <h2 style="color:#e67e22;margin-top:24px">🟠 Priority 2 — Within 7 days</h2>
-  …same structure (h3 + p + ul CVE/IOC/Action + p Sources)…
-
-  <h2 style="color:#f1c40f;margin-top:24px">🟡 Priority 3 — Within the month</h2>
-  …same structure…
-
-  <h2 style="color:#2c3e50;margin-top:24px">📌 Sector context</h2>
-  <p>2-4 trends specific to the CISO's sector over the period (ransomware, fraud, social engineering, deepfake, etc.) with concrete implications.</p>
-  <p style="margin:6px 0 14px;font-size:11px;color:#666">Sources: <a href="URL">…</a></p>
-
-  <h2 style="color:#27ae60;margin-top:24px">✅ Action plan — summary</h2>
-  <table style="border-collapse:collapse;width:100%;font-size:13px">
-    <thead><tr style="background:#ecf0f1"><th style="text-align:left;padding:6px;border:1px solid #ddd">Priority</th><th style="text-align:left;padding:6px;border:1px solid #ddd">Action</th><th style="text-align:left;padding:6px;border:1px solid #ddd">Deadline</th></tr></thead>
-    <tbody><tr><td style="padding:6px;border:1px solid #ddd">P1</td><td style="padding:6px;border:1px solid #ddd">…</td><td style="padding:6px;border:1px solid #ddd">…</td></tr>…</tbody>
-  </table>
-
-Strict rules:
-  - Stay within the indicated time window (CURRENT DATE is provided).
-  - Always include supply-chain compromises (npm, PyPI, GitHub Actions,
-    Docker registries, etc.) and actively exploited zero-days that affect
-    any language / runtime / product mentioned in the CISO's stack, EVEN
-    if the CISO did not name them explicitly.
-  - Honest triage: if nothing rises to P1, do not invent — leave the P1
-    section with a single line ("No P1-level threat in this period.").
-  - At most 4 items per priority bucket — more becomes diluted noise.
-  - Provide a CVE id + CVSS score when the item is a vulnerability.
-  - Provide at least 1 concrete IOC when known (path, domain, IP, hash).
-  - Each action must be executable as-is (command, path, step).
-  - End every <h2> section with <p style="margin:6px 0 14px;font-size:11px;color:#666">Sources: <a href="URL">domain</a>, …</p>
-    listing the URLs actually used in that section (link text = domain).
-  - Allowed HTML only: <h2>, <h3>, <p>, <ul>, <li>, <b>, <table>, <thead>, <tbody>, <tr>, <th>, <td>, <a>.
-  - No markdown, no <html>, <body>, <script>, <style>, <iframe>.
-  - No emojis other than section headers (🔴 🟠 🟡 📌 ✅)."""
+_THREAT_BRIEF_SYSTEM_EN = _load_prompt("threat_brief_skill_en.md")
 
 
-# Hard guard prepended to whichever language prompt we use. Models with
-# web_search love to narrate ("Je vais lancer les recherches…", "Voici le
-# rapport"), and that chatter then leaks into the email body. We say it
-# again here, in both languages, on top of what the skill file already
-# says — and we still strip post-hoc (see ``_strip_llm_chatter``).
-_THREAT_BRIEF_NO_PREAMBLE = (
-    "RÈGLE ABSOLUE DE SORTIE / OUTPUT RULE — ANSWER WITH HTML ONLY.\n"
-    "Ne dis pas \"je vais chercher\", \"voici le rapport\", \"---\", etc. "
+# Hard guard prepended to the prompt. Models with web_search love to narrate
+# ("I will run the searches…", "Here is the report"), and that chatter then
+# leaks into the email body. We say it again here, on top of what the skill
+# file already says — and we still strip post-hoc (see ``_strip_llm_chatter``).
+_THREAT_BRIEF_NO_PREAMBLE_EN = (
+    "OUTPUT RULE — ANSWER WITH HTML ONLY.\n"
+    "Do NOT say \"I will search\", \"here is the report\", \"---\", etc. "
     "Do NOT narrate the workflow, do NOT introduce, do NOT conclude. "
+    "The very first thing in your answer must be an HTML tag "
+    "(<p>, <h2>, <table>, …): its first character MUST be '<'. "
+    "No prose before, no prose after.\n\n"
+)
+
+_THREAT_BRIEF_NO_PREAMBLE_FR = (
+    "RÈGLE ABSOLUE DE SORTIE — RÉPONDS UNIQUEMENT EN HTML.\n"
+    "Ne dis pas \"je vais chercher\", \"voici le rapport\", \"---\", etc. "
+    "Ne raconte pas ta démarche, n'introduis pas, ne conclus pas. "
     "La toute première chose de ta réponse doit être un tag HTML "
-    "(<p>, <h2>, <table>, …). The first character of your answer "
-    "MUST be '<'. No prose before, no prose after.\n\n"
+    "(<p>, <h2>, <table>, …) : son premier caractère DOIT être '<'. "
+    "Aucun texte avant, aucun texte après.\n\n"
+)
+
+_THREAT_BRIEF_USER_EN = (
+    "CURRENT DATE: {today} (UTC).\n"
+    "WINDOW: last {days} days only.\n\n"
+    "CONTEXT (written by the CISO):\n{context}\n\n"
+    "Write the note in English following the mandatory structure "
+    "(P1/P2/P3 + sector context + action-plan table, sources per section)."
+)
+
+_THREAT_BRIEF_USER_FR = (
+    "DATE COURANTE : {today} (UTC).\n"
+    "FENÊTRE : {days} derniers jours uniquement.\n\n"
+    "CONTEXTE (rédigé par le RSSI) :\n{context}\n\n"
+    "Produis la note en français en suivant strictement la structure imposée "
+    "(P1/P2/P3 + contexte sectoriel + tableau plan d'action, sources par section)."
 )
 
 
 def _threat_brief_system(language: str) -> str:
-    body = (
-        _THREAT_BRIEF_SYSTEM_FR
-        if (language or "fr").lower().startswith("fr")
-        else _THREAT_BRIEF_SYSTEM_EN
-    )
-    return _THREAT_BRIEF_NO_PREAMBLE + body
+    if _is_french(language):
+        return _THREAT_BRIEF_NO_PREAMBLE_FR + _THREAT_BRIEF_SYSTEM_FR
+    return _THREAT_BRIEF_NO_PREAMBLE_EN + _THREAT_BRIEF_SYSTEM_EN
 
 
 # Tags we consider valid "real content" openings — first one wins.
@@ -673,26 +734,15 @@ def _strip_llm_chatter(html: str) -> str:
 
 def _threat_brief_user(prompt: str, window_days: int, language: str) -> str:
     """Build the user-message body fed to Claude alongside the system prompt."""
-    today_iso = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    if (language or "fr").lower().startswith("fr"):
-        return (
-            f"DATE COURANTE : {today_iso} (UTC).\n"
-            f"FENÊTRE : {int(window_days)} derniers jours uniquement.\n\n"
-            f"CONTEXTE (rédigé par le RSSI) :\n{prompt.strip()}\n\n"
-            f"Produis la note en français en suivant strictement la structure imposée "
-            f"(P1/P2/P3 + contexte sectoriel + tableau plan d'action, sources par section)."
-        )
-    return (
-        f"CURRENT DATE: {today_iso} (UTC).\n"
-        f"WINDOW: last {int(window_days)} days only.\n\n"
-        f"CONTEXT (written by the CISO):\n{prompt.strip()}\n\n"
-        f"Write the note in English following the mandatory structure "
-        f"(P1/P2/P3 + sector context + action-plan table, sources per section)."
+    template = _THREAT_BRIEF_USER_FR if _is_french(language) else _THREAT_BRIEF_USER_EN
+    return template.format(
+        today=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        days=int(window_days), context=prompt.strip(),
     )
 
 
 async def _render_threat_brief(
-    db: AsyncSession, scope: Scope, since: datetime, language: str = "fr",
+    db: AsyncSession, scope: Scope, since: datetime, language: str = "en",
 ) -> tuple[str, list[dict]]:
     """Call Anthropic Messages API with the ``web_search`` tool and return
     ``(brief_html, citations)``.
@@ -806,7 +856,7 @@ async def _render_threat_brief(
 
 
 def _render_threat_section(
-    brief_html: str, citations: list[dict], language: str = "fr",
+    brief_html: str, citations: list[dict], language: str = "en",
     skipped: str = "",
 ) -> str:
     """Wrap the Claude HTML brief into the digest section.
@@ -817,33 +867,11 @@ def _render_threat_section(
     is no longer rendered as a footer — Claude's inline sources are the
     canonical placement so a reader sees the source next to the claim.
     """
-    is_fr = (language or "fr").lower().startswith("fr")
-    title = "Veille menaces" if is_fr else "Threat watch"
+    L = _texts(language)
+    title = L["threat_title"]
     # `skipped`: the preview chose not to run the LLM — say why, rather than
     # blame the AI configuration.
-    skipped_txt = {
-        "no_ai": (
-            "Veille menaces non générée dans l'aperçu : votre compte n'a pas "
-            "accès à l'IA." if is_fr else
-            "Threat brief not generated in the preview: your account has no "
-            "AI access."
-        ),
-        "rate_limited": (
-            "Veille menaces non générée dans l'aperçu : limite d'aperçus "
-            "atteinte, réessayez dans quelques minutes." if is_fr else
-            "Threat brief not generated in the preview: preview limit "
-            "reached, retry in a few minutes."
-        ),
-    }
-    no_brief = skipped_txt.get(skipped) or (
-        "La veille menaces n'a pas pu être générée (clé Anthropic absente "
-        "ou erreur API). Le contexte de veille reste enregistré pour le "
-        "prochain envoi."
-        if is_fr
-        else "The threat brief could not be generated (missing Anthropic "
-        "key or API error). The watch context is still saved for the "
-        "next run."
-    )
+    no_brief = L.get("skipped_" + skipped) or L["no_brief"]
 
     if not brief_html.strip():
         body = (
@@ -875,20 +903,17 @@ def render_threat_digest_html(
     citations: list[dict],
     user_name: str = "",
     since: datetime | None = None,
-    language: str = "fr",
+    language: str = "en",
 ) -> str:
     """Threat-watch digest body (M22 — free-prompt brief).
 
     ``brief_html`` is the HTML produced by Claude with web_search; an
     empty string yields the "could not generate" placeholder.
     """
-    intro = (
-        f"Voici la <strong>veille menaces</strong> du périmètre "
-        f"<strong>{h_esc(scope_name)}</strong> depuis le précédent digest "
-        f"({h_esc(_since_txt(since))})."
-    )
+    L = _texts(language)
     section = _render_threat_section(brief_html, citations, language)
-    return _wrap_html(_greeting(user_name), intro, section)
+    return _wrap_html(_greeting(user_name, L), _intro("intro_threat", scope_name, since, L),
+                      section, L["footer"])
 
 
 def render_html(
@@ -899,7 +924,7 @@ def render_html(
     threat_citations: list[dict] | None = None,
     user_name: str = "",
     since: datetime | None = None,
-    language: str = "fr",
+    language: str = "en",
     threat_skipped: str = "",
 ) -> str:
     """Combined vuln + threat preview body.
@@ -909,36 +934,12 @@ def render_html(
     :func:`render_vuln_digest_html` and :func:`render_threat_digest_html`
     directly so each email shows only its own section.
     """
-    intro = (
-        f"Aperçu du digest Watch du périmètre <strong>{h_esc(scope_name)}</strong>"
-        f" — vulnérabilités critiques et menaces relevées depuis le précédent digest "
-        f"({h_esc(_since_txt(since))})."
-    )
-
-    if groups:
-        v_cards = "".join(
-            _render_group_card(g, analyses.get(g.primary.id)) for g in groups
-        )
-        vuln_section = (
-            f'<h2 style="color:#2c3e50;border-bottom:2px solid #c0392b;'
-            f'padding-bottom:6px;margin-top:28px">'
-            f'Vulnérabilités critiques ({len(groups)})</h2>{v_cards}'
-        )
-    else:
-        vuln_section = (
-            f'<h2 style="color:#2c3e50;border-bottom:2px solid #c0392b;'
-            f'padding-bottom:6px;margin-top:28px">Vulnérabilités critiques</h2>'
-            f'<div style="padding:14px;color:#7f8c8d;background:#fafafa;'
-            f'border:1px dashed #ddd;border-radius:6px">'
-            f'Aucune vulnérabilité critique n\'a été publiée dans votre périmètre depuis le précédent digest.'
-            f'</div>'
-        )
-
+    L = _texts(language)
     threat_section = _render_threat_section(
         threat_brief_html, threat_citations or [], language, skipped=threat_skipped,
     )
-
-    return _wrap_html(_greeting(user_name), intro, vuln_section + threat_section)
+    return _wrap_html(_greeting(user_name, L), _intro("intro_preview", scope_name, since, L),
+                      _vuln_section(groups, analyses, L) + threat_section, L["footer"])
 
 
 def _send_smtp(to: str, subject: str, html: str) -> tuple[bool, str]:
@@ -1125,9 +1126,11 @@ async def _send_vuln_digest(
     html = render_vuln_digest_html(
         scope.name, groups, analyses,
         user_name=display_name or "", since=since,
+        language=_DIGEST_LANGUAGE,
     )
     n = len(groups)
-    subj = f"[Watch] {scope.name} — {n} vuln. critique{'s' if n > 1 else ''}"
+    L = _texts(_DIGEST_LANGUAGE)
+    subj = L["subject_vuln_one" if n == 1 else "subject_vuln_many"].format(scope=scope.name, n=n)
     ok, err = _send_smtp(email, subj, html)
     db.add(DigestRun(
         id=uuid.uuid4(),
@@ -1199,7 +1202,7 @@ async def _send_threat_digest(
         user_name=display_name or "", since=since,
         language=_DIGEST_LANGUAGE,
     )
-    subj = f"[Watch] {scope.name} — Veille menaces"
+    subj = _texts(_DIGEST_LANGUAGE)["subject_threat"].format(scope=scope.name)
     ok, err = _send_smtp(email, subj, html)
     db.add(DigestRun(
         id=uuid.uuid4(),

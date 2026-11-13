@@ -123,7 +123,7 @@ class NotificationPrefs(Base):
     include_overdue = Column(Boolean, nullable=False, default=True, server_default=text("true"))
     scope = Column(String(10), nullable=False, default="mine", server_default="mine")  # mine | all (admin)
     modules = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))  # [] = tous
-    lang = Column(String(5), nullable=False, default="fr", server_default="fr")
+    lang = Column(String(5), nullable=False, default="en", server_default="en")
     subject_prefix = Column(String(60), nullable=False, default="[CISO Toolbox]", server_default="[CISO Toolbox]")
     module_prefs = Column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))  # {"appsec": {...}} — FEAT-35
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc),

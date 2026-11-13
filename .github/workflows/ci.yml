@@ -39,6 +39,10 @@ jobs:
         run: pytest tests/test_project_creation_roles.py -q
       - name: API messages are written in English
         run: pytest tests/test_api_messages_english.py -q
+      - name: English is the default language
+        run: pytest tests/test_english_is_the_default.py -q
+      - name: A text held in one language is English
+        run: pytest tests/test_frontend_texts_are_english.py -q
       - name: backup agent (recovery API)
         run: pytest backup-agent/tests -q
 

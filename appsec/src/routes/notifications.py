@@ -81,7 +81,7 @@ async def get_prefs(user: Optional[User] = Depends(get_current_user),
     p = (await db.execute(
         select(NotificationPrefs).where(NotificationPrefs.user_id == user.id)
     )).scalar_one_or_none()
-    return {"lang": (p.lang if p else "fr"),
+    return {"lang": (p.lang if p else "en"),
             "module_prefs": {"appsec": _normalize_appsec(
                 ((p.module_prefs if p else {}) or {}).get("appsec"))}}
 
@@ -94,7 +94,7 @@ async def put_prefs(body: dict,
     if _suite_mode():
         return await _pilot("PUT", "/api/internal/notification-prefs",
                             json={"email": user.email, "prefs": body})
-    lang = body.get("lang", "fr")
+    lang = body.get("lang", "en")
     if lang not in ("fr", "en"):
         raise HTTPException(status_code=422, detail="lang must be fr|en")
     appsec_block = _normalize_appsec((body.get("module_prefs") or {}).get("appsec"))
