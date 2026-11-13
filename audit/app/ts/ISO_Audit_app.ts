@@ -410,7 +410,7 @@ function renderDashboard(): void {
 
     if (ecarts.length > 0) {
         h += '<div class="dash-card"><h3>' + t("audit.dash.nc_table") + ' (' + ecarts.length + ')</h3>';
-        h += '<table class="ct-table"><thead><tr><th>ID</th><th>' + t("audit.dash.nc_control") + '</th><th>Statut</th><th>' + t("audit.field.ecart_constat") + '</th><th>' + t("audit.field.ecart_action") + '</th></tr></thead><tbody>';
+        h += '<table class="ct-table"><thead><tr><th>ID</th><th>' + t("audit.dash.nc_control") + '</th><th>' + t("audit.doc.col_status") + '</th><th>' + t("audit.field.ecart_constat") + '</th><th>' + t("audit.field.ecart_action") + '</th></tr></thead><tbody>';
         ecarts.forEach(function(e) {
             h += '<tr><td><strong>' + esc(e.ctrl.id) + '</strong></td>';
             h += '<td>' + esc(ctrlT(e.ctrl)) + '</td>';
@@ -696,7 +696,7 @@ function renderJournal(): void {
     var h = '';
     D.journal.forEach(function(entry) {
         var d = new Date(entry.ts);
-        var time = d.toLocaleDateString(_locale === "en" ? "en-GB" : "fr-FR") + " " + d.toLocaleTimeString(_locale === "en" ? "en-GB" : "fr-FR", { hour: "2-digit", minute: "2-digit" });
+        var time = d.toLocaleDateString(_locale === "fr" ? "fr-FR" : "en-GB") + " " + d.toLocaleTimeString(_locale === "fr" ? "fr-FR" : "en-GB", { hour: "2-digit", minute: "2-digit" });
         var typeLabel = t("audit.journal.type_" + entry.type) || entry.type;
         var typeColor = entry.type === "status" ? "var(--ct-info)" : entry.type === "field" ? "var(--ct-neutral)" : entry.type === "create" ? "var(--ct-low)" : "var(--ct-ink-2)";
         var text = "";
@@ -892,7 +892,7 @@ function generateReport(): void {
         }
     });
     var payload = {
-        lang: _locale === "en" ? "en" : "fr",
+        lang: _locale === "fr" ? "fr" : "en",
         ref: text(D.meta.ref, 120), date: text(D.meta.date, 40),
         scope: text(D.meta.scope, 2000), hds: text(D.meta.hds, 20),
         stats: { total: S.total, audited: S.audited, c: S.c, ncmaj: S.ncmaj, ncmin: S.ncmin,
@@ -968,8 +968,8 @@ function _exportAIReportAsWord(text: string): void {
         var body = "";
         // Cover
         body += wp("", { after: 600 });
-        body += wp("Rapport d'audit ISO 27001", { sz: "48", bold: true, color: "2C3E50", align: "center", after: 40 });
-        body += wp("Généré par l'assistant IA", { sz: "22", color: "999999", align: "center", italic: true, after: 400 });
+        body += wp(t("audit.word.title"), { sz: "48", bold: true, color: "2C3E50", align: "center", after: 40 });
+        body += wp(t("audit.report.ai_generated"), { sz: "22", color: "999999", align: "center", italic: true, after: 400 });
         body += wp(m.name || "[Client]", { sz: "36", bold: true, align: "center", after: 60 });
         body += wp((m.ref || "") + " — " + (m.date || ""), { sz: "22", color: "666666", align: "center", after: 400 });
         body += '<w:p><w:r><w:br w:type="page"/></w:r></w:p>';
@@ -1017,7 +1017,7 @@ function _exportAIReportAsWord(text: string): void {
         var rels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>';
         var wordRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>';
 
-        var fname = _safeFileName((m.ref || "audit") + "_rapport_IA") + ".docx";
+        var fname = _safeFileName((m.ref || "audit") + "_AI_report") + ".docx";
 
         var zip = new JSZip();
         zip.file("[Content_Types].xml", contentTypes);

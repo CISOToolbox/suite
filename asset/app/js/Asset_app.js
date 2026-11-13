@@ -151,7 +151,7 @@ function _typeLabel(type) {
         return i18n;
     var custom = _getCustomTypes().find(function (x) { return x.id === type; });
     if (custom) {
-        var lang = (typeof _locale !== "undefined" && _locale) ? _locale : "fr";
+        var lang = (typeof _locale !== "undefined" && _locale) ? _locale : "en";
         return (lang === "en" && custom.label_en) || custom.label || type;
     }
     return type;
@@ -422,7 +422,7 @@ function exportEcheancesIcs() {
     var url = URL.createObjectURL(blob);
     var link = document.createElement("a");
     link.href = url;
-    link.download = "echeances-assets.ics";
+    link.download = "asset-deadlines.ics";
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -529,8 +529,8 @@ function renderAssetList() {
     var h = '<div class="ct-row ct-row-between ct-mb-3">';
     h += '<h2>' + t("nav.assets") + '</h2>';
     h += '<div class="ct-flex ct-gap-1">';
-    h += '<button class="ct-btn mt-8" data-write data-size="xs" data-click="refreshConnectors">' + (t("asset.refresh_connectors") || "Rafraîchir les connecteurs") + '</button>';
-    h += '<button class="ct-btn mt-8" data-write data-size="xs" data-click="openAssetTypesModal">' + (t("asset.manage_types") || "Gérer les types") + '</button>';
+    h += '<button class="ct-btn mt-8" data-write data-size="xs" data-click="refreshConnectors">' + (t("asset.refresh_connectors")) + '</button>';
+    h += '<button class="ct-btn mt-8" data-write data-size="xs" data-click="openAssetTypesModal">' + (t("asset.manage_types")) + '</button>';
     h += '<button class="ct-btn mt-8" data-write data-variant="primary" data-size="xs" data-click="addAsset">' + t("asset.add") + '</button>';
     h += '</div></div>';
     // Filters
@@ -548,7 +548,7 @@ function renderAssetList() {
         h += '<option value="' + ci + '"' + (_assetCritFilter == String(ci) ? " selected" : "") + '>' + esc(_critLabel(ci)) + '</option>';
     h += '</select>';
     h += '<select class="ct-filter" data-change="filterAssetStatut" data-pass-value>';
-    h += '<option value="">' + (t("asset.all_statuts") || "Tous les statuts") + '</option>';
+    h += '<option value="">' + (t("asset.all_statuts")) + '</option>';
     ["actif", "inactif", "en_cours", "retire"].forEach(function (s) {
         h += '<option value="' + s + '"' + (_assetStatutFilter === s ? " selected" : "") + '>' + esc(_statusLabel(s)) + '</option>';
     });
@@ -616,9 +616,9 @@ function renderAssetList() {
             render: function (a) { return _critBadge(a.criticite || 1); } },
         { key: "proprietaire", label: t("asset.col_proprio"), sortable: true,
             render: function (a) { return '<span class="ct-text-meta">' + esc(a.proprietaire || "") + '</span>'; } },
-        { key: "localisation", label: t("asset.col_localisation") || "Localisation", sortable: true,
+        { key: "localisation", label: t("asset.col_localisation"), sortable: true,
             render: function (a) { return '<span class="ct-text-label">' + esc(a.localisation || "-") + '</span>'; } },
-        { key: "os", label: t("asset.col_os") || "OS", sortable: true,
+        { key: "os", label: t("asset.col_os"), sortable: true,
             render: function (a) {
                 var os = a.os || "";
                 var v = a.version || "";
@@ -626,7 +626,7 @@ function renderAssetList() {
                     return '<span class="text-muted">-</span>';
                 return '<span class="ct-text-label">' + esc(os) + (v ? ' <span class="text-muted">(' + esc(v) + ')</span>' : '') + '</span>';
             } },
-        { key: "ip_address", label: t("asset.col_ip") || "IP", sortable: true, width: "130px",
+        { key: "ip_address", label: t("asset.col_ip"), sortable: true, width: "130px",
             render: function (a) { return a.ip_address ? '<span class="ct-text-label ct-mono">' + esc(a.ip_address) + '</span>' : '<span class="text-muted">-</span>'; } },
         { key: "groupes", label: t("asset.col_groupes"), sortable: true,
             render: function (a) { return '<span class="ct-text-label ct-muted">' + esc(a.__groupes_names || "-") + '</span>'; } },
@@ -634,7 +634,7 @@ function renderAssetList() {
             render: function (a) { return esc(_statusLabel(a.statut || "actif")); } },
         { key: "fin_support", label: t("asset.col_fin_support"), sortable: true, width: "110px",
             render: function (a) { return '<span class="ct-text-label">' + esc(a.fin_support || "-") + '</span>'; } },
-        { key: "last_login_at", label: t("asset.col_last_login") || "Dernière connexion", sortable: true, width: "140px",
+        { key: "last_login_at", label: t("asset.col_last_login"), sortable: true, width: "140px",
             render: function (a) {
                 if (!a.last_login_at)
                     return '<span class="text-muted">—</span>';
@@ -643,7 +643,7 @@ function renderAssetList() {
                     return '<span class="text-muted">—</span>';
                 var daysAgo = Math.floor((Date.now() - d.getTime()) / 86400000);
                 var color = daysAgo > 180 ? "var(--ct-critical)" : (daysAgo > 60 ? "var(--ct-high)" : "");
-                return '<span style="font-size:var(--ct-text-label)' + (color ? ";color:" + color : "") + '" title="' + esc(a.last_login_at) + (daysAgo >= 0 ? " (il y a " + daysAgo + " j)" : "") + '">'
+                return '<span style="font-size:var(--ct-text-label)' + (color ? ";color:" + color : "") + '" title="' + esc(a.last_login_at) + (daysAgo >= 0 ? " (" + t("asset.days_ago").replace("{n}", String(daysAgo)) + ")" : "") + '">'
                     + esc(d.toISOString().slice(0, 10)) + '</span>';
             } }
     ];
@@ -655,7 +655,7 @@ function renderAssetList() {
     var visibleCols = allCols.filter(function (c) { return !_assetHiddenCols[c.key]; });
     // "Colonnes" toolbar — button + popup listing ALL columns with checkboxes
     h += '<div style="position:relative;display:inline-block;margin-bottom:var(--ct-s2)">';
-    h += '<button class="ct-btn mt-8" data-write data-size="xs" data-click="_toggleAssetColsPopup">' + (t("asset.columns") || "Colonnes") + '</button>';
+    h += '<button class="ct-btn mt-8" data-write data-size="xs" data-click="_toggleAssetColsPopup">' + (t("asset.columns")) + '</button>';
     var popupId = "asset-cols-popup";
     var popup = '<div class="asset-cols-popup" id="' + popupId + '" style="display:none;position:absolute;top:100%;left:0;margin-top:var(--ct-s1);background:var(--ct-surface);border:1px solid var(--ct-line);border-radius:var(--ct-r-md);box-shadow:0 4px 12px rgba(0,0,0,0.08);padding:var(--ct-s2);z-index:50;min-width:200px">';
     allCols.forEach(function (c) {
@@ -681,17 +681,17 @@ function renderAssetList() {
             return;
         ct_bulkbar.attach({
             scope: "asset-list",
-            label: t("asset.selected_n") || "{n} actif(s) sélectionné(s)",
+            label: t("asset.selected_n"),
             actions: [
-                { id: "edit", icon: "edit", label: t("asset.bulk_edit") || "Modifier",
+                { id: "edit", icon: "edit", label: t("asset.bulk_edit"),
                     onClick: "_bulkAssetsEdit" },
-                { id: "group", icon: "plus", label: t("asset.bulk_add_group") || "Ajouter à un groupe",
+                { id: "group", icon: "plus", label: t("asset.bulk_add_group"),
                     onClick: "_bulkAssetsAddToGroup" },
-                { id: "retire", icon: "check", label: t("asset.bulk_retire") || "Marquer retiré", variant: "warning",
+                { id: "retire", icon: "check", label: t("asset.bulk_retire"), variant: "warning",
                     onClick: "_bulkAssetsRetire" },
-                { id: "delete", icon: "trash", label: t("btn_delete") || "Supprimer", danger: true,
+                { id: "delete", icon: "trash", label: t("btn_delete"), danger: true,
                     onClick: "_bulkAssetsDelete",
-                    confirm: { title: "Supprimer {n} actif(s) ?", message: "Les dépendances et groupes liés seront aussi nettoyés. Action irréversible." } }
+                    confirm: { title: t("asset.bulk_delete_confirm"), message: t("asset.bulk_delete_confirm_body") } }
             ]
         });
         ct_bulkbar.update("asset-list");
@@ -718,7 +718,7 @@ window._bulkAssetsRetire = function (scope) {
     });
     _save();
     ct_bulkbar.clear(scope);
-    showStatus(count + " " + (t("asset.bulk_retire_done") || "actif(s) marqué(s) retiré(s)"));
+    showStatus(count + " " + (t("asset.bulk_retire_done")));
     renderPanel();
 };
 window._bulkAssetsAddToGroup = function (scope) {
@@ -728,7 +728,7 @@ window._bulkAssetsAddToGroup = function (scope) {
     if (!window.ct_modal)
         return;
     if (!D.groupes.length) {
-        showStatus(t("asset.bulk_add_group_none") || "Aucun groupe — créez-en un d'abord", true);
+        showStatus(t("asset.bulk_add_group_none"), true);
         return;
     }
     var sel = '<select id="bulk-group" class="ct-w-full">';
@@ -737,15 +737,15 @@ window._bulkAssetsAddToGroup = function (scope) {
     });
     sel += '</select>';
     var body = '<div class="ct-text-meta ct-mb-2">'
-        + esc(t("asset.bulk_add_group_field") || "Groupe cible") + '</div>' + sel;
+        + esc(t("asset.bulk_add_group_field")) + '</div>' + sel;
     ct_modal.open({
-        title: (t("asset.bulk_add_group_title") || "Ajouter {n} actif(s) à un groupe")
+        title: (t("asset.bulk_add_group_title"))
             .replace("{n}", String(ids.length)),
         body: body,
         size: "sm",
         buttons: [
-            { id: "cancel", label: t("btn_cancel") || "Annuler" },
-            { id: "add", primary: true, label: t("btn_add") || "Ajouter",
+            { id: "cancel", label: t("btn_cancel") },
+            { id: "add", primary: true, label: t("btn_add"),
                 result: function () {
                     var el = document.getElementById("bulk-group");
                     return el && el.value ? el.value : false;
@@ -756,7 +756,7 @@ window._bulkAssetsAddToGroup = function (scope) {
             return;
         var n = _linkAssetsToGroup(ids, gid);
         ct_bulkbar.clear(scope);
-        showStatus(n + " " + (t("asset.bulk_add_group_done") || "actif(s) ajouté(s) au groupe"));
+        showStatus(n + " " + (t("asset.bulk_add_group_done")));
         renderPanel();
     });
 };
@@ -775,10 +775,10 @@ window._bulkAssetsEdit = function (scope) {
             + '<div class="ct-flex-1">' + fieldHtml + '</div></div>';
     }
     function checkbox(id) {
-        return '<input type="checkbox" id="bulk-apply-' + id + '" style="margin-right:var(--ct-s1)" title="Appliquer ce champ">';
+        return '<input type="checkbox" id="bulk-apply-' + id + '" style="margin-right:var(--ct-s1)" title="' + esc(t("asset.bulk_apply_field")) + '">';
     }
     var h = '<div class="ct-text-label ct-muted ct-mb-3">'
-        + 'Coche les champs à modifier. Les champs non cochés sont ignorés (les valeurs existantes sont préservées).</div>';
+        + esc(t("asset.bulk_edit_help")) + '</div>';
     // Type — built-in i18n + custom types via _typeLabel fallback.
     var typeSel = '<select id="bulk-type" class="ct-w-full">';
     types.forEach(function (t_) {
@@ -792,27 +792,27 @@ window._bulkAssetsEdit = function (scope) {
         critSel += '<option value="' + i + '">' + i + ' — ' + esc(t("asset.crit." + i) || "") + '</option>';
     }
     critSel += '</select>';
-    h += row(t("asset.col_crit") || "Criticité", checkbox("crit") + critSel);
+    h += row(t("asset.col_crit"), checkbox("crit") + critSel);
     // Owner
-    h += row(t("asset.col_proprio") || "Propriétaire", checkbox("proprio")
-        + '<input type="text" id="bulk-proprio" class="ct-w-full" placeholder="Laisse vide pour effacer">');
+    h += row(t("asset.col_proprio"), checkbox("proprio")
+        + '<input type="text" id="bulk-proprio" class="ct-w-full" placeholder="' + esc(t("asset.bulk_empty_clears")) + '">');
     // Statut
     var statSel = '<select id="bulk-statut" class="ct-w-full">';
     statuts.forEach(function (s) {
         statSel += '<option value="' + s + '">' + esc(t("asset.statut." + s) || s) + '</option>';
     });
     statSel += '</select>';
-    h += row(t("asset.col_statut") || "Statut", checkbox("statut") + statSel);
+    h += row(t("asset.col_statut"), checkbox("statut") + statSel);
     // OS
-    h += row(t("asset.col_os") || "OS", checkbox("os")
+    h += row(t("asset.col_os"), checkbox("os")
         + '<input type="text" id="bulk-os" class="ct-w-full" placeholder="Windows 11, Ubuntu 22.04...">');
     ct_modal.open({
-        title: (t("asset.bulk_edit_title") || "Modifier {n} actif(s)").replace("{n}", String(ids.length)),
+        title: (t("asset.bulk_edit_title")).replace("{n}", String(ids.length)),
         body: h,
         size: "md",
         buttons: [
-            { id: "cancel", label: t("btn_cancel") || "Annuler" },
-            { id: "save", primary: true, label: t("btn_save") || "Enregistrer",
+            { id: "cancel", label: t("btn_cancel") },
+            { id: "save", primary: true, label: t("btn_save"),
                 result: function () {
                     var changes = {};
                     ["type", "crit", "proprio", "statut", "os"].forEach(function (k) {
@@ -824,7 +824,7 @@ window._bulkAssetsEdit = function (scope) {
                         }
                     });
                     if (!Object.keys(changes).length) {
-                        showStatus("Aucun champ sélectionné", true);
+                        showStatus(t("asset.bulk_no_field"), true);
                         return false;
                     }
                     return changes;
@@ -873,7 +873,7 @@ window._bulkAssetsEdit = function (scope) {
         if (typeof _save === "function")
             _save();
         ct_bulkbar.clear(scope);
-        showStatus(count + " actif(s) mis à jour");
+        showStatus(t("asset.bulk_updated").replace("{n}", String(count)));
         renderPanel();
     });
 };
@@ -893,7 +893,7 @@ window._bulkAssetsDelete = function (scope) {
     });
     _save();
     ct_bulkbar.clear(scope);
-    showStatus(ids.length + " " + (t("asset.bulk_delete_done") || "actif(s) supprimé(s)"));
+    showStatus(ids.length + " " + (t("asset.bulk_delete_done")));
     renderPanel();
 };
 function openAsset(idx) { _selectedAsset = parseInt(String(idx)); renderPanel(); }
@@ -925,17 +925,17 @@ window.openAssetTypesModal = function () {
 };
 function _renderAssetTypesModal() {
     var h = '<div class="ct-text-meta ct-muted ct-mb-2">'
-        + esc(t("asset.types_help") || "Les types personnalisés s'ajoutent aux 8 types prédéfinis. Ils apparaissent dans le dropdown Type des actifs et la répartition par type.")
+        + esc(t("asset.types_help"))
         + '</div>';
     // Existing custom types
     var customs = D.custom_asset_types || [];
-    h += '<h4 style="margin:var(--ct-s2) 0 var(--ct-s1) 0;font-size:var(--ct-text-ui)">' + (t("asset.types_custom") || "Types personnalisés") + '</h4>';
+    h += '<h4 style="margin:var(--ct-s2) 0 var(--ct-s1) 0;font-size:var(--ct-text-ui)">' + (t("asset.types_custom")) + '</h4>';
     if (customs.length === 0) {
-        h += '<p class="text-muted ct-text-meta">' + (t("asset.types_empty") || "Aucun type personnalisé.") + '</p>';
+        h += '<p class="text-muted ct-text-meta">' + (t("asset.types_empty")) + '</p>';
     }
     else {
         h += '<table class="ct-w-full ct-text-meta ct-mb-3 ct-table">';
-        h += '<thead><tr><th>Id</th><th>Label FR</th><th>Label EN</th><th>' + (t("asset.types_color") || "Couleur") + '</th><th></th></tr></thead><tbody>';
+        h += '<thead><tr><th>Id</th><th>Label FR</th><th>Label EN</th><th>' + (t("asset.types_color")) + '</th><th></th></tr></thead><tbody>';
         customs.forEach(function (ct, i) {
             h += '<tr>';
             h += '<td><code class="ct-text-label">' + esc(ct.id) + '</code></td>';
@@ -948,11 +948,11 @@ function _renderAssetTypesModal() {
         h += '</tbody></table>';
     }
     // Add form
-    h += '<h4 style="margin:var(--ct-s3) 0 var(--ct-s1) 0;font-size:var(--ct-text-ui)">' + (t("asset.types_add") || "Ajouter un type") + '</h4>';
+    h += '<h4 style="margin:var(--ct-s3) 0 var(--ct-s1) 0;font-size:var(--ct-text-ui)">' + (t("asset.types_add")) + '</h4>';
     h += '<div class="ct-form-grid ct-mb-2">';
     h += '<div><label class="ct-text-label">Id <span class="ct-text-critical">*</span></label>';
     h += '<input type="text" id="nt-id" placeholder="equipement_reseau" class="ct-input" pattern="[a-z0-9_]+"></div>';
-    h += '<div><label class="ct-text-label">' + (t("asset.types_color") || "Couleur") + '</label>';
+    h += '<div><label class="ct-text-label">' + (t("asset.types_color")) + '</label>';
     // A colour input only takes #rrggbb: a CSS variable is invalid there and
     // the browser falls back to black. The default is a data colour.
     h += '<input type="color" id="nt-color" class="ct-input" value="' + CT_COLORS.gray.vivid + '"></div>';
@@ -962,29 +962,29 @@ function _renderAssetTypesModal() {
     h += '<input type="text" id="nt-label-en" placeholder="Network equipment" class="ct-input"></div>';
     h += '</div>';
     ct_modal.open({
-        title: (t("asset.manage_types") || "Gérer les types d'actifs"),
+        title: (t("asset.manage_types")),
         body: h,
         size: "lg",
         buttons: [
-            { id: "close", label: (t("btn_close") || "Fermer") },
-            { id: "add", primary: true, label: (t("asset.types_add") || "Ajouter ce type"),
+            { id: "close", label: (t("btn_close")) },
+            { id: "add", primary: true, label: (t("asset.types_add")),
                 result: function () {
                     var id = (document.getElementById("nt-id").value || "").trim().toLowerCase().replace(/[^a-z0-9_]/g, "_");
                     var label = (document.getElementById("nt-label").value || "").trim();
                     var labelEn = (document.getElementById("nt-label-en").value || "").trim();
                     var color = document.getElementById("nt-color").value || CT_COLORS.gray.vivid;
                     if (!id || !label) {
-                        showStatus(t("asset.types_err_missing") || "Id et Label FR requis", true);
+                        showStatus(t("asset.types_err_missing"), true);
                         return false;
                     }
                     // Conflict with built-in?
                     if (ASSET_TYPES_BUILTIN.indexOf(id) >= 0) {
-                        showStatus(t("asset.types_err_builtin") || "Cet ID est déjà pris par un type prédéfini", true);
+                        showStatus(t("asset.types_err_builtin"), true);
                         return false;
                     }
                     // Conflict with existing custom?
                     if ((D.custom_asset_types || []).some(function (x) { return x.id === id; })) {
-                        showStatus(t("asset.types_err_dup") || "Un type avec cet ID existe déjà", true);
+                        showStatus(t("asset.types_err_dup"), true);
                         return false;
                     }
                     return { id: id, label: label, label_en: labelEn, color: color };
@@ -998,7 +998,7 @@ function _renderAssetTypesModal() {
         D.custom_asset_types.push(newType);
         if (typeof _save === "function")
             _save();
-        showStatus((t("asset.types_added") || "Type ajouté") + " : " + newType.label);
+        showStatus((t("asset.types_added")) + " : " + newType.label);
         // Re-open to show the updated list and let the user add more.
         setTimeout(_renderAssetTypesModal, 100);
     });
@@ -1011,14 +1011,14 @@ window._deleteCustomType = function (idx) {
     // Check if any asset still uses this type.
     var inUse = (D.assets || []).filter(function (a) { return a.type === ct.id; }).length;
     var msg = inUse > 0
-        ? ((t("asset.types_in_use") || "Ce type est utilisé par {n} actif(s). Supprimer quand même ?").replace("{n}", String(inUse)))
-        : (t("asset.types_confirm_delete") || "Supprimer ce type ?");
+        ? ((t("asset.types_in_use")).replace("{n}", String(inUse)))
+        : (t("asset.types_confirm_delete"));
     if (!confirm(msg))
         return;
     customs.splice(idx, 1);
     if (typeof _save === "function")
         _save();
-    showStatus(t("asset.types_removed") || "Type supprimé");
+    showStatus(t("asset.types_removed"));
     setTimeout(_renderAssetTypesModal, 100);
 };
 function deleteAsset() {
@@ -1063,12 +1063,12 @@ function renderAssetDetail() {
     var manualFields = _getManualFields(a);
     if (manualFields.length > 0) {
         h += '<div class="manual-lock-banner">';
-        h += '<span>&#128274; <strong>' + (t("asset.manual_lock_title") || "Édits manuels protégés") + '</strong> : '
-            + (t("asset.manual_lock_body") || "les champs suivants ne seront pas écrasés par les synchros connecteur — ")
+        h += '<span>&#128274; <strong>' + (t("asset.manual_lock_title")) + '</strong> : '
+            + (t("asset.manual_lock_body"))
             + '<em>' + manualFields.map(function (f) { return esc(_fieldLabel(f)); }).join(", ") + '</em></span>';
         h += '<span class="ct-flex-1"></span>';
         h += '<button class="ct-btn mt-8" data-write data-size="xs" data-click="_clearManualLocks">'
-            + (t("asset.manual_lock_release") || "Réautoriser les connecteurs")
+            + (t("asset.manual_lock_release"))
             + '</button>';
         h += '</div>';
     }
@@ -1090,7 +1090,7 @@ function renderAssetDetail() {
     h += _formField("version", t("asset.version"), "text", a.version);
     h += '</div>';
     h += '<div class="ct-form-grid">';
-    h += _formField("ip_address", t("asset.col_ip") || "IP", "text", a.ip_address);
+    h += _formField("ip_address", t("asset.col_ip"), "text", a.ip_address);
     h += '<div></div>';
     h += '</div>';
     h += '<div class="ct-form-grid">';
@@ -1244,7 +1244,7 @@ window._clearManualLocks = function () {
         delete f[k]; });
     _save();
     renderPanel();
-    showStatus(t("asset.manual_lock_cleared") || "Verrous retirés — les prochaines synchros pourront écraser ces champs");
+    showStatus(t("asset.manual_lock_cleared"));
 };
 function saveAssetField(field, val) {
     if (_selectedAsset === null)
@@ -1644,7 +1644,7 @@ function _renderGroupeActifs(g) {
         h += '<div class="ct-muted ct-text-meta ct-mb-2">-</div>';
     }
     h += '<button class="ct-btn mt-8 ct-mt-2 ct-text-label ct-py-1 ct-px-3" data-write data-variant="primary" data-click="_openGroupeAssetPicker">'
-        + _icon("plus", 14) + ' ' + (t("groupe.add_assets") || "Ajouter des actifs") + '</button>';
+        + _icon("plus", 14) + ' ' + (t("groupe.add_assets")) + '</button>';
     h += '</div>';
     return h;
 }
@@ -1656,10 +1656,10 @@ window._openGroupeAssetPicker = function () {
     var g = D.groupes[_selectedGroupe];
     var candidates = D.assets.filter(function (a) { return (g.asset_ids || []).indexOf(a.id) < 0; });
     if (!candidates.length) {
-        showStatus(t("groupe.pick_assets_none") || "Tous les actifs sont déjà dans ce groupe", true);
+        showStatus(t("groupe.pick_assets_none"), true);
         return;
     }
-    var h = '<input type="text" id="grp-pick-search" placeholder="' + esc(t("asset.search") || "Rechercher...")
+    var h = '<input type="text" id="grp-pick-search" placeholder="' + esc(t("asset.search"))
         + '" data-input="_groupePickerFilter" data-pass-value autocomplete="off"'
         + ' class="ct-w-full ct-py-1 ct-px-2 ct-bordered ct-r-md ct-text-meta ct-mb-2">';
     h += '<div id="grp-pick-list" style="max-height:340px;overflow:auto;border:1px solid var(--ct-line);border-radius:var(--ct-r-md)">';
@@ -1674,17 +1674,17 @@ window._openGroupeAssetPicker = function () {
     });
     h += '</div>';
     ct_modal.open({
-        title: (t("groupe.pick_assets_title") || "Ajouter des actifs à « {nom} »").replace("{nom}", esc(g.nom || g.id)),
+        title: (t("groupe.pick_assets_title")).replace("{nom}", esc(g.nom || g.id)),
         body: h,
         size: "md",
         buttons: [
-            { id: "cancel", label: t("btn_cancel") || "Annuler" },
-            { id: "add", primary: true, label: t("btn_add") || "Ajouter",
+            { id: "cancel", label: t("btn_cancel") },
+            { id: "add", primary: true, label: t("btn_add"),
                 result: function () {
                     var boxes = Array.from(document.querySelectorAll("#grp-pick-list .grp-pick-cb:checked"));
                     var ids = boxes.map(function (b) { return b.value; });
                     if (!ids.length) {
-                        showStatus(t("groupe.pick_assets_empty") || "Aucun actif sélectionné", true);
+                        showStatus(t("groupe.pick_assets_empty"), true);
                         return false;
                     }
                     return ids;
@@ -1694,7 +1694,7 @@ window._openGroupeAssetPicker = function () {
         if (!ids || !ids.length)
             return;
         var n = _linkAssetsToGroup(ids, g.id);
-        showStatus(n + " " + (t("groupe.assets_added") || "actif(s) ajouté(s)"));
+        showStatus(n + " " + (t("groupe.assets_added")));
         renderPanel();
     });
 };
@@ -2093,7 +2093,8 @@ else if (window._debouncedSave)
 function _aiMeta() {
     return {
         methodology_context: window._aiGetContext != null ? (_aiGetContext() || "") : "",
-        organization: (D.metadata && D.metadata.organization) || ""
+        organization: (D.metadata && D.metadata.organization) || "",
+        language: _locale
     };
 }
 async function _aiPost(feature, payload) {
@@ -2258,39 +2259,39 @@ function renderPluginsPanel(c) {
         return;
     }
     var h = '<div class="ct-row ct-row-between ct-mb-3">';
-    h += '<h2>' + (t("plg.title") || "Connecteurs") + '</h2>';
-    h += '<button class="ct-btn mt-8" data-write data-variant="primary" data-click="showPluginModal">' + (t("plg.add") || "Ajouter un connecteur") + '</button>';
+    h += '<h2>' + (t("plg.title")) + '</h2>';
+    h += '<button class="ct-btn mt-8" data-write data-variant="primary" data-click="showPluginModal">' + (t("plg.add")) + '</button>';
     h += '</div>';
     if (!_pluginList.length) {
-        h += '<div class="ct-empty-state">' + (t("plg.empty") || "Aucun connecteur configure. Cliquez sur Ajouter pour synchroniser des actifs depuis AD, Intune, EDR, etc.") + '</div>';
+        h += '<div class="ct-empty-state">' + (t("plg.empty")) + '</div>';
         c.innerHTML = h;
         return;
     }
     _pluginList.forEach(function (p) {
         var statusCls = p.last_sync_status === "success" ? "ok"
             : (p.last_sync_status === "error" ? "ko" : "");
-        h += '<div class="ct-groupe-card ct-clickable ct-userpicker ct-mb-2" data-click="showPluginModal" data-args=\'' + _da(p.id) + '\' title="' + esc(t("plg.edit") || "Modifier") + '">';
+        h += '<div class="ct-groupe-card ct-clickable ct-userpicker ct-mb-2" data-click="showPluginModal" data-args=\'' + _da(p.id) + '\' title="' + esc(t("plg.edit")) + '">';
         h += '<div class="ct-flex ct-items-center ct-gap-2 ct-mb-1 ct-row-wrap">';
         h += '<strong>' + esc(p.label || p.plugin_type) + '</strong>';
         h += '<span class="ct-badge" data-tone="info">' + esc(p.plugin_type) + '</span>';
         h += '<span class="ct-compliance-tag ' + (p.enabled ? "ok" : "ko") + '">'
-            + (p.enabled ? (t("plg.enabled") || "Actif") : (t("plg.disabled") || "Inactif")) + '</span>';
+            + (p.enabled ? (t("plg.enabled")) : (t("plg.disabled"))) + '</span>';
         if (p.last_sync_status) {
             h += '<span class="ct-compliance-tag ' + statusCls + '">' + esc(p.last_sync_status) + '</span>';
         }
         h += '</div>';
         h += '<div class="ct-text-label ct-muted ct-mb-2">';
-        h += (t("plg.schedule") || "Planification") + ' : ' + esc(p.schedule || "manual");
-        h += ' &middot; ' + (t("plg.priority") || "Priorité") + ' : ' + esc(String(p.priority != null ? p.priority : 100));
+        h += (t("plg.schedule")) + ' : ' + esc(p.schedule || "manual");
+        h += ' &middot; ' + (t("plg.priority")) + ' : ' + esc(String(p.priority != null ? p.priority : 100));
         if (p.last_sync_at) {
-            h += ' &middot; ' + (t("plg.last_sync") || "Dernière sync") + ' : ' + esc(p.last_sync_at.split("T")[0]);
+            h += ' &middot; ' + (t("plg.last_sync")) + ' : ' + esc(p.last_sync_at.split("T")[0]);
         }
         h += '</div>';
         h += '<div class="ct-flex ct-gap-1 ct-row-wrap">';
-        h += '<button class="ct-btn mt-8" data-write data-size="xs" data-stop data-click="testAssetPlugin" data-args=\'' + _da(p.id) + '\'>' + (t("plg.test") || "Tester") + '</button>';
-        h += '<button class="ct-btn mt-8" data-write data-variant="primary" data-size="xs" data-stop data-click="syncAssetPlugin" data-args=\'' + _da(p.id) + '\'>' + (t("plg.sync") || "Synchroniser") + '</button>';
-        h += '<button class="ct-btn mt-8" data-write data-size="xs" data-stop data-click="showAssetPluginHistory" data-args=\'' + _da(p.id) + '\'>' + (t("plg.history") || "Historique") + '</button>';
-        h += '<button class="ct-btn mt-8" data-write data-variant="danger" data-size="xs" data-stop data-click="deleteAssetPlugin" data-args=\'' + _da(p.id) + '\'>' + (t("btn_delete") || "Supprimer") + '</button>';
+        h += '<button class="ct-btn mt-8" data-write data-size="xs" data-stop data-click="testAssetPlugin" data-args=\'' + _da(p.id) + '\'>' + (t("plg.test")) + '</button>';
+        h += '<button class="ct-btn mt-8" data-write data-variant="primary" data-size="xs" data-stop data-click="syncAssetPlugin" data-args=\'' + _da(p.id) + '\'>' + (t("plg.sync")) + '</button>';
+        h += '<button class="ct-btn mt-8" data-write data-size="xs" data-stop data-click="showAssetPluginHistory" data-args=\'' + _da(p.id) + '\'>' + (t("plg.history")) + '</button>';
+        h += '<button class="ct-btn mt-8" data-write data-variant="danger" data-size="xs" data-stop data-click="deleteAssetPlugin" data-args=\'' + _da(p.id) + '\'>' + (t("btn_delete")) + '</button>';
         h += '</div>';
         h += '</div>';
     });
@@ -2323,7 +2324,7 @@ window.showPluginModal = function (pluginId) {
         h += '<input type="hidden" id="aplg-id" value="' + esc(existing ? existing.id : "") + '">';
         // Type selector (only for new plugins)
         if (!existing) {
-            h += '<label>' + (t("plg.type") || "Type de connecteur") + '</label>';
+            h += '<label>' + (t("plg.type")) + '</label>';
             h += '<select id="aplg-type" data-change="_aplgTypeChanged" data-pass-value class="ct-w-full ct-mb-2">';
             typeOpts.forEach(function (o) {
                 h += '<option value="' + esc(o.value) + '"' + (o.value === currentType ? " selected" : "") + '>' + esc(o.label) + '</option>';
@@ -2334,13 +2335,13 @@ window.showPluginModal = function (pluginId) {
             h += '<input type="hidden" id="aplg-type" value="' + esc(existing.plugin_type) + '">';
         }
         // Label
-        h += '<label>' + (t("plg.label") || "Libellé") + '</label>';
+        h += '<label>' + (t("plg.label")) + '</label>';
         h += '<input type="text" id="aplg-label" value="' + esc(existing ? existing.label : "") + '" placeholder="AD Corp" class="ct-w-full">';
         // Setup guide (collapsible)
         var guide = tdef ? _rt(tdef, "setup_guide") || tdef.setup_guide_en || "" : "";
         if (guide) {
             h += '<details style="margin:var(--ct-s2) 0;border:1px solid var(--ct-line);border-radius:var(--ct-r-sm);padding:var(--ct-s1);background:var(--ct-surface-2)">';
-            h += '<summary class="ct-clickable ct-text-label ct-text-info">' + (t("plg.setup_guide") || "Guide de configuration") + '</summary>';
+            h += '<summary class="ct-clickable ct-text-label ct-text-info">' + (t("plg.setup_guide")) + '</summary>';
             h += '<div style="margin-top:var(--ct-s1);font-size:var(--ct-text-label);line-height:1.5;white-space:pre-wrap">' + esc(guide) + '</div>';
             h += '</details>';
         }
@@ -2350,37 +2351,37 @@ window.showPluginModal = function (pluginId) {
         h += '</div>';
         // Schedule + priority + enabled
         h += '<div style="display:flex;gap:var(--ct-s2);align-items:flex-end;margin-top:var(--ct-s2)">';
-        h += '<label class="ct-flex-1">' + (t("plg.schedule") || "Planification") + '<select id="aplg-schedule" class="ct-w-full">';
+        h += '<label class="ct-flex-1">' + (t("plg.schedule")) + '<select id="aplg-schedule" class="ct-w-full">';
         ["manual", "daily", "weekly"].forEach(function (s) {
             h += '<option value="' + s + '"' + (existing && existing.schedule === s ? " selected" : "") + '>' + esc(s) + '</option>';
         });
         h += '</select></label>';
-        h += '<label style="flex:0 0 120px" title="' + esc(t("plg.priority_help") || "Plus la valeur est haute, plus ce connecteur gagne en cas de conflit sur un champ.") + '">'
-            + (t("plg.priority") || "Priorité")
+        h += '<label style="flex:0 0 120px" title="' + esc(t("plg.priority_help")) + '">'
+            + (t("plg.priority"))
             + '<input type="number" id="aplg-priority" min="0" max="1000" value="'
             + esc(String(existing && existing.priority != null ? existing.priority : 100))
             + '" class="ct-w-full"></label>';
         h += '<label class="ct-flex ct-items-center ct-gap-1 ct-text-meta">'
             + '<input type="checkbox" id="aplg-enabled"' + (existing && existing.enabled ? " checked" : "") + '> '
-            + (t("plg.enabled") || "Actif") + '</label>';
+            + (t("plg.enabled")) + '</label>';
         h += '</div>';
         h += '<div class="ct-text-label ct-muted ct-mt-1">'
-            + esc(t("plg.priority_help") || "Priorité (0-1000) : plus la valeur est haute, plus ce connecteur gagne en cas de conflit sur un champ commun avec un autre connecteur pour le même host.")
+            + esc(t("plg.priority_help"))
             + '</div>';
         return h;
     }
     ct_modal.open({
-        title: existing ? (t("plg.edit") || "Modifier le connecteur") : (t("plg.add") || "Ajouter un connecteur"),
+        title: existing ? (t("plg.edit")) : (t("plg.add")),
         body: _buildBody(initialType),
         size: "md",
         buttons: [
-            { id: "test", label: t("plg.test") || "Tester",
+            { id: "test", label: t("plg.test"),
                 result: function () {
                     setTimeout(_testCurrentForm, 0);
                     return { __test: true };
                 } },
-            { id: "cancel", label: t("btn_cancel") || "Annuler" },
-            { id: "save", primary: true, label: t("btn_save") || "Enregistrer",
+            { id: "cancel", label: t("btn_cancel") },
+            { id: "save", primary: true, label: t("btn_save"),
                 result: function () {
                     var data = _collectPluginForm();
                     if (!data)
@@ -2404,9 +2405,9 @@ window.showPluginModal = function (pluginId) {
                     renderPanel();
                 }
             });
-            showStatus(existing ? "Connecteur mis à jour" : "Connecteur créé");
+            showStatus(t(existing ? "plg.updated" : "plg.created"));
         }).catch(function (e) {
-            showStatus((existing ? "Modif échouée : " : "Création échouée : ") + (e.message || String(e)), true);
+            showStatus(t(existing ? "plg.update_failed" : "plg.create_failed") + ": " + (e.message || String(e)), true);
         });
     });
 };
@@ -2423,7 +2424,7 @@ function _renderPluginConfigFields(tdef, values) {
         return "";
     values = values || {};
     var h = '<div class="ct-mt-2 ct-mb-1 ct-text-label ct-strong ct-muted">'
-        + (t("plg.config") || "Configuration") + '</div>';
+        + (t("plg.config")) + '</div>';
     tdef.config_schema.forEach(function (f) {
         var id = "aplg-cfg-" + f.key;
         var val = values[f.key];
@@ -2455,12 +2456,12 @@ function _collectPluginForm() {
     var enabledEl = document.getElementById("aplg-enabled");
     var priorityEl = document.getElementById("aplg-priority");
     if (!typeEl) {
-        showStatus("Form missing", true);
+        showStatus(t("plg.err_no_form"), true);
         return null;
     }
     var pluginType = (typeEl.value || "").trim();
     if (!pluginType) {
-        showStatus("Type de connecteur manquant", true);
+        showStatus(t("plg.err_no_type"), true);
         return null;
     }
     var config = {};
@@ -2496,13 +2497,13 @@ function _testCurrentForm() {
     var data = _collectPluginForm();
     if (!data)
         return;
-    showStatus(t("plg.testing") || "Test de connexion en cours...");
+    showStatus(t("plg.testing"));
     AssetAPI.testPluginConfig(pid, data).then(function (r) {
         if (r.ok) {
-            showStatus((t("plg.test_ok") || "Connexion OK") + (r.details ? " — " + r.details : ""));
+            showStatus((t("plg.test_ok")) + (r.details ? " — " + r.details : ""));
         }
         else {
-            showStatus((t("plg.test_fail") || "Échec : ") + (r.error || ""), true);
+            showStatus((t("plg.test_fail")) + (r.error || ""), true);
         }
         // Reopen the modal with same data (ct_modal closed on button click)
         setTimeout(function () { window.showPluginModal(data.plugin_id); }, 100);
@@ -2514,12 +2515,12 @@ window.testAssetPlugin = function (pluginId) {
     var pid = window.getActiveProjectId != null ? getActiveProjectId() : null;
     if (!pid)
         return;
-    showStatus(t("plg.testing") || "Test en cours...");
+    showStatus(t("plg.testing"));
     AssetAPI.testPlugin(pid, pluginId).then(function (r) {
         if (r.ok)
-            showStatus((t("plg.test_ok") || "Connexion OK") + (r.details ? " — " + r.details : ""));
+            showStatus((t("plg.test_ok")) + (r.details ? " — " + r.details : ""));
         else
-            showStatus((t("plg.test_fail") || "Échec : ") + (r.error || ""), true);
+            showStatus((t("plg.test_fail")) + (r.error || ""), true);
     }).catch(function (e) { showStatus(e.message || String(e), true); });
 };
 window.syncAssetPlugin = function (pluginId) {
@@ -2527,24 +2528,23 @@ window.syncAssetPlugin = function (pluginId) {
     if (!pid)
         return;
     var p = _pluginList.find(function (x) { return x.id === pluginId; });
-    var msg = (t("plg.confirm_sync") || "Lancer la synchronisation ? Elle peut prendre plusieurs secondes.");
+    var msg = (t("plg.confirm_sync"));
     if (!confirm(msg))
         return;
     if (window._cancelAutosave)
         window._cancelAutosave();
-    showStatus(t("plg.syncing") || "Synchronisation en cours...");
+    showStatus(t("plg.syncing"));
     AssetAPI.syncPlugin(pid, pluginId).then(function (r) {
-        var tpl = t("plg.sync_done") ||
-            "Sync terminée : {found} trouvés, {created} créés, {updated} mis à jour, {unchanged} inchangés";
+        var tpl = t("plg.sync_done");
         var extra = "";
         if (r.assets_retired) {
-            extra += " (" + r.assets_retired + " retiré(s) — absent(s) du connecteur)";
+            extra += " (" + t("plg.sync_retired").replace("{n}", String(r.assets_retired)) + ")";
         }
         if (r.assets_reactivated) {
-            extra += " (" + r.assets_reactivated + " réactivé(s))";
+            extra += " (" + t("plg.sync_reactivated").replace("{n}", String(r.assets_reactivated)) + ")";
         }
         if (r.assets_merged_hosts) {
-            extra += " (" + r.assets_merged_hosts + " fusion(s) cross-connecteur)";
+            extra += " (" + t("plg.sync_merged").replace("{n}", String(r.assets_merged_hosts)) + ")";
         }
         showStatus(tpl
             .replace("{found}", r.assets_found || 0)
@@ -2553,7 +2553,7 @@ window.syncAssetPlugin = function (pluginId) {
             .replace("{unchanged}", r.assets_unchanged || 0)
             + extra);
         if (r.connector_errors_count && r.connector_errors_count > 0) {
-            showStatus(r.connector_errors_count + " erreur(s) connecteur — voir logs serveur", true);
+            showStatus(t("plg.connector_errors").replace("{n}", String(r.connector_errors_count)), true);
         }
         // Reload D so new assets appear in the list
         AssetAPI.get(pid).then(function (prj) {
@@ -2576,16 +2576,16 @@ window.refreshConnectors = function () {
     function run() {
         var enabled = _pluginList.filter(function (p) { return p.enabled; });
         if (!enabled.length) {
-            showStatus(t("plg.refresh_none") || "Aucun connecteur activé à synchroniser.", true);
+            showStatus(t("plg.refresh_none"), true);
             return;
         }
-        var msg = (t("plg.confirm_refresh") || "Rafraîchir les {n} connecteur(s) activé(s) ?")
+        var msg = (t("plg.confirm_refresh"))
             .replace("{n}", String(enabled.length));
         if (!confirm(msg))
             return;
         if (window._cancelAutosave)
             window._cancelAutosave();
-        showStatus(t("plg.syncing") || "Synchronisation en cours...");
+        showStatus(t("plg.syncing"));
         var agg = { found: 0, created: 0, updated: 0, unchanged: 0, retired: 0, reactivated: 0, errors: 0 };
         var i = 0;
         function next() {
@@ -2606,13 +2606,12 @@ window.refreshConnectors = function () {
             }).catch(function () { agg.errors++; next(); });
         }
         function finish() {
-            var tpl = t("plg.sync_done") ||
-                "Sync terminée : {found} trouvés, {created} créés, {updated} mis à jour, {unchanged} inchangés";
+            var tpl = t("plg.sync_done");
             var extra = "";
             if (agg.retired)
-                extra += " (" + agg.retired + " retiré(s) — absent(s) des connecteurs)";
+                extra += " (" + t("plg.sync_retired").replace("{n}", String(agg.retired)) + ")";
             if (agg.reactivated)
-                extra += " (" + agg.reactivated + " réactivé(s))";
+                extra += " (" + t("plg.sync_reactivated").replace("{n}", String(agg.reactivated)) + ")";
             showStatus(tpl
                 .replace("{found}", agg.found)
                 .replace("{created}", agg.created)
@@ -2620,7 +2619,7 @@ window.refreshConnectors = function () {
                 .replace("{unchanged}", agg.unchanged)
                 + extra);
             if (agg.errors > 0) {
-                showStatus(agg.errors + " erreur(s) connecteur — voir logs serveur", true);
+                showStatus(t("plg.connector_errors").replace("{n}", String(agg.errors)), true);
             }
             AssetAPI.get(pid).then(function (prj) {
                 var d = typeof prj.data === "string" ? JSON.parse(prj.data) : (prj.data || {});
@@ -2643,12 +2642,12 @@ window.deleteAssetPlugin = function (pluginId) {
         return;
     var p = _pluginList.find(function (x) { return x.id === pluginId; });
     var name = (p && p.label) || pluginId;
-    if (!confirm((t("plg.confirm_delete") || "Supprimer le connecteur") + " \"" + name + "\" ?"))
+    if (!confirm((t("plg.confirm_delete")) + " \"" + name + "\" ?"))
         return;
     AssetAPI.deletePlugin(pid, pluginId).then(function () {
         _pluginsLoaded = false;
         _loadPlugins(function () { renderPanel(); });
-        showStatus("Connecteur supprimé");
+        showStatus(t("plg.deleted"));
     }).catch(function (e) { showStatus(e.message || String(e), true); });
 };
 window.showAssetPluginHistory = function (pluginId) {
@@ -2658,18 +2657,18 @@ window.showAssetPluginHistory = function (pluginId) {
     AssetAPI.pluginHistory(pid, pluginId).then(function (jobs) {
         var h = '';
         if (!jobs.length) {
-            h = '<div class="ct-empty-state">' + (t("plg.history_empty") || "Aucun historique.") + '</div>';
+            h = '<div class="ct-empty-state">' + (t("plg.history_empty")) + '</div>';
         }
         else {
             h = '<table class="ct-w-full ct-text-meta">';
             h += '<thead><tr>'
-                + '<th class="ct-ta-l ct-py-1 ct-px-2 ct-border-bottom">Date</th>'
-                + '<th class="ct-ta-l ct-py-1 ct-px-2 ct-border-bottom ct-w-110">Statut</th>'
-                + '<th class="ct-ta-r ct-py-1 ct-px-2 ct-border-bottom">Trouvés</th>'
-                + '<th class="ct-ta-r ct-py-1 ct-px-2 ct-border-bottom">Créés</th>'
-                + '<th class="ct-ta-r ct-py-1 ct-px-2 ct-border-bottom">MAJ</th>'
+                + '<th class="ct-ta-l ct-py-1 ct-px-2 ct-border-bottom">' + esc(t("plg.history_date")) + '</th>'
+                + '<th class="ct-ta-l ct-py-1 ct-px-2 ct-border-bottom ct-w-110">' + esc(t("plg.history_status")) + '</th>'
+                + '<th class="ct-ta-r ct-py-1 ct-px-2 ct-border-bottom">' + esc(t("plg.history_found")) + '</th>'
+                + '<th class="ct-ta-r ct-py-1 ct-px-2 ct-border-bottom">' + esc(t("plg.history_created")) + '</th>'
+                + '<th class="ct-ta-r ct-py-1 ct-px-2 ct-border-bottom">' + esc(t("plg.history_updated")) + '</th>'
                 + '<th class="ct-ta-r ct-py-1 ct-px-2 ct-border-bottom">=</th>'
-                + '<th class="ct-ta-l ct-py-1 ct-px-2 ct-border-bottom">Erreur</th>'
+                + '<th class="ct-ta-l ct-py-1 ct-px-2 ct-border-bottom">' + esc(t("plg.history_error")) + '</th>'
                 + '</tr></thead><tbody>';
             jobs.forEach(function (j) {
                 var cls = j.status === "success" ? "ok" : (j.status === "error" ? "ko" : "");
@@ -2688,10 +2687,10 @@ window.showAssetPluginHistory = function (pluginId) {
             h += '</tbody></table>';
         }
         ct_modal.open({
-            title: (t("plg.history") || "Historique") + " — " + pluginId,
+            title: (t("plg.history")) + " — " + pluginId,
             body: '<div style="max-height:60vh;overflow-y:auto">' + h + '</div>',
             size: "lg",
-            buttons: [{ id: "close", primary: true, label: (t("btn_close") || "Fermer") }],
+            buttons: [{ id: "close", primary: true, label: (t("btn_close")) }],
         });
     }).catch(function (e) { showStatus(e.message || String(e), true); });
 };
@@ -2701,13 +2700,13 @@ window.showAssetPluginHistory = function (pluginId) {
 var _measureList = [];
 var _measuresLoaded = false;
 var _MES_STATUS = [
-    { value: "a_faire", key: "measure.status.a_faire", fallback: "À faire" },
-    { value: "en_cours", key: "measure.status.en_cours", fallback: "En cours" },
-    { value: "termine", key: "measure.status.termine", fallback: "Terminé" },
+    { value: "a_faire", key: "measure.status.a_faire" },
+    { value: "en_cours", key: "measure.status.en_cours" },
+    { value: "termine", key: "measure.status.termine" },
 ];
 function _mesStatutLabel(s) {
     var o = _MES_STATUS.find(function (x) { return x.value === s; });
-    return o ? (t(o.key) || o.fallback) : s;
+    return o ? t(o.key) : s;
 }
 function _loadMeasures(cb) {
     var pid = window.getActiveProjectId != null ? getActiveProjectId() : null;
@@ -2733,27 +2732,27 @@ function _loadMeasures(cb) {
 }
 function renderMeasuresPanel(c) {
     if (!_measuresLoaded) {
-        c.innerHTML = '<div class="ct-p-5 ct-muted">' + (t("common.loading") || "Chargement…") + '</div>';
+        c.innerHTML = '<div class="ct-p-5 ct-muted">' + (t("common.loading")) + '</div>';
         _loadMeasures(function () { renderPanel(); });
         return;
     }
     var h = '<div class="ct-row ct-row-between ct-mb-3">';
-    h += '<h2 class="ct-m-0">' + (t("nav.mesures") || "Actions") + '</h2>';
-    h += '<button class="ct-btn mt-8" data-write data-variant="primary" data-click="_newAssetMeasure">' + (t("measure.new") || "Nouvelle action") + '</button>';
+    h += '<h2 class="ct-m-0">' + (t("nav.mesures")) + '</h2>';
+    h += '<button class="ct-btn mt-8" data-write data-variant="primary" data-click="_newAssetMeasure">' + (t("measure.new")) + '</button>';
     h += '</div>';
     if (!_measureList.length) {
-        h += '<div class="ct-empty-state">' + (t("mes.empty") || "Aucune action. Les échéances d'actifs en génèrent automatiquement, ou créez-en une.") + '</div>';
+        h += '<div class="ct-empty-state">' + (t("mes.empty")) + '</div>';
         c.innerHTML = h;
         return;
     }
     var today = new Date().toISOString().slice(0, 10);
     h += '<table class="ct-table"><thead><tr>';
-    h += '<th>' + (t("mes.col.id") || "ID") + '</th>';
-    h += '<th>' + (t("measure.field.title") || "Intitulé") + '</th>';
-    h += '<th>' + (t("measure.field.statut") || "Statut") + '</th>';
-    h += '<th>' + (t("measure.field.responsable") || "Responsable") + '</th>';
-    h += '<th>' + (t("measure.field.echeance") || "Échéance") + '</th>';
-    h += '<th>' + (t("mes.col.origine") || "Origine") + '</th></tr></thead><tbody>';
+    h += '<th>' + (t("mes.col.id")) + '</th>';
+    h += '<th>' + (t("measure.field.title")) + '</th>';
+    h += '<th>' + (t("measure.field.statut")) + '</th>';
+    h += '<th>' + (t("measure.field.responsable")) + '</th>';
+    h += '<th>' + (t("measure.field.echeance")) + '</th>';
+    h += '<th>' + (t("mes.col.origine")) + '</th></tr></thead><tbody>';
     _measureList.forEach(function (m) {
         var overdue = !!(m.echeance && m.echeance < today && m.statut !== "termine");
         h += '<tr class="ct-clickable" data-click="_editAssetMeasureRow" data-args=\'' + _da(m.id) + '\'>';
@@ -2763,8 +2762,8 @@ function renderMeasuresPanel(c) {
         h += '<td>' + esc(m.responsable || "") + '</td>';
         h += '<td' + (overdue ? ' class="ct-measure-overdue"' : '') + '>' + esc(m.echeance || "") + '</td>';
         h += '<td>' + (m.origine === "echeance"
-            ? '<span class="ct-badge" data-tone="info" data-size="sm">' + (t("mes.auto") || "auto") + '</span>'
-            : esc(t("mes.manual") || "manuelle")) + '</td>';
+            ? '<span class="ct-badge" data-tone="info" data-size="sm">' + (t("mes.auto")) + '</span>'
+            : esc(t("mes.manual"))) + '</td>';
         h += '</tr>';
     });
     h += '</tbody></table>';
@@ -2773,7 +2772,7 @@ function renderMeasuresPanel(c) {
 function _measureModalBaseOpts() {
     return {
         hideFields: ["type"],
-        statusOptions: _MES_STATUS.map(function (s) { return { value: s.value, label: t(s.key) || s.fallback }; }),
+        statusOptions: _MES_STATUS.map(function (s) { return { value: s.value, label: t(s.key) }; }),
         defaultStatus: "a_faire",
         ownerPicker: { pickerId: "asset-measure-owner", directoryUrl: "api/directory" },
     };
@@ -2784,14 +2783,14 @@ function _newAssetMeasure() {
     if (!pid || !window.ct_measure_modal)
         return;
     var opts = _measureModalBaseOpts();
-    opts.title = t("measure.new") || "Nouvelle action";
+    opts.title = t("measure.new");
     window.ct_measure_modal.open(null, opts).then(function (result) {
         if (!result)
             return;
         AssetAPI.createMeasure(pid, result).then(function () {
             _reloadMeasures();
             if (typeof showStatus === "function")
-                showStatus(t("measure.created") || "Mesure créée");
+                showStatus(t("measure.created"));
         }).catch(function (e) {
             if (typeof showStatus === "function")
                 showStatus(e.message || String(e), true);
@@ -2810,7 +2809,7 @@ function _editAssetMeasureRow(id) {
         return AssetAPI.patchMeasure(pid, m.id, { progress_log: fullLog });
     };
     opts.onDelete = function () {
-        if (!confirm(t("measure.confirm_delete") || "Supprimer cette action ?"))
+        if (!confirm(t("measure.confirm_delete")))
             return;
         AssetAPI.deleteMeasure(pid, m.id).then(function () {
             _reloadMeasures();

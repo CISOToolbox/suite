@@ -55,9 +55,13 @@ INTERVAL_HOURS = int(os.getenv("ACCESS_EXPIRY_INTERVAL_HOURS", "24"))
 
 # Alert-email language — module-level, like the other suite mailers (the
 # recipients are plain emails with no stored preference). Same FR/EN dict
-# pattern as pilot/src/deadline_digest.py; default fr, override with
-# ACCESS_MAIL_LANG=en.
-MAIL_LANG = os.getenv("ACCESS_MAIL_LANG", "fr")
+# pattern as pilot/src/deadline_digest.py; default en, override with
+# ACCESS_MAIL_LANG=fr (any spelling of French: FR, fr-FR).
+def _mail_language() -> str:
+    return "fr" if os.getenv("ACCESS_MAIL_LANG", "").strip().lower().startswith("fr") else "en"
+
+
+MAIL_LANG = _mail_language()
 
 _L = {
     "fr": {
@@ -84,7 +88,7 @@ _L = {
 
 
 def _lang() -> dict:
-    return _L.get(MAIL_LANG) or _L["fr"]
+    return _L.get(MAIL_LANG) or _L["en"]
 
 _STATE_KEY = "sa_expiry.sent"
 _LAST_RUN_KEY = "sa_expiry.last_run"

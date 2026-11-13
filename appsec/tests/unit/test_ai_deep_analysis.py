@@ -75,11 +75,13 @@ class TestFindingAnalysisSystemLanguage:
         s = _finding_analysis_system("en")
         assert "in English" in s
 
-    def test_unknown_language_defaults_to_french(self):
-        assert "French" in _finding_analysis_system("de")
+    def test_unknown_language_defaults_to_english(self):
+        assert "French" not in _finding_analysis_system("de")
+        assert "in English" in _finding_analysis_system("de")
 
-    def test_default_argument_is_french(self):
-        assert "French" in _finding_analysis_system()
+    def test_default_argument_is_english(self):
+        assert "French" not in _finding_analysis_system()
+        assert "in English" in _finding_analysis_system()
 
     def test_prompt_pins_json_keys_and_enums_to_english(self):
         s = _finding_analysis_system("fr")

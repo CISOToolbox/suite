@@ -2,7 +2,7 @@
 
 The shared /api/ai proxy (provider registry, key/settings management,
 /complete, /runtime, /config, /keys, /validate-key, the LLM dispatch) lives in
-src/ai_proxy_common.py. Only the asset-inventory métier prompt and its four
+src/ai_proxy_common.py. Only the asset-inventory domain prompt and its four
 suggestion endpoints are here — the methodology stays server-side.
 """
 from __future__ import annotations
@@ -28,19 +28,24 @@ router = make_ai_router()
 
 
 ASSET_SYSTEM_PROMPT = (
-    "Tu es un expert en gestion d'actifs informatiques et en securite des SI. "
-    "Tu aides a documenter un inventaire d'actifs pour une organisation. "
-    "Reponds en francais, de maniere structuree et concise. "
-    "Utilise un vocabulaire professionnel adapte a un RSSI ou un DSI."
+    "You are an expert in IT asset management and information-system security. "
+    "You help document the asset inventory of an organisation. "
+    "Respond in {lang}, in a structured and concise way. "
+    "Use the professional vocabulary of a CISO or a CIO."
 )
 
 
-def _asset_system(methodology_context: str = "", organization: str = "") -> str:
+def _lang_name(language: str) -> str:
+    return "French" if (language or "").strip().lower().startswith("fr") else "English"
+
+
+def _asset_system(methodology_context: str = "", organization: str = "",
+                  language: str = "en") -> str:
     """Build the system prompt: base methodology + optional user-supplied
     methodological context + optional organization name."""
-    sys = ASSET_SYSTEM_PROMPT
+    sys = ASSET_SYSTEM_PROMPT.format(lang=_lang_name(language))
     if methodology_context:
-        sys += "\n\nContexte methodologique fourni:\n" + methodology_context
+        sys += "\n\nMethodological context provided:\n" + methodology_context
     if organization:
         sys += "\n\nOrganisation: " + organization
     return sys
@@ -55,6 +60,7 @@ class AssetDescriptionRequest(BaseModel):
     criticite_label: str = ""
     methodology_context: str = ""
     organization: str = ""
+    language: str = "en"
 
 
 class AssetTextResponse(BaseModel):
@@ -71,17 +77,17 @@ async def asset_suggest_description(body: AssetDescriptionRequest,
     _check_rate_limit(str(user.id) if user else "anonymous")
     provider, model = await _runtime_provider_model(db)
     user_prompt = (
-        "Redige une description concise (2-3 phrases) pour cet actif informatique:\n"
-        f"- Nom: {body.nom or 'non defini'}\n"
-        f"- Type: {body.type_label or 'non defini'}\n"
-        f"- Proprietaire: {body.proprietaire or 'non defini'}\n"
-        f"- Fournisseur: {body.fournisseur or 'non defini'}\n"
-        f"- OS: {body.os or 'non defini'}\n"
-        f"- Criticite: {body.criticite_label or 'non defini'}\n"
-        "Reponds uniquement avec la description, sans introduction."
+        "Write a concise description (2-3 sentences) of this IT asset:\n"
+        f"- Name: {body.nom or 'not set'}\n"
+        f"- Type: {body.type_label or 'not set'}\n"
+        f"- Owner: {body.proprietaire or 'not set'}\n"
+        f"- Vendor: {body.fournisseur or 'not set'}\n"
+        f"- OS: {body.os or 'not set'}\n"
+        f"- Criticality: {body.criticite_label or 'not set'}\n"
+        "Respond with the description only, without an introduction."
     )
     raw = await _provider_complete(
-        db, _asset_system(body.methodology_context, body.organization),
+        db, _asset_system(body.methodology_context, body.organization, body.language),
         user_prompt, provider, model)
     return AssetTextResponse(text=(raw or "").strip())
 
@@ -92,6 +98,7 @@ class AssetPrincipeRequest(BaseModel):
     members: list[str] = []
     methodology_context: str = ""
     organization: str = ""
+    language: str = "en"
 
 
 @router.post("/asset/suggest-principe", response_model=AssetTextResponse)
@@ -103,17 +110,17 @@ async def asset_suggest_principe(body: AssetPrincipeRequest,
     _check_ai_access(user)
     _check_rate_limit(str(user.id) if user else "anonymous")
     provider, model = await _runtime_provider_model(db)
-    member_desc = "\n".join("- " + m for m in body.members) or "  (aucun actif assigne)"
+    member_desc = "\n".join("- " + m for m in body.members) or "  (no asset assigned)"
     user_prompt = (
-        "Redige le principe/fonction de ce groupe d'actifs (3-5 phrases):\n"
-        f"- Nom du groupe: {body.nom or 'non defini'}\n"
-        f"- Criticite: {body.criticite_label or 'non defini'}\n"
-        f"- Actifs membres:\n{member_desc}\n"
-        "Decris a quoi sert ce groupe, son role dans le SI, et pourquoi il est important. "
-        "Reponds uniquement avec le texte du principe."
+        "Write the principle/function of this asset group (3-5 sentences):\n"
+        f"- Group name: {body.nom or 'not set'}\n"
+        f"- Criticality: {body.criticite_label or 'not set'}\n"
+        f"- Member assets:\n{member_desc}\n"
+        "Describe what this group is for, its role in the information system, and why "
+        "it matters. Respond with the text of the principle only."
     )
     raw = await _provider_complete(
-        db, _asset_system(body.methodology_context, body.organization),
+        db, _asset_system(body.methodology_context, body.organization, body.language),
         user_prompt, provider, model)
     return AssetTextResponse(text=(raw or "").strip())
 
@@ -125,6 +132,7 @@ class AssetRaciRequest(BaseModel):
     existing_activities: list[str] = []
     methodology_context: str = ""
     organization: str = ""
+    language: str = "en"
 
 
 class RaciRow(BaseModel):
@@ -149,22 +157,22 @@ async def asset_suggest_raci(body: AssetRaciRequest,
     _check_rate_limit(str(user.id) if user else "anonymous")
     provider, model = await _runtime_provider_model(db)
     user_prompt = (
-        "Propose une matrice RACI pour ce groupe d'actifs:\n"
-        f"- Nom: {body.nom or 'non defini'}\n"
-        f"- Principe: {body.principe or 'non defini'}\n"
-        f"- Criticite: {body.criticite_label or 'non defini'}\n\n"
-        f"Activites existantes: {', '.join(body.existing_activities)}\n"
-        "Roles: R (Responsable), A (Approbateur), C (Consulte), I (Informe)\n\n"
-        "Reponds au format JSON strict — un tableau d'objets:\n"
+        "Suggest a RACI matrix for this asset group:\n"
+        f"- Name: {body.nom or 'not set'}\n"
+        f"- Principle: {body.principe or 'not set'}\n"
+        f"- Criticality: {body.criticite_label or 'not set'}\n\n"
+        f"Existing activities: {', '.join(body.existing_activities)}\n"
+        "Roles: R (Responsible), A (Accountable), C (Consulted), I (Informed)\n\n"
+        "Respond in strict JSON — an array of objects, with these keys as written:\n"
         '[{"activite":"installation","r":"...","a":"...","c":"...","i":"..."},'
         '{"activite":"mco","r":"...","a":"...","c":"...","i":"..."},'
         '{"activite":"mcs","r":"...","a":"...","c":"...","i":"..."}]\n'
-        "Tu peux proposer des activites supplementaires pertinentes au-dela des 3 par defaut.\n"
-        "Utilise des noms de roles/services (DSI, RSSI, Metier, DG, Admin Sys, etc.), "
-        "pas des noms de personnes."
+        "You may add relevant activities beyond the 3 default ones.\n"
+        "Use names of roles or departments (CIO, CISO, business owner, executive "
+        "management, system administrators, etc.), not names of people."
     )
     raw = await _provider_complete(
-        db, _asset_system(body.methodology_context, body.organization),
+        db, _asset_system(body.methodology_context, body.organization, body.language),
         user_prompt, provider, model)
     parsed = _parse_json_lax(raw)
     if not isinstance(parsed, list):
@@ -189,6 +197,7 @@ class AssetPoliciesRequest(BaseModel):
     members: list[str] = []
     methodology_context: str = ""
     organization: str = ""
+    language: str = "en"
 
 
 class AssetPoliciesResponse(BaseModel):
@@ -206,24 +215,24 @@ async def asset_suggest_policies(body: AssetPoliciesRequest,
     _check_ai_access(user)
     _check_rate_limit(str(user.id) if user else "anonymous")
     provider, model = await _runtime_provider_model(db)
-    member_desc = "\n".join("- " + m for m in body.members) or "  (aucun)"
+    member_desc = "\n".join("- " + m for m in body.members) or "  (none)"
     user_prompt = (
-        "Propose des politiques de sauvegarde, supervision et mise a jour pour ce groupe d'actifs:\n"
-        f"- Nom: {body.nom or 'non defini'}\n"
-        f"- Principe: {body.principe or 'non defini'}\n"
-        f"- Criticite: {body.criticite_label or 'non defini'}\n"
-        f"- Actifs:\n{member_desc}\n\n"
-        "Reponds au format JSON strict:\n"
+        "Suggest backup, monitoring and update policies for this asset group:\n"
+        f"- Name: {body.nom or 'not set'}\n"
+        f"- Principle: {body.principe or 'not set'}\n"
+        f"- Criticality: {body.criticite_label or 'not set'}\n"
+        f"- Assets:\n{member_desc}\n\n"
+        "Respond in strict JSON, with these keys as written:\n"
         '{"politique_sauvegarde":{"frequence":"...","retention":"...","type":"...",'
         '"site_distant":true/false,"teste":true/false},'
         '"politique_supervision":{"outil":"...","perimetre":"...","alerting":true/false,'
         '"h24":true/false},'
         '"politique_maj":{"frequence":"...","fenetre":"...","validation":"...",'
         '"critique_delai":"..."}}\n'
-        "Sois realiste et adapte a la criticite du groupe."
+        "Be realistic and fit the criticality of the group."
     )
     raw = await _provider_complete(
-        db, _asset_system(body.methodology_context, body.organization),
+        db, _asset_system(body.methodology_context, body.organization, body.language),
         user_prompt, provider, model)
     parsed = _parse_json_lax(raw)
     if not isinstance(parsed, dict):

@@ -674,4 +674,5 @@ _registerTranslations("fr", {
     "pilot.dashboard.backups_stale_n": "{n} en retard",
     "pilot.dashboard.restore_test_failed_n": "{n} restore-test KO",
     "pilot.dashboard.restore_test_ok_short": "Restore-test OK",
+    "pilot.ai.default_project_name": "Projet IA",
 });

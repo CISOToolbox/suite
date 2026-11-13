@@ -1067,20 +1067,21 @@ window._aiSuggestGroups = function() {
 
     _aiShowLoading(t("pilot.ai.groups_title"), t("pilot.ai.groups_analyzing", { n: candidates.length }));
 
-    var system = "Tu es un assistant CISO. On te donne la liste des actions de remediation remontees par les differents modules d'une suite de gouvernance securite (Risk, Compliance, Vendor, Surface, AppSec, Access, Asset, Audit, Watch). " +
-        "Une MEME action reelle existe souvent en double : remontee par un module Risk ET par un module Compliance par exemple (titres proches, meme objectif de securite, parfois meme responsable ou meme entite). " +
-        "Ta tache : proposer des GROUPEMENTS d'actions qui representent la meme action reelle, pour les piloter en un seul point.\n" +
-        "REGLES STRICTES :\n" +
-        "  - Ne groupe que des actions qui sont TRES probablement la meme chose (meme objectif concret, pas seulement le meme theme general).\n" +
-        "  - Chaque groupe contient au moins 2 actions ; une action apparait dans au plus un groupe.\n" +
-        "  - Privilegie les doublons INTER-modules (modules differents) ; un doublon intra-module n'est propose que s'il est evident.\n" +
-        "  - Donne a chaque groupe un titre court qui decrit l'action commune.\n" +
-        "  - Justifie chaque groupe par UNE phrase qui cite les references groupees.\n" +
-        "  - Si aucun doublon plausible n'existe, reponds avec une liste vide.\n" +
-        "Reponds STRICTEMENT en JSON valide, sans texte autour, au format :\n" +
-        "{ \"groups\": [{\"title\": \"<titre court>\", \"measure_ids\": [\"<id1>\", \"<id2>\"], \"reason\": \"<phrase>\"}] }";
+    var system = "You are a CISO assistant. You are given the list of remediation actions reported by the modules of a security governance suite (Risk, Compliance, Vendor, Surface, AppSec, Access, Asset, Audit, Watch). " +
+        "ONE real action often exists twice: reported by a Risk module AND by a Compliance module for instance (close titles, same security objective, sometimes the same owner or the same entity). " +
+        "Your task: suggest GROUPS of actions that stand for the same real action, so that they are steered from one place.\n" +
+        "STRICT RULES:\n" +
+        "  - Group only actions that are VERY likely the same thing (same concrete objective, not merely the same general theme).\n" +
+        "  - Each group holds at least 2 actions; an action appears in at most one group.\n" +
+        "  - Prefer duplicates ACROSS modules (different modules); suggest a duplicate within one module only when it is obvious.\n" +
+        "  - Give each group a short title that describes the common action.\n" +
+        "  - Justify each group in ONE sentence that quotes the references grouped.\n" +
+        "  - If no plausible duplicate exists, respond with an empty list.\n" +
+        "Write the titles and the reasons in " + _aiAnswerLanguage() + ".\n" +
+        "Respond STRICTLY in valid JSON, with no text around it, in this format:\n" +
+        "{ \"groups\": [{\"title\": \"<short title>\", \"measure_ids\": [\"<id1>\", \"<id2>\"], \"reason\": \"<sentence>\"}] }";
 
-    var user = "ACTIONS (id | module | reference | titre | entite | responsable | statut)\n" +
+    var user = "ACTIONS (id | module | reference | title | entity | owner | status)\n" +
         candidates.map(function(m) {
             return m.id + " | " + m.module + " | " + m.source_id + " | " + (m.title || "") +
                 " | " + (m.entity_name || "") + " | " + (m.assignee || "") + " | " + (m.status || "");
@@ -1212,7 +1213,7 @@ function _showMeasureModal(em: PilotMeasure) {
     var projectOpts = (_projects || []).slice().sort(function(a, b) {
         return (a.name || "").localeCompare(b.name || "");
     }).map(function(p) {
-        return { value: p.id, label: p.name || "(sans nom)" };
+        return { value: p.id, label: p.name || t("pilot.common.unnamed") };
     });
 
     ct_measure_modal.open(em, {
@@ -1365,7 +1366,7 @@ window._showNewMeasureForm = function() {
     // TRANSVERSE measure, not a domain measure (spec reconciliation, decision B).
     var projectOpts = (_projects || []).slice().sort(function(a, b) {
         return (a.name || "").localeCompare(b.name || "");
-    }).map(function(p) { return { value: p.id, label: p.name || "(sans nom)" }; });
+    }).map(function(p) { return { value: p.id, label: p.name || t("pilot.common.unnamed") }; });
     if (!projectOpts.length) {
         showStatus(t("pilot.measures.need_project"), true);
         return;
@@ -1719,6 +1720,11 @@ window._addSelectedMeasures = function() {
 // AI ASSISTANT
 // ═══════════════════════════════════════════════════════════════
 
+// The language a model is asked to answer in: the one of the interface.
+function _aiAnswerLanguage(): string {
+    return _locale === "fr" ? "French" : "English";
+}
+
 function _aiCall(systemPrompt: string, userPrompt: string): Promise<any> {
     return _fetch("/ai/complete", {
         method: "POST",
@@ -1764,15 +1770,16 @@ window._aiSuggestMeasures = function(projectId: string) {
     _aiSuggestProjectId = projectId;
     _aiShowLoading(t("pilot.ai.suggested_for", { name: name }), t("pilot.ai.analyzing_project"));
 
-    var system = "Tu es un assistant CISO qui aide a organiser un plan d'action de securite en projets thematiques. " +
-                 "On te donne un projet (nom + description) et une liste d'actions candidates issues de differents modules (Risk, Compliance, Vendor, Asset, Access, Audit). " +
-                 "Selectionne les actions qui correspondent le mieux au projet en te basant sur leur contenu et leur contexte. " +
-                 "Reponds STRICTEMENT en JSON valide, sans texte autour, sans bloc markdown, au format : " +
-                 "{\"measures\": [{\"id\": \"<id action>\", \"reason\": \"<phrase courte expliquant le rattachement>\"}]}. " +
-                 "Choisis entre 3 et 15 actions pertinentes maximum. Si aucune action ne convient, renvoie {\"measures\": []}.";
+    var system = "You are a CISO assistant who helps organise a security action plan into thematic projects. " +
+                 "You are given a project (name + description) and a list of candidate actions coming from several modules (Risk, Compliance, Vendor, Asset, Access, Audit). " +
+                 "Select the actions that fit the project best, going by their content and their context. " +
+                 "Write the reasons in " + _aiAnswerLanguage() + ". " +
+                 "Respond STRICTLY in valid JSON, with no text around it and no markdown block, in this format: " +
+                 "{\"measures\": [{\"id\": \"<action id>\", \"reason\": \"<short sentence explaining the link>\"}]}. " +
+                 "Pick between 3 and 15 relevant actions at most. If no action fits, return {\"measures\": []}.";
 
-    var user = "PROJET\nNom: " + name + "\nDescription: " + (desc || "(non renseignee)") + "\n\n" +
-               "ACTIONS DISPONIBLES (id | module | reference | titre)\n" +
+    var user = "PROJECT\nName: " + name + "\nDescription: " + (desc || "(none)") + "\n\n" +
+               "AVAILABLE ACTIONS (id | module | reference | title)\n" +
                available.map(function(m) {
                    return m.id + " | " + m.module + " | " + m.source_id + " | " + (m.title || "");
                }).join("\n");
@@ -1872,55 +1879,56 @@ window._aiSuggestProjects = function() {
 
     _aiShowLoading(t("pilot.ai.action_plan"), t("pilot.ai.analyzing_orphans", { n: orphans.length }));
 
-    var system = "Tu es un assistant CISO qui aide a structurer un plan d'action en projets thematiques. " +
-                 "On te donne : (1) la liste des PROJETS DEJA EXISTANTS avec leur description ET les actions qu'ils contiennent deja (cela revele le theme reel du projet), (2) la liste des ACTIONS ORPHELINES (actions qui ne sont rattachees a AUCUN projet pour l'instant). " +
-                 "Pour decider du rattachement d'une action orpheline a un projet existant, base-toi PRINCIPALEMENT sur la similarite thematique entre l'action orpheline et les actions deja presentes dans le projet (meme module ? meme entite ? meme type d'action ? meme objectif de securite ?). La description du projet est secondaire — les actions qu'il contient deja sont la verite. " +
-                 "Pour CHAQUE action orpheline, decide :\n" +
-                 "  - SOIT la rattacher a un projet existant qui contient deja des actions du meme theme (privilegie tres fortement cette option) ;\n" +
-                 "  - SOIT proposer un NOUVEAU projet thematique uniquement si AUCUN projet existant n'a d'action du meme theme.\n" +
-                 "REGLES STRICTES :\n" +
-                 "  - Ne propose JAMAIS un nouveau projet dont le theme est deja represente dans un projet existant (meme partiellement). Utilise l'ajout.\n" +
-                 "  - Chaque action orpheline apparait dans au plus une recommandation.\n" +
-                 "  - Justifie chaque rattachement par UNE phrase qui cite explicitement l'action existante du projet qui partage le theme (ex: 'Comme l'action RSK-012 deja presente, cette action traite de la gestion des acces privilegies').\n" +
-                 "  - Si une action orpheline ne s'integre vraiment nulle part, ignore-la (ne la mets dans aucune sortie).\n" +
-                 "  - Maximum 5 nouveaux projets, au moins 2 actions chacun.\n" +
-                 "Reponds STRICTEMENT en JSON valide, sans texte autour, sans bloc markdown, au format :\n" +
+    var system = "You are a CISO assistant who helps structure an action plan into thematic projects. " +
+                 "You are given: (1) the list of EXISTING PROJECTS with their description AND the actions they already hold (which reveals the real theme of the project), (2) the list of ORPHAN ACTIONS (actions attached to NO project so far). " +
+                 "To decide whether an orphan action joins an existing project, rely MAINLY on the thematic similarity between the orphan action and the actions already in the project (same module? same entity? same kind of action? same security objective?). The description of the project comes second — the actions it already holds are the truth. " +
+                 "For EACH orphan action, decide:\n" +
+                 "  - EITHER to attach it to an existing project that already holds actions of the same theme (strongly prefer this option);\n" +
+                 "  - OR to suggest a NEW thematic project, only if NO existing project holds an action of the same theme.\n" +
+                 "STRICT RULES:\n" +
+                 "  - NEVER suggest a new project whose theme is already present in an existing project (even partly). Use the addition.\n" +
+                 "  - Each orphan action appears in at most one recommendation.\n" +
+                 "  - Justify each attachment in ONE sentence that explicitly quotes the existing action of the project sharing the theme (e.g. 'Like action RSK-012 already there, this action deals with privileged access management').\n" +
+                 "  - If an orphan action really fits nowhere, ignore it (put it in no output).\n" +
+                 "  - At most 5 new projects, at least 2 actions each.\n" +
+                 "Write the names, descriptions and reasons in " + _aiAnswerLanguage() + ".\n" +
+                 "Respond STRICTLY in valid JSON, with no text around it and no markdown block, in this format:\n" +
                  "{\n" +
-                 "  \"additions\": [{\"project_id\": \"<id>\", \"measure_ids\": [\"<id1>\"], \"reason\": \"<phrase qui cite une action existante du projet>\"}],\n" +
-                 "  \"new_projects\": [{\"name\": \"<nom court>\", \"description\": \"<2-3 phrases>\", \"priority\": \"low|medium|high|critical\", \"measure_ids\": [\"<id1>\", \"<id2>\"]}]\n" +
+                 "  \"additions\": [{\"project_id\": \"<id>\", \"measure_ids\": [\"<id1>\"], \"reason\": \"<sentence quoting an existing action of the project>\"}],\n" +
+                 "  \"new_projects\": [{\"name\": \"<short name>\", \"description\": \"<2-3 sentences>\", \"priority\": \"low|medium|high|critical\", \"measure_ids\": [\"<id1>\", \"<id2>\"]}]\n" +
                  "}";
 
-    var user = "PROJETS EXISTANTS\n";
+    var user = "EXISTING PROJECTS\n";
     if (_projects.length) {
         _projects.forEach(function(p) {
-            user += "\n--- Projet " + p.id + " ---\n";
-            user += "Nom: " + (p.name || "") + "\n";
-            user += "Description: " + ((p.description || "(pas de description)").replace(/\n/g, " ")) + "\n";
-            user += "Statut: " + (p.status || "?") + " | Priorite: " + (p.priority || "?") + "\n";
+            user += "\n--- Project " + p.id + " ---\n";
+            user += "Name: " + (p.name || "") + "\n";
+            user += "Description: " + ((p.description || "(no description)").replace(/\n/g, " ")) + "\n";
+            user += "Status: " + (p.status || "?") + " | Priority: " + (p.priority || "?") + "\n";
             var pms = p.measures || [];
-            user += "Actions deja rattachees (" + pms.length + ") :\n";
+            user += "Actions already attached (" + pms.length + "):\n";
             if (!pms.length) {
-                user += "  (aucune action pour l'instant — base-toi uniquement sur le nom et la description)\n";
+                user += "  (no action yet — rely on the name and the description only)\n";
             } else {
                 pms.slice(0, 25).forEach(function(m) {
                     user += "  - [" + m.module + "] " + m.source_id + " | " + (m.title || "") +
                             (m.entity_name && m.entity_name !== m.title ? " (" + m.entity_name + ")" : "") + "\n";
                 });
-                if (pms.length > 25) user += "  ... et " + (pms.length - 25) + " autre(s)\n";
+                if (pms.length > 25) user += "  ... and " + (pms.length - 25) + " more\n";
             }
         });
     } else {
-        user += "(aucun projet existant)\n";
+        user += "(no existing project)\n";
     }
 
-    user += "\n\nACTIONS ORPHELINES (id | module | reference | titre | entite | statut)\n" +
+    user += "\n\nORPHAN ACTIONS (id | module | reference | title | entity | status)\n" +
             orphans.map(function(m) {
                 return m.id + " | " + m.module + " | " + m.source_id + " | " + (m.title || "") +
                        " | " + (m.entity_name || "") + " | " + (m.status || "");
             }).join("\n");
 
     if (customInstruction && customInstruction.trim()) {
-        user += "\n\nINSTRUCTION SUPPLEMENTAIRE DE L'UTILISATEUR :\n" + customInstruction.trim();
+        user += "\n\nADDITIONAL INSTRUCTION FROM THE USER:\n" + customInstruction.trim();
     }
 
     _aiCall(system, user).then(function(parsed) {
@@ -2048,7 +2056,7 @@ window._aiApplySuggestedPlan = function() {
     pickedNew.forEach(function(np) {
         chain = chain.then(function() {
             return _fetch("/projects", { method: "POST", body: {
-                name: (np.name || "Projet IA").trim(),
+                name: (np.name || t("pilot.ai.default_project_name")).trim(),
                 description: np.description || "",
                 status: "planned",
                 priority: np.priority || "medium",
@@ -2221,7 +2229,7 @@ function _dirOpenPersonModal(idx: number | null) {
             if (locked || typeof ct_userpicker === "undefined" || !ct_userpicker.mount) return;
             var mgr = _directory.find(function(x: any) { return !!x.email && !!p.manager_email && String(x.email).toLowerCase() === String(p.manager_email).toLowerCase(); });
             var lbl = mgr ? ((mgr.prenom + " " + mgr.nom).trim() || mgr.email || "") : (p.manager_email || "");
-            ct_userpicker.mount({ slotId: "pdm-manager-slot", pickerId: "pdm-manager", value: lbl, placeholder: t("pilot.common.search") || "Rechercher un utilisateur\u2026", directoryUrl: "api/directory", sourceUrl: null });
+            ct_userpicker.mount({ slotId: "pdm-manager-slot", pickerId: "pdm-manager", value: lbl, placeholder: t("pilot.common.search"), directoryUrl: "api/directory", sourceUrl: null });
         }
     }).then(function(result: any) {
         if (!result || result.__deleted) return;
@@ -2334,7 +2342,7 @@ window._dirExportForAccess = function() {
     var a = document.createElement("a");
     var today = new Date().toISOString().slice(0, 10);
     a.href = url;
-    a.download = "annuaire-pilot-pour-access-" + today + ".csv";
+    a.download = "pilot-directory-for-access-" + today + ".csv";
     document.body.appendChild(a);
     a.click();
     setTimeout(function() {
@@ -2893,7 +2901,7 @@ function _renderSettings(c: HTMLElement) {
             + (on ? "background:var(--ct-accent);color:var(--ct-onaccent)" : "background:var(--ct-surface);color:var(--ct-ink)") + '">' + esc(label) + '</button>';
     }
     var langSection = '<div class="ct-bordered ct-r-lg ct-p-4 ct-mb-5">'
-        + '<h3 class="ct-text-data ct-mb-3">' + esc(t("settings.language") || "Langue") + '</h3>'
+        + '<h3 class="ct-text-data ct-mb-3">' + esc(t("settings.language")) + '</h3>'
         + '<div class="ct-flex ct-gap-2">' + _langBtn("fr", "Français") + _langBtn("en", "English") + '</div></div>';
     function wireLang() {
         ["fr", "en"].forEach(function(lang) {

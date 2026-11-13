@@ -136,7 +136,7 @@ function exportPlanningCSV() {
     var blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
     var a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = "planning_audit_" + (D.meta.ref || "export") + ".csv";
+    a.download = "audit_schedule_" + (D.meta.ref || "export") + ".csv";
     a.click();
 }
 window.exportPlanningCSV = exportPlanningCSV;
@@ -164,7 +164,7 @@ function exportPlanningWord() {
     var blob = new Blob([html], { type: "application/msword" });
     var a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = "planning_audit_" + (D.meta.ref || "export") + ".doc";
+    a.download = "audit_schedule_" + (D.meta.ref || "export") + ".doc";
     a.click();
 }
 window.exportPlanningWord = exportPlanningWord;

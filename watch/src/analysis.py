@@ -74,8 +74,16 @@ Les clés JSON restent en anglais (executive_summary…) — seules les valeurs 
 """
 
 
-def _system_prompt(language: str) -> str:
-    return _SYSTEM_PROMPT_FR if (language or "en").lower().startswith("fr") else _SYSTEM_PROMPT_EN
+def _language_code(language: str | None) -> str:
+    """`fr`, `FR`, `fr-FR`, ` fr `: French. Anything else is English."""
+    return "fr" if (language or "").strip().lower().startswith("fr") else "en"
+
+
+_SYSTEM_PROMPTS = {"fr": _SYSTEM_PROMPT_FR, "en": _SYSTEM_PROMPT_EN}
+
+
+def _system_prompt(language: str | None) -> str:
+    return _SYSTEM_PROMPTS[_language_code(language)]
 
 
 def compute_alert_hash(alert: Alert) -> str:
@@ -153,10 +161,7 @@ async def generate_or_get(
     button in the UI and the digest pipeline when an analysis is older
     than the threshold).
     """
-    lang = (language or "en").lower()
-    if not lang.startswith(("en", "fr")):
-        lang = "en"
-    lang = "fr" if lang.startswith("fr") else "en"
+    lang = _language_code(language)
 
     h = compute_alert_hash(alert)
     if not force:

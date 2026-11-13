@@ -40,8 +40,8 @@
             return "";
         if (typeof obj === "string")
             return obj;
-        var l = window._locale || "fr";
-        return obj[l] || obj.fr || obj.en || "";
+        var l = window._locale || "en";
+        return obj[l] || obj.en || obj.fr || "";
     }
     // Cached aggregator response so multiple actions don't re-fetch
     var _aggCache = null;

@@ -429,7 +429,7 @@ async def get_alert_analysis(
     a = await _ensure_alert_visible(db, user, alert_id)
     from src.analysis import compute_alert_hash
     h = compute_alert_hash(a)
-    lang = language or "fr"
+    lang = language or "en"
     # Try the requested language first; fall back to any cached row so
     # an existing EN analysis still shows up if the user toggles locale
     # before regenerating.
@@ -465,10 +465,10 @@ async def analyze_alert(
     # trigger an LLM call. Managed-mode keys live on Pilot.
     if user is not None and (user.ai_enabled or "").lower() != "true":
         raise HTTPException(status_code=403, detail="AI access not granted")
-    # Default to FR (the toolbox default locale). The frontend always
-    # passes the active locale; this fallback only kicks in for API
-    # callers that omit the param.
-    lang = language or "fr"
+    # English when no language is given. The frontend always passes the
+    # active locale; this fallback only kicks in for API callers that omit
+    # the param.
+    lang = language or "en"
     from src.analysis import generate_or_get
     row = await generate_or_get(db, a, user, language=lang)
     await log_action(db, user, request, "alert.analyze",

@@ -4,7 +4,7 @@ In-process asyncio loop (same pattern as Surface/Watch): ticks every
 ASSET_RENEWAL_TICK_SECONDS but only acts once per ASSET_RENEWAL_INTERVAL_HOURS,
 gated by the ``renewal.last_run`` row in app_settings so the cadence survives
 restarts. On each run it scans every asset for deadlines falling within their
-notice window — software licence renewals (licence.date_renouvellement, lead =
+notice window — software license renewals (licence.date_renouvellement, lead =
 licence.preavis_jours) plus hardware fin_support / fin_vie (lead 90 d) — and
 emails a single digest of everything due/overdue.
 
@@ -40,7 +40,7 @@ _KIND_LABEL = {
 # The same deadlines as the generated measures name them: a measure is stored
 # data, written in English like the rest of what the backend generates.
 _MEASURE_DEADLINE = {
-    "licence": "software licence",
+    "licence": "software license",
     "support": "hardware support",
     "vie": "end-of-life",
 }
@@ -193,7 +193,7 @@ async def _ensure_measures(db, due: list[dict], assets) -> int:
         deadline = _MEASURE_DEADLINE.get(e["kind"], e["kind"])
         nom = e["asset_nom"]
         titles = {
-            "licence": f"Renew the licence: {nom}",
+            "licence": f"Renew the license: {nom}",
             "support": f"Prepare for the end of support: {nom}",
             "vie": f"Prepare for the end of life: {nom}",
         }

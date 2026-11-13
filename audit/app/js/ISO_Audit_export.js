@@ -9,10 +9,11 @@ function exportCSV() {
         return;
     var domainMap = {};
     DOMAINS.forEach(function (d) { domainMap[d.id] = _rt(d, "label"); });
-    var rows = [["ID", "Domaine", "Contrôle", "Statut", "Preuves", "Constats", "Critère", "Constat factuel", "Cause", "Action corrective"]];
+    var rows = [["ID", t("audit.timer.domain"), t("audit.dash.nc_control"), t("audit.doc.col_status"), t("audit.csv.col_evidence"), t("audit.field.constats"),
+            t("audit.csv.col_criterion"), t("audit.field.ecart_constat"), t("audit.field.ecart_cause"), t("audit.word.col_action")]];
     CONTROLS.forEach(function (c) {
         var f = readFinding(c.id);
-        var lbl = statusLabel(f.status) || t("audit.status.na_export") || "Non audité";
+        var lbl = statusLabel(f.status) || t("audit.status.na_export");
         rows.push([
             c.id,
             domainMap[c.d] || c.d,
@@ -38,7 +39,7 @@ function exportCSV() {
     a.download = fname;
     a.click();
     URL.revokeObjectURL(a.href);
-    showStatus(t("audit.export.csv_ok") || "CSV exporté");
+    showStatus(t("audit.export.csv_ok"));
 }
 window.exportCSV = exportCSV;
 // ── WORD EXPORT ─────────────────────────────────────────────────────────
@@ -47,7 +48,7 @@ function exportWord() {
     var DOMAINS = window.ISO_AUDIT_DOMAINS || [];
     if (!D || !D.meta)
         return;
-    showStatus(t("audit.export.word_loading") || "Preparing export...");
+    showStatus(t("audit.export.word_loading"));
     // JSZip 3.10.1, vendored under js/vendor/ — same-origin, so the app CSP
     // keeps script-src 'self' with no CDN entry and the export works offline.
     _loadAsset("js/vendor/jszip.min.js", function () {
@@ -81,7 +82,7 @@ function _preloadAllImages(CONTROLS, cb) {
 function _buildWordDoc(CONTROLS, DOMAINS, imageMap) {
     var m = D.meta;
     var findings = D.findings || {};
-    var now = new Date().toLocaleDateString("fr-FR");
+    var now = new Date().toLocaleDateString(_locale === "fr" ? "fr-FR" : "en-GB");
     // ── Counts ──
     var cCnt = 0, ncmajCnt = 0, ncminCnt = 0, psCnt = 0, ppCnt = 0, naCnt = 0, todoCnt = 0;
     CONTROLS.forEach(function (ctrl) {
@@ -168,7 +169,7 @@ function _buildWordDoc(CONTROLS, DOMAINS, imageMap) {
         return s === "c" ? "27AE60" : s === "ncmaj" ? "C0203A" : s === "ncmin" ? "C06000" : s === "ps" ? "6030C0" : s === "pp" ? "3498DB" : "888888";
     }
     function _sLabel(s) {
-        return statusLabel(s) || t("audit.status.na_export") || "N/A";
+        return statusLabel(s) || t("audit.status.na_export");
     }
     // ── Image tracking for OOXML ──
     var _imgRels = []; // { rId, filename, base64 }
@@ -201,56 +202,56 @@ function _buildWordDoc(CONTROLS, DOMAINS, imageMap) {
     }
     // ── START BUILDING BODY ──
     var body = "";
-    // ═══ PAGE DE GARDE ═══
+    // ═══ COVER PAGE ═══
     body += pEmpty(600);
-    body += p("Rapport d'audit ISO 27001", null, { sz: "48", bold: true, color: "2C3E50", align: "center", spacing: { before: 0, after: 40 } });
-    body += p("Système de management de la sécurité de l'information", null, { sz: "24", color: "555555", align: "center", spacing: { before: 0, after: 400 } });
+    body += p(t("audit.word.title"), null, { sz: "48", bold: true, color: "2C3E50", align: "center", spacing: { before: 0, after: 40 } });
+    body += p(t("audit.word.subtitle"), null, { sz: "24", color: "555555", align: "center", spacing: { before: 0, after: 400 } });
     body += hrLine();
     body += pEmpty(200);
     body += p(m.name || "[Client]", null, { sz: "40", bold: true, align: "center", spacing: { before: 0, after: 60 } });
-    body += p("Audit ISO 27001:2022" + (m.hds && m.hds !== "non" ? " + HDS" : ""), null, { sz: "26", color: "2C3E50", align: "center", spacing: { before: 0, after: 400 } });
+    body += p(t("audit.word.audit_of") + (m.hds && m.hds !== "non" ? " + HDS" : ""), null, { sz: "26", color: "2C3E50", align: "center", spacing: { before: 0, after: 400 } });
     body += pEmpty(200);
     body += table([
-        { cells: [{ text: "Référence", bold: true, bg: "F0F0F0", sz: "18" }, { text: m.ref || "", sz: "18" }] },
-        { cells: [{ text: "Date", bold: true, bg: "F0F0F0", sz: "18" }, { text: m.date || now, sz: "18" }] },
-        { cells: [{ text: "Auditeur(s)", bold: true, bg: "F0F0F0", sz: "18" }, { text: m.auditor || "", sz: "18" }] },
-        { cells: [{ text: "Périmètre", bold: true, bg: "F0F0F0", sz: "18" }, { text: m.scope || "À définir", sz: "18" }] }
+        { cells: [{ text: t("audit.word.reference"), bold: true, bg: "F0F0F0", sz: "18" }, { text: m.ref || "", sz: "18" }] },
+        { cells: [{ text: t("audit.meta.date"), bold: true, bg: "F0F0F0", sz: "18" }, { text: m.date || now, sz: "18" }] },
+        { cells: [{ text: t("audit.word.auditors"), bold: true, bg: "F0F0F0", sz: "18" }, { text: m.auditor || "", sz: "18" }] },
+        { cells: [{ text: t("audit.meta.scope"), bold: true, bg: "F0F0F0", sz: "18" }, { text: m.scope || t("audit.word.scope_tbd"), sz: "18" }] }
     ], [2200, 6800]);
     body += pEmpty(400);
-    body += p("Confidentiel — usage interne", null, { sz: "16", color: "999999", align: "center", italic: true });
+    body += p(t("audit.word.confidential"), null, { sz: "16", color: "999999", align: "center", italic: true });
     body += pageBreak();
     // ═══ EXECUTIVE SUMMARY ═══
-    body += heading("Synthèse exécutive", 1);
+    body += heading(t("audit.word.summary"), 1);
     body += hrLine();
     body += pEmpty();
     body += table([
         { cells: [
-                { text: "Indicateur", bold: true, bg: "2C3E50", color: "FFFFFF", sz: "20" },
-                { text: "Valeur", bold: true, bg: "2C3E50", color: "FFFFFF", sz: "20", align: "center" }
+                { text: t("audit.word.indicator"), bold: true, bg: "2C3E50", color: "FFFFFF", sz: "20" },
+                { text: t("audit.word.value"), bold: true, bg: "2C3E50", color: "FFFFFF", sz: "20", align: "center" }
             ] },
         { cells: [
-                { text: "Mesures totales", bg: "F7F7F7", sz: "20" },
+                { text: t("audit.word.controls_total"), bg: "F7F7F7", sz: "20" },
                 { text: String(CONTROLS.length), align: "center", sz: "20", bg: "F7F7F7" }
             ] },
         { cells: [
-                { text: "Mesures auditées", sz: "20" },
+                { text: t("audit.word.controls_audited"), sz: "20" },
                 { text: String(audited), align: "center", bold: true, sz: "20", color: "2C3E50" }
             ] },
         { cells: [
-                { text: "Conformes", bg: "F7F7F7", sz: "20" },
+                { text: t("audit.dash.conformes"), bg: "F7F7F7", sz: "20" },
                 { text: String(cCnt), align: "center", bold: true, sz: "20", color: "2C3E50", bg: "F7F7F7" }
             ] },
         { cells: [
-                { text: "NC majeures", sz: "20" },
+                { text: t("audit.dash.nc_maj"), sz: "20" },
                 { text: String(ncmajCnt), align: "center", bold: true, sz: "20", color: ncmajCnt > 0 ? "C0203A" : "2C3E50" }
             ] },
         { cells: [
-                { text: "NC mineures", bg: "F7F7F7", sz: "20" },
+                { text: t("audit.dash.nc_min"), bg: "F7F7F7", sz: "20" },
                 { text: String(ncminCnt), align: "center", bold: true, sz: "20", color: ncminCnt > 0 ? "C06000" : "2C3E50", bg: "F7F7F7" }
             ] },
         { cells: [
-                { text: "Score de maturité", sz: "20" },
-                { text: scorePct + "% — Niveau " + grade, align: "center", bold: true, sz: "20", color: scorePct >= 80 ? "2C3E50" : scorePct >= 50 ? "C06000" : "C0203A" }
+                { text: t("audit.dash.score"), sz: "20" },
+                { text: scorePct + "% — " + t("audit.dash.grade_level") + " " + grade, align: "center", bold: true, sz: "20", color: scorePct >= 80 ? "2C3E50" : scorePct >= 50 ? "C06000" : "C0203A" }
             ] }
     ], [4500, 4500]);
     body += pEmpty();
@@ -264,10 +265,10 @@ function _buildWordDoc(CONTROLS, DOMAINS, imageMap) {
         body += hrLine();
         body += pEmpty();
         var domRows = [{ cells: [
-                    { text: "Réf.", bold: true, bg: "2C3E50", color: "FFFFFF", sz: "18" },
-                    { text: "Contrôle", bold: true, bg: "2C3E50", color: "FFFFFF", sz: "18" },
-                    { text: "Statut", bold: true, bg: "2C3E50", color: "FFFFFF", sz: "18", align: "center" },
-                    { text: "Constats / Preuves", bold: true, bg: "2C3E50", color: "FFFFFF", sz: "18" }
+                    { text: t("audit.doc.col_ref"), bold: true, bg: "2C3E50", color: "FFFFFF", sz: "18" },
+                    { text: t("audit.dash.nc_control"), bold: true, bg: "2C3E50", color: "FFFFFF", sz: "18" },
+                    { text: t("audit.doc.col_status"), bold: true, bg: "2C3E50", color: "FFFFFF", sz: "18", align: "center" },
+                    { text: t("audit.word.col_findings_evidence"), bold: true, bg: "2C3E50", color: "FFFFFF", sz: "18" }
                 ] }];
         ctrls.forEach(function (ctrl, i) {
             var f = readFinding(ctrl.id);
@@ -275,7 +276,7 @@ function _buildWordDoc(CONTROLS, DOMAINS, imageMap) {
             var notes = (f.constats || "") + (f.preuve ? (f.constats ? " | " : "") + f.preuve : "");
             domRows.push({ cells: [
                     { text: ctrl.id, bold: true, color: _sColor(f.status), bg: bg, sz: "18" },
-                    { text: ctrl.t, bg: bg, sz: "18" },
+                    { text: ctrlT(ctrl), bg: bg, sz: "18" },
                     { text: _sLabel(f.status), align: "center", bold: true, color: _sColor(f.status), bg: bg, sz: "16" },
                     { text: notes || "", bg: bg, sz: "16" }
                 ] });
@@ -288,7 +289,7 @@ function _buildWordDoc(CONTROLS, DOMAINS, imageMap) {
         ctrls.forEach(function (ctrl) {
             if (!ctrl._ctrlImages || ctrl._ctrlImages.length === 0)
                 return;
-            body += heading(ctrl.id + " — Images preuves", 3);
+            body += heading(ctrl.id + " — " + t("audit.word.images"), 3);
             ctrl._ctrlImages.forEach(function (img) {
                 if (img.data) {
                     if (img.name)
@@ -313,16 +314,16 @@ function _buildWordDoc(CONTROLS, DOMAINS, imageMap) {
         return sa - sb;
     });
     if (ncs.length > 0) {
-        body += heading("Non-conformités et écarts", 1);
+        body += heading(t("audit.word.nc_title"), 1);
         body += hrLine();
         body += pEmpty();
         var ncRows = [{ cells: [
                     { text: "#", bold: true, bg: "2C3E50", color: "FFFFFF", sz: "16", align: "center" },
-                    { text: "Réf.", bold: true, bg: "2C3E50", color: "FFFFFF", sz: "16" },
-                    { text: "Type", bold: true, bg: "2C3E50", color: "FFFFFF", sz: "16", align: "center" },
-                    { text: "Contrôle", bold: true, bg: "2C3E50", color: "FFFFFF", sz: "16" },
-                    { text: "Constat", bold: true, bg: "2C3E50", color: "FFFFFF", sz: "16" },
-                    { text: "Action corrective", bold: true, bg: "2C3E50", color: "FFFFFF", sz: "16" }
+                    { text: t("audit.doc.col_ref"), bold: true, bg: "2C3E50", color: "FFFFFF", sz: "16" },
+                    { text: t("audit.planning.col_type"), bold: true, bg: "2C3E50", color: "FFFFFF", sz: "16", align: "center" },
+                    { text: t("audit.dash.nc_control"), bold: true, bg: "2C3E50", color: "FFFFFF", sz: "16" },
+                    { text: t("audit.word.col_finding"), bold: true, bg: "2C3E50", color: "FFFFFF", sz: "16" },
+                    { text: t("audit.word.col_action"), bold: true, bg: "2C3E50", color: "FFFFFF", sz: "16" }
                 ] }];
         ncs.forEach(function (ctrl, i) {
             var f = readFinding(ctrl.id);
@@ -331,7 +332,7 @@ function _buildWordDoc(CONTROLS, DOMAINS, imageMap) {
                     { text: String(i + 1), align: "center", bg: bg, sz: "16" },
                     { text: ctrl.id, bold: true, color: _sColor(f.status), bg: bg, sz: "16" },
                     { text: _sLabel(f.status), align: "center", bold: true, color: _sColor(f.status), bg: bg, sz: "15" },
-                    { text: ctrl.t, bg: bg, sz: "16" },
+                    { text: ctrlT(ctrl), bg: bg, sz: "16" },
                     { text: f.ecart_constat || f.constats || "", bg: bg, sz: "16" },
                     { text: f.ecart_action || "", bg: bg, sz: "16" }
                 ] });
@@ -382,7 +383,7 @@ function _buildWordDoc(CONTROLS, DOMAINS, imageMap) {
             a.download = fname;
             a.click();
             URL.revokeObjectURL(a.href);
-            showStatus(t("audit.export.word_ok") || "Word exporté");
+            showStatus(t("audit.export.word_ok"));
         });
     }
     else {
@@ -392,7 +393,7 @@ function _buildWordDoc(CONTROLS, DOMAINS, imageMap) {
         a.download = fname.replace(".docx", ".xml");
         a.click();
         URL.revokeObjectURL(a.href);
-        showStatus("JSZip non disponible — fichier XML téléchargé");
+        showStatus(t("audit.export.no_zip"));
     }
 }
 // ── DOC REVIEW CSV EXPORT ───────────────────────────────────────────────
@@ -400,8 +401,8 @@ function exportDocReviewCSV() {
     var DOC_REVIEW = window.ISO_AUDIT_DOC_REVIEW || [];
     if (!D || !D.doc_review)
         return;
-    var statusMap = { recu: "Reçu", incomplet: "Incomplet", manquant: "Manquant", na: "N/A" };
-    var rows = [["Ref", "Document", "Statut", "Observations"]];
+    var statusMap = { recu: t("audit.doc.recu"), incomplet: t("audit.doc.incomplet"), manquant: t("audit.doc.manquant"), na: t("audit.doc.na") };
+    var rows = [[t("audit.doc.col_ref"), t("audit.doc.col_doc"), t("audit.doc.col_status"), t("audit.doc.observations")]];
     DOC_REVIEW.forEach(function (d) {
         var entry = D.doc_review[d.ref] || {};
         rows.push([
@@ -417,12 +418,12 @@ function exportDocReviewCSV() {
         }).join(";");
     }).join("\n");
     var blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
-    var fname = (D.meta.ref || "audit") + "_" + (D.meta.name || "revue_doc").replace(/\s/g, "_") + "_revue_doc.csv";
+    var fname = (D.meta.ref || "audit") + "_" + (D.meta.name || "doc_review").replace(/\s/g, "_") + "_doc_review.csv";
     var a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = fname;
     a.click();
     URL.revokeObjectURL(a.href);
-    showStatus(t("audit.export.docreview_ok") || "Revue documentaire exportée");
+    showStatus(t("audit.export.docreview_ok"));
 }
 window.exportDocReviewCSV = exportDocReviewCSV;

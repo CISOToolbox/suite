@@ -43,11 +43,11 @@ one in a sibling key. `<key>_en` beside `<key>` declares `<key>` as the French
 one (the connectors' field labels); `<key>_fr` holds the French beside an
 English `<key>` (the dashboard contract).
 
-Not covered: the digest of Watch, written in French until its language
-becomes a setting (`FRENCH_MAILS`), the findings of the SMB share scanner,
-written by its worker, the prompts given to a model, and a text that reaches
-the screen by a path the sweep does not follow: a variable or a constant it
-does not know by name, a chained or unpacked assignment (`a = b = …`,
+Not covered: the findings of the SMB share scanner, written by its worker,
+the prompts given to a model (`test_english_is_the_default.py` reads them),
+and a text that reaches the screen by a path the sweep does not follow: a
+variable or a constant it does not know by name, a chained or unpacked
+assignment (`a = b = …`,
 `subject, body = …`), an item appended to a list other than `errors` or
 `warnings`, a result of more than two elements, a single word a migration
 writes, the text of a tag's attribute (`title=`, `alt=`), a piece of a page
@@ -86,14 +86,6 @@ PAGE_VARS = ("body", "html")
 
 # Lists a failure is reported in, one sentence per item.
 ERROR_LISTS = ("errors", "warnings")
-
-# The mail bodies still written in French only: Watch's digest. Only these
-# functions need naming: the rest of that digest — its subjects, the cards its
-# body is made of — is French too, held in a variable or built in a function
-# the sweep does not read. A text written into a `body` or an `html` of that
-# digest is read like any other.
-FRENCH_MAILS = {("watch", "_wrap_html"), ("watch", "render_vuln_digest_html"),
-                ("watch", "render_threat_digest_html"), ("watch", "render_html")}
 
 # A tag and its attributes are markup, not text: `font-family:…,sans-serif`.
 _TAG = re.compile(r"<[a-zA-Z][^<>]*=[^<>]*>")
@@ -226,8 +218,7 @@ def _messages(tree: ast.AST, module: str):
                 if isinstance(ret, ast.Return) and ret.value is not None:
                     yield from _strings(ret.value)
         elif (isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-              and node.name.endswith("_html")
-              and (module, node.name) not in FRENCH_MAILS):
+              and node.name.endswith("_html")):
             docstring = _docstring(node)
             for statement in node.body:
                 if statement is not docstring:
@@ -389,10 +380,12 @@ def test_an_email_is_read_subject_and_body():
     assert french('body = "<p>Aucun contenu archivé</p>" if empty else row.body_html') == ["<p>Aucun contenu archivé</p>"]
     # The payload of a request is not a page.
     assert french('body = {"system": "Tu es un analyste sécurité"}') == []
-    # The one mail declared French is not read; the same function elsewhere is.
+    # A mail in two languages keeps them in a dict; written in the function, the French is read.
     digest = 'def render_html(inner):\n    return f"<p>Périmètre</p>{inner}"\n'
-    assert french(digest, "watch") == []
-    assert french(digest, "surface") == ["<p>Périmètre</p>"]
+    assert french(digest, "watch") == ["<p>Périmètre</p>"]
+    paired = ('_L = {"en": {"scope": "Scope"}, "fr": {"scope": "Périmètre"}}\n'
+              'def render_html(inner, L):\n    return f"<p>{L[\'scope\']}</p>{inner}"\n')
+    assert french(paired, "watch") == []
 
 
 def test_a_migration_is_read_sentence_and_sql_value():

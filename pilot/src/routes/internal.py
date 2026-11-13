@@ -167,13 +167,13 @@ async def internal_lookup_prefs(request: Request, db: AsyncSession = Depends(get
     if not emails:
         return {}
     from src.models import NotificationPrefs, User
-    from src.routes.notifications import _dict as _prefs_dict
+    from src.routes.notifications import _lookup_dict
     rows = (await db.execute(
         select(User, NotificationPrefs)
         .outerjoin(NotificationPrefs, NotificationPrefs.user_id == User.id)
         .where(func.lower(User.email).in_(emails))
     )).all()
-    return {u.email.lower(): _prefs_dict(p) for u, p in rows}
+    return {u.email.lower(): _lookup_dict(p) for u, p in rows}
 
 
 @router.post("/notification-test")

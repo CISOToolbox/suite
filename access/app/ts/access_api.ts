@@ -221,14 +221,14 @@ window._appInitCallback = function() {
         var html = ''
             + '<div style="max-width:480px;margin:var(--ct-s12) auto;padding:var(--ct-s8);background:var(--ct-surface);border:1px solid var(--ct-line);border-radius:var(--ct-r-xl);box-shadow:0 4px 12px rgba(0,0,0,0.04);text-align:center">'
             + '<div class="ct-text-page ct-mb-3">&#128274;</div>'
-            + '<h2 style="margin:0 0 var(--ct-s2) 0;color:var(--ct-ink)">Accès refusé</h2>'
+            + '<h2 style="margin:0 0 var(--ct-s2) 0;color:var(--ct-ink)">' + esc(t("denied.title")) + '</h2>'
             + '<p style="color:var(--ct-ink-2);font-size:var(--ct-text-ui);line-height:1.5;margin:var(--ct-s4) 0">'
-            + 'Vous êtes authentifié mais n\'avez pas de rôle attribué sur le module Access.'
-            + '<br>Contactez un administrateur pour obtenir les droits d\'accès.'
+            + esc(t("denied.no_role"))
+            + '<br>' + esc(t("denied.contact_admin"))
             + '</p>'
             + '<button id="ct-logout-btn" '
             + 'style="margin-top:var(--ct-s3);padding:var(--ct-s2) var(--ct-s5);background:var(--ct-info);color:var(--ct-onsolid);border:0;border-radius:var(--ct-r-md);font-size:var(--ct-text-data);cursor:pointer">'
-            + 'Se déconnecter</button>'
+            + esc(t("btn_sign_out")) + '</button>'
             + '</div>';
         document.body.innerHTML = html;
         var btn = document.getElementById("ct-logout-btn");

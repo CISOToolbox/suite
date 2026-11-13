@@ -801,18 +801,19 @@
         var out = document.getElementById("kpi-detail-ai-suggestions");
         if (out) out.innerHTML = '<span class="ct-muted ct-text-data">' + esc(t("pilot.kpi.ai_analyzing")) + '</span>';
         var fwList = FW_ORDER.map(function(f) { return f + " (" + (FW_LABELS[f] || f) + ")"; }).join(", ");
-        var system = "Tu es expert GRC (gouvernance, risque, conformité). On te donne un indicateur de sécurité (KPI). "
-            + "Propose les exigences de référentiels les plus pertinentes à lui associer. "
-            + "Réponds UNIQUEMENT par un tableau JSON d'objets "
-            + '{"framework":"<code>","ref":"<référence exacte>","label":"<intitulé court>"}, sans aucun texte autour. '
-            + "framework doit être l'un de : " + fwList + ". "
-            + "Donne au plus 6 propositions, les plus précises possibles (ex: ISO A.5.31, NIST PR.AT-01).";
+        var system = "You are a GRC (governance, risk, compliance) expert. You are given a security indicator (KPI). "
+            + "Suggest the framework requirements that are most relevant to map to it. "
+            + "Respond ONLY with a JSON array of objects "
+            + '{"framework":"<code>","ref":"<exact reference>","label":"<short title>"}, with no text around it. '
+            + "framework must be one of: " + fwList + ". "
+            + "Write the labels in " + (_locale === "fr" ? "French" : "English") + ". "
+            + "Give at most 6 suggestions, as precise as possible (e.g. ISO A.5.31, NIST PR.AT-01).";
         var existing = (k.mappings || []).map(function(m) { return m.framework + " " + m.ref; }).join("; ");
-        var user = "KPI : " + (k.name_fr || k.code)
-            + "\nCatégorie : " + (k.category_primary || "")
-            + "\nUnité : " + (k.unit || "")
-            + "\nDescription : " + (k.description_fr || "")
-            + "\nDéjà associés (ne pas répéter) : " + (existing || "aucun");
+        var user = "KPI: " + (_kpiName(k) || k.code)
+            + "\nCategory: " + (k.category_primary || "")
+            + "\nUnit: " + (k.unit || "")
+            + "\nDescription: " + _kpiDesc(k)
+            + "\nAlready mapped (do not repeat): " + (existing || "none");
         _fetch("/ai/complete", { method: "POST", body: { system: system, user: user, provider: provider } })
         .then(function(res: any) {
             var arr = _parseJsonArray((res && res.text) || "");

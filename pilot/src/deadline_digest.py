@@ -253,7 +253,7 @@ def render_digest_html(items: list[dict], user_name: str, lang: str,
                        upcoming_days: int, ext_urls: dict[str, str],
                        pilot_url: str) -> str:
     """Self-contained inline-styled HTML. Titles/refs are user data → escaped."""
-    L = _L.get(lang) or _L["fr"]
+    L = _L.get(lang) or _L["en"]
     e = _html.escape
 
     def _section(kind: str, color: str, label: str) -> str:
@@ -348,7 +348,7 @@ async def send_digest_for_user(db: AsyncSession, user: User, prefs: Notification
             await db.rollback()
         return "skipped_empty"
 
-    lang = prefs.lang if prefs.lang in ("fr", "en") else "fr"
+    lang = prefs.lang if prefs.lang in ("fr", "en") else "en"
     html = render_digest_html(items, user.name or user.email, lang,
                               prefs.upcoming_days, ext_urls, pilot_url)
     prefix = (getattr(prefs, "subject_prefix", "") or "[CISO Toolbox]").strip()

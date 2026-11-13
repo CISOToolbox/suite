@@ -64,11 +64,11 @@ var WatchAPI: WatchApiType = (function() {
         getAlertAnalysis: function(id: string) {
             // Pass the active i18n locale so the backend prefers a cached
             // row in the user's language (falls back to any cached row).
-            var lang = (typeof _locale !== "undefined") ? _locale : "fr";
+            var lang = (typeof _locale !== "undefined") ? _locale : "en";
             return _fetch("/alerts/" + encodeURIComponent(id) + "/analysis?language=" + encodeURIComponent(lang));
         },
         analyzeAlert:   function(id: string) {
-            var lang = (typeof _locale !== "undefined") ? _locale : "fr";
+            var lang = (typeof _locale !== "undefined") ? _locale : "en";
             return _fetch("/alerts/" + encodeURIComponent(id) + "/analyze?language=" + encodeURIComponent(lang), { method: "POST", body: {} });
         },
         getAlertSbomImpact: function(id: string) { return _fetch("/alerts/" + encodeURIComponent(id) + "/sbom-impact"); },
