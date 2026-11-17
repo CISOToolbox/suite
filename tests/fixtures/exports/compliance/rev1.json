@@ -1,0 +1,56 @@
+{
+ "meta": {
+  "societe": "MedSecure",
+  "date_evaluation": "2026-11-01",
+  "evaluateur": "",
+  "perimetre": "",
+  "commentaires": "",
+  "schema_rev": 1
+ },
+ "referentiels_actifs": ["iso"],
+ "referentiels": {
+  "iso": [
+   {
+    "ref": "A.8.5",
+    "thematique": "Technological controls",
+    "mesure": "Secure authentication",
+    "applicable": "",
+    "conformite": "",
+    "ecart": "",
+    "mesures_prevues": "",
+    "mesures_ids": ["M-001"],
+    "thematique_en": "",
+    "mesure_en": ""
+   }
+  ]
+ },
+ "mesures": [
+  {
+   "id": "M-001",
+   "description": "Enforce MFA on the cloud console",
+   "details": "",
+   "statut": "termine",
+   "date_cible": "2026-10-31",
+   "responsable": "IT",
+   "recurrence": "annuelle",
+   "dernier_controle": "2026-10-30",
+   "preuves_ids": ["P-001"],
+   "progress_log": [],
+   "auto_key": null
+  }
+ ],
+ "preuves": [
+  {
+   "id": "P-001",
+   "label": "IAM credential report",
+   "url": "",
+   "date_obtention": "2026-10-30",
+   "date_expiration": "2027-10-30",
+   "commentaire": "",
+   "kind": "link",
+   "file_ref": "",
+   "owner": "IT",
+   "tags": []
+  }
+ ]
+}
