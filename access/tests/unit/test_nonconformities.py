@@ -126,6 +126,39 @@ async def test_an_approved_derogation_marks_the_entry_until_it_expires_or_is_dec
 
 
 @pytest.mark.asyncio
+async def test_revoking_keeps_who_approved_and_says_who_revoked(db):
+    """BUG-157 — the approval stays the approver's; the revocation has its own who and when."""
+    from datetime import datetime, timezone
+    for revoke in ("route", "subject"):
+        e = await _entry(db)
+        d = await _endpoint("request_derogation")(DerogationCreate(**_der_body(_key(e))), _req(), user=None, db=db)
+        await _endpoint("decide_derogation")(d["id"], DecisionBody(approve=True), _req(), user=None, db=db)
+        der = await db.get(Derogation, uuid.UUID(d["id"]))
+        approved_at = datetime(2026, 11, 1, 9, 0, tzinfo=timezone.utc)
+        der.decided_by, der.decided_at = "ciso@medsecure.example", approved_at
+        await db.commit()
+        if revoke == "route":
+            from src.nonconformity_common import RevokeBody
+            out = await _endpoint("revoke_derogation")(d["id"], RevokeBody(reason="The account was removed"), _req(), user=None, db=db)
+        else:
+            await revoke_for_subject(db, Derogation, "review_entry", _key(e), "entry decided 'conforme'", actor="reviewer")
+            await db.commit()
+            from src.nonconformity_common import der_to_dict
+            out = der_to_dict(await db.get(Derogation, uuid.UUID(d["id"])))
+        assert out["status"] == "revoked"
+        assert out["decided_by"] == "ciso@medsecure.example", revoke
+        assert out["decided_at"].startswith("2026-11-01"), revoke
+        assert out["revoked_by"] == ("system" if revoke == "route" else "reviewer")
+        assert out["revoked_at"] and out["revoked_at"][:10] == date.today().isoformat()
+        # the revocation is journaled, whichever way it came
+        from sqlalchemy import select
+        from src.models import AuditLog
+        rows = (await db.execute(select(AuditLog).where(AuditLog.action == "derogation.revoked",
+                                                        AuditLog.target == out["reference"]))).scalars().all()
+        assert len(rows) == 1 and rows[0].user_email == out["revoked_by"], revoke
+
+
+@pytest.mark.asyncio
 async def test_a_record_concerns_entries_and_project_measures(db):
     e1, e2 = await _entry(db), await _entry(db)
     n = await _endpoint("declare_nonconformity")(
