@@ -52,6 +52,22 @@ if SERVICE_TOKEN:
 #   3. Merge all activity feeds + derive `upcoming` from MeasureCache.
 # ═══════════════════════════════════════════════════════════════════════
 
+def summarize_unassessable(module_cards: list) -> dict:
+    """Requirements an automated monitoring could not assess (FEAT-73:
+    collection in error, stalled, not collected yet), summed over the modules
+    whose posture says so (`posture.unassessable`)."""
+    out = {"total": 0, "modules": {}}
+    for card in module_cards:
+        try:
+            n = int(((card.get("stats") or {}).get("posture") or {}).get("unassessable") or 0)
+        except (TypeError, ValueError, AttributeError):
+            n = 0
+        if n:
+            out["total"] += n
+            out["modules"][card.get("id", "")] = n
+    return out
+
+
 def summarize_nonconformities(module_cards: list) -> dict:
     """Sum of the modules' `nonconformities` blocks (contract §nonconformities);
     `modules` keeps the per-module derogated count for the tile's detail."""
@@ -440,6 +456,8 @@ async def get_dashboard(user: User = Depends(get_current_user), db: AsyncSession
         # FEAT-45 — under derogation / to qualify, summed over the modules
         # that keep a register (contract §nonconformities).
         "nonconformities": nc_summary,
+        # FEAT-73 — requirements the automated monitoring could not assess.
+        "unassessable": summarize_unassessable(module_cards),
     }
 
     # ── Backup health (FEAT-30 phase 3) ──
