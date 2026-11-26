@@ -6,7 +6,7 @@ import csv
 import io
 import os
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
 from sqlalchemy import select
@@ -113,7 +113,7 @@ async def _sync_to_users(db: AsyncSession, email: str, name: str):
     ))
 
 
-async def _retire_directory_entry(db: AsyncSession, email: str) -> None:
+async def _retire_directory_entry(db: AsyncSession, email: str) -> dict | None:
     """Detach the directory entry of a deleted account from its address.
 
     The entry is kept for history (name, function, manager), marked
@@ -123,17 +123,24 @@ async def _retire_directory_entry(db: AsyncSession, email: str) -> None:
     the former holder's entry over — function, manager and status included.
 
     Entries fed by Access (`sync_source="access"`) are left alone: Access
-    owns them and would push them back on its next sync."""
+    owns them and would push them back on its next sync.
+
+    Returns the change to broadcast once committed (a rename, with
+    `old_email`, to `inactif`), or None: a module that mirrors the directory
+    keeps the person, departed, with what it holds of its own."""
     email = (email or "").strip().lower()
     if not email:
-        return
+        return None
     p = (await db.execute(select(Personnel).where(Personnel.email == email))).scalar_one_or_none()
     if p is None or (p.sync_source or "") == "access":
-        return
+        return None
     suffix = f".deleted-{p.id.hex[:12]}.invalid"
     p.email = email[:255 - len(suffix)] + suffix
+    if (p.statut or "").lower() != "inactif":
+        p.date_depart = date.today().isoformat()       # left today, unless it already said when
     p.statut = "inactif"
     p.updated_at = datetime.now(timezone.utc)
+    return {"action": "upsert", "personnel": _to_dict(p), "old_email": email}
 
 
 def _check_service_token(request: Request) -> None:
@@ -145,6 +152,30 @@ def _check_service_token(request: Request) -> None:
         raise HTTPException(status_code=403, detail="Invalid service token")
 
 
+def _departure(statut: str, value: object) -> str | None:
+    """The departure date to store: YYYY-MM-DD, and only for a person who
+    left (`inactif`); refused when it is not a date."""
+    text = str(value or "").strip()
+    if not text or (statut or "actif").strip().lower() != "inactif":
+        return None
+    try:
+        parsed = date.fromisoformat(text)
+    except ValueError:
+        raise HTTPException(status_code=422, detail=f"date_depart must be a date (YYYY-MM-DD), not {text[:20]}") from None
+    if parsed.isoformat() != text:
+        raise HTTPException(status_code=422, detail=f"date_depart must be a date (YYYY-MM-DD), not {text[:20]}")
+    return text
+
+
+def _csv_departure(statut: str, value: object) -> str | None:
+    """The import keeps going past a line it cannot read: a date that is not
+    one is left out, not a reason to refuse the file."""
+    try:
+        return _departure(statut, value)
+    except HTTPException:
+        return None
+
+
 def _to_dict(p: Personnel) -> dict:
     return {
         "id": str(p.id),
@@ -154,6 +185,7 @@ def _to_dict(p: Personnel) -> dict:
         "fonction": p.fonction or "",
         "departement": p.departement or "",
         "statut": p.statut or "actif",
+        "date_depart": p.date_depart or None,
         "telephone": p.telephone or "",
         "site": p.site or "",
         "manager_email": p.manager_email or "",
@@ -183,6 +215,7 @@ async def create_personnel(body: dict, user: User = Depends(get_current_user), d
         nom=body.get("nom", ""), prenom=body.get("prenom", ""),
         email=email, fonction=body.get("fonction", ""),
         departement=body.get("departement", ""), statut=body.get("statut", "actif"),
+        date_depart=_departure(body.get("statut", "actif"), body.get("date_depart")),
         telephone=body.get("telephone", ""), site=body.get("site", ""),
         manager_email=manager_email,
     )
@@ -213,6 +246,8 @@ async def update_personnel(person_id: uuid.UUID, body: dict, user: User = Depend
             if f in ("email", "manager_email"):
                 val = val.strip().lower()
             setattr(p, f, val)
+    # Sent or not, a person back from inactif keeps no departure date.
+    p.date_depart = _departure(p.statut, body.get("date_depart", p.date_depart))
     p.updated_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(p)
@@ -266,6 +301,7 @@ async def import_csv(file: UploadFile, user: User = Depends(get_current_user), d
         "fonction": "fonction", "role": "fonction", "title": "fonction", "job_title": "fonction",
         "departement": "departement", "department": "departement", "service": "departement",
         "statut": "statut", "status": "statut",
+        "date_depart": "date_depart", "departure_date": "date_depart", "left_on": "date_depart",
         "telephone": "telephone", "phone": "telephone", "tel": "telephone",
         "site": "site", "location": "site", "localisation": "site",
         "manager": "manager_email", "manager_email": "manager_email",
@@ -295,6 +331,7 @@ async def import_csv(file: UploadFile, user: User = Depends(get_current_user), d
             email=email, fonction=mapped.get("fonction", ""),
             departement=mapped.get("departement", ""),
             statut=mapped.get("statut", "actif"),
+            date_depart=_csv_departure(mapped.get("statut", "actif"), mapped.get("date_depart")),
             telephone=mapped.get("telephone", ""),
             site=mapped.get("site", ""),
             manager_email=manager_email,
@@ -311,10 +348,13 @@ async def import_csv(file: UploadFile, user: User = Depends(get_current_user), d
 # ── Internal endpoint for modules (service token) ──────────────
 
 @router.get("/api/internal/directory")
-async def internal_directory(request: Request, db: AsyncSession = Depends(get_db)):
-    """Return personnel directory for other modules. Protected by service token."""
+async def internal_directory(request: Request, include_inactive: bool = False, db: AsyncSession = Depends(get_db)):
+    """Return personnel directory for other modules. Protected by service token.
+    The people who left (`inactif`) only with `include_inactive`: a module that
+    mirrors the directory needs them to see a departure."""
     _check_service_token(request)
-    result = await db.execute(select(Personnel).where(Personnel.statut != "inactif").order_by(Personnel.nom, Personnel.prenom))
+    query = select(Personnel) if include_inactive else select(Personnel).where(Personnel.statut != "inactif")
+    result = await db.execute(query.order_by(Personnel.nom, Personnel.prenom))
     return [_to_dict(p) for p in result.scalars().all()]
 
 
@@ -338,6 +378,7 @@ async def internal_create_personnel(request: Request, body: dict, db: AsyncSessi
         nom=body.get("nom", ""), prenom=body.get("prenom", ""),
         email=email, fonction=body.get("fonction", ""),
         departement=body.get("departement", ""), statut=body.get("statut", "actif"),
+        date_depart=_departure(body.get("statut", "actif"), body.get("date_depart")),
         telephone=body.get("telephone", ""), site=body.get("site", ""),
         manager_email=manager_email,
     )

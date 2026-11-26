@@ -13,7 +13,7 @@ from src.auth import VALID_MODULES, get_current_user, require_admin
 from src.database import get_db
 from src.models import ModuleRegistry, NotificationPrefs, User
 from src.routes.auth import _ensure_directory_entry
-from src.routes.directory import _retire_directory_entry
+from src.routes.directory import _push_personnel_to_modules, _retire_directory_entry
 from src.schemas import UserResponse, UserUpdate
 
 router = APIRouter(prefix="/api/users", tags=["users"])
@@ -145,9 +145,12 @@ async def delete_user(user_id: uuid.UUID, user: User = Depends(get_current_user)
         # Committed before the modules are called: the account is locked out
         # whatever they answer, and however long they take.
         target.deletion_requested_at = datetime.now(timezone.utc)
-        await _retire_directory_entry(db, email)
+        retired = await _retire_directory_entry(db, email)
         await db.execute(delete(NotificationPrefs).where(NotificationPrefs.user_id == target.id))
         await db.commit()
+        if retired:
+            # Not to Access, which keeps its own identities (FEAT-74 lot 3).
+            await _push_personnel_to_modules(db, retired, exclude_module="access")
     report = await _delete_user_in_modules(email, db)
     # A module that did not confirm keeps its row: the account stays, pending,
     # rather than claiming a clean deletion.

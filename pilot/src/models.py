@@ -58,6 +58,7 @@ class Personnel(Base):
     fonction = Column(String(255), nullable=True, default="")
     departement = Column(String(255), nullable=True, default="")
     statut = Column(String(50), nullable=False, default="actif")  # actif, inactif, externe
+    date_depart = Column(String(10), nullable=True)               # YYYY-MM-DD, an inactif's departure
     telephone = Column(String(50), nullable=True, default="")
     site = Column(String(255), nullable=True, default="")
     manager_email = Column(String(255), nullable=True, default="")

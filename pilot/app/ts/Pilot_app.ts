@@ -2138,7 +2138,7 @@ function _doRenderDirectory(c: HTMLElement) {
 // On Delete (edit only) : confirms then DELETE.
 function _dirOpenPersonModal(idx: number | null) {
     var isNew = (idx === null || idx === undefined);
-    var p = isNew ? { nom: "", prenom: "", email: "", fonction: "", departement: "", statut: "actif", telephone: "", site: "", manager_email: "" } : (_directory[idx!] || {});
+    var p = isNew ? { nom: "", prenom: "", email: "", fonction: "", departement: "", statut: "actif", date_depart: "", telephone: "", site: "", manager_email: "" } : (_directory[idx!] || {});
     var title = isNew ? t("pilot.directory.new_person") : ((p.prenom + " " + p.nom).trim() || p.email || t("pilot.directory.person"));
     // Read-only when fed from Access (HR connector). Identities flow
     // Access → Pilot only; editing/deleting here is disabled.
@@ -2161,6 +2161,9 @@ function _dirOpenPersonModal(idx: number | null) {
     body += '</div><div class="ct-form-grid">';
     body +=   _dirModalField("telephone", t("pilot.directory.field_phone"),  p.telephone, "tel", locked);
     body +=   _dirModalField("site",      t("pilot.directory.col_site"),     p.site, "text", locked);
+    body += '</div><div class="ct-form-grid">';
+    // Kept only for a person who left (inactif); the modules read it from here.
+    body +=   _dirModalField("date_depart", t("pilot.directory.field_departure"), p.date_depart, "date", locked);
     body += '</div>';
     if (locked) {
         body += _dirModalUserSelect("manager_email", t("pilot.directory.field_manager"), p.manager_email, p.email, true);
@@ -2201,7 +2204,7 @@ function _dirOpenPersonModal(idx: number | null) {
         id: "save", label: t("pilot.action.save"), primary: true,
         result: function() {
             var data: Record<string, string> = {};
-            ["nom","prenom","email","fonction","departement","statut","telephone","site"].forEach(function(k) {
+            ["nom","prenom","email","fonction","departement","statut","date_depart","telephone","site"].forEach(function(k) {
                 var el = document.getElementById("pdm-" + k) as HTMLInputElement | HTMLSelectElement | null;
                 data[k] = el ? (el.value || "") : "";
             });
