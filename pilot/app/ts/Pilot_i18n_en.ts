@@ -204,6 +204,7 @@ _registerTranslations("en", {
   "pilot.directory.export_access": "Export for Access",
   "pilot.directory.export_access_tooltip": "Export as CSV importable into an Access review",
   "pilot.directory.exported_n": "{n} row(s) exported",
+  "pilot.directory.field_departure": "Departure date (when inactive)",
   "pilot.directory.field_email": "Email *",
   "pilot.directory.field_firstname": "First name *",
   "pilot.directory.field_lastname": "Last name *",
