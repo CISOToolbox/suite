@@ -62,7 +62,7 @@ def _si_user_to_dict(u: SiUser) -> dict:
     return {
         "id": u.id, "nom": u.nom or "", "prenom": u.prenom or "",
         "email": u.email or "", "statut": u.statut or "actif",
-        "type_compte": u.type_compte or "salarie",
+        "type_compte": u.type_compte or "interne",
         "fonction": u.fonction or "",
         "equipe": u.equipe or "",
         "date_fin_contrat": u.date_fin_contrat or "",
@@ -338,18 +338,14 @@ async def _decompose_data(db: AsyncSession, project_id: uuid.UUID, data: dict):
         created_date=meta.get("created", ""),
     ))
 
-    _VALID_STATUTS = {"actif", "ancien", "recrutement"}
-    _VALID_TYPES = {"salarie", "prestataire", "stagiaire", "alternant"}
+    from src.routes.si_users import _CSV_STATUT_MAP, _CSV_TYPE_MAP
     for i, u in enumerate(data.get("si_users") or []):
-        statut = _s(u.get("statut", "actif")).lower()
-        # Tolerate legacy 'employe' value from older exports.
-        if statut == "employe":
+        # The former words (ancien, salarie, prestataire, employe) still read
+        # right: a stale tab or an older export may send them.
+        statut = _CSV_STATUT_MAP.get(_s(u.get("statut", "actif")).lower(), "actif")
+        if _s(u.get("statut", "")).lower() == "employe":
             statut = "actif"
-        if statut not in _VALID_STATUTS:
-            statut = "actif"
-        type_compte = _s(u.get("type_compte", "salarie")).lower()
-        if type_compte not in _VALID_TYPES:
-            type_compte = "salarie"
+        type_compte = _CSV_TYPE_MAP.get(_s(u.get("type_compte", "interne")).lower(), "interne")
         _su = SiUser(
             project_id=project_id, id=u.get("id", ""), sort_order=i,
             nom=_s(u.get("nom", "")), prenom=_s(u.get("prenom", "")),

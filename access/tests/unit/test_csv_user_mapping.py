@@ -28,12 +28,15 @@ class TestCsvColumnMapping:
 
 
 class TestCsvTypeNormalization:
-    def test_salarie_variants(self):
-        assert _CSV_TYPE_MAP["salarié"] == "salarie"
-        assert _CSV_TYPE_MAP["employee"] == "salarie"
+    def test_internal_variants(self):
+        assert _CSV_TYPE_MAP["interne"] == "interne"
+        assert _CSV_TYPE_MAP["salarié"] == "interne"                # the former word still reads
+        assert _CSV_TYPE_MAP["employee"] == "interne"
 
     def test_other_types(self):
-        assert _CSV_TYPE_MAP["contractor"] == "prestataire"
+        assert _CSV_TYPE_MAP["externe"] == "externe"
+        assert _CSV_TYPE_MAP["prestataire"] == "externe"
+        assert _CSV_TYPE_MAP["contractor"] == "externe"
         assert _CSV_TYPE_MAP["intern"] == "stagiaire"
         assert _CSV_TYPE_MAP["apprenti"] == "alternant"
 
@@ -41,5 +44,6 @@ class TestCsvTypeNormalization:
 class TestCsvStatutNormalization:
     def test_statut_variants(self):
         assert _CSV_STATUT_MAP["active"] == "actif"
-        assert _CSV_STATUT_MAP["inactif"] == "ancien"
+        assert _CSV_STATUT_MAP["inactif"] == "inactif"
+        assert _CSV_STATUT_MAP["ancien"] == "inactif"                # the former word still reads
         assert _CSV_STATUT_MAP["onboarding"] == "recrutement"

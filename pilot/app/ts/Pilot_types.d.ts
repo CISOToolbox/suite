@@ -165,7 +165,8 @@ interface PilotPerson {
     email?: string;
     fonction?: string;
     departement?: string;
-    statut?: string;         // actif | inactif | externe
+    statut?: string;         // recrutement | actif | inactif
+    type_contrat?: string;   // interne | externe | alternant | stagiaire
     date_depart?: string | null;  // YYYY-MM-DD, an inactif's departure
     telephone?: string;
     site?: string;

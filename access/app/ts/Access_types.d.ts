@@ -14,14 +14,14 @@ type AccessSiUser = {
     nom: string;
     prenom: string;
     email: string;
-    /** "actif" | "ancien" | "recrutement" (legacy: "employe"). */
+    /** "recrutement" | "actif" | "inactif" (legacy: "employe"). */
     statut: string;
-    /** "salarie" | "prestataire" | "stagiaire" | "alternant". */
+    /** Contract type: "interne" | "externe" | "alternant" | "stagiaire". */
     type_compte?: string;
     fonction: string;
     /** Team / department (free text). */
     equipe?: string;
-    /** Planned contract end date (ISO). Required for non-salarie. */
+    /** Planned contract end date (ISO). Required for every contract but interne. */
     date_fin_contrat?: string;
     /** Email of the user's manager (hierarchy). */
     manager_email?: string;

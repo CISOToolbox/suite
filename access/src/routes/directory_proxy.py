@@ -62,17 +62,14 @@ async def _fetch_pilot_directory() -> list[dict]:
     return []
 
 
-# Access statut (actif/ancien/recrutement) → Pilot statut (actif/inactif).
-_ACCESS_TO_PILOT_STATUT = {"actif": "actif", "ancien": "inactif", "recrutement": "actif"}
-
-
 def siuser_to_pilot_dict(su) -> dict:
     """Map an Access SiUser to Pilot's directory schema."""
     return {
         "email": (su.email or "").strip(),
         "nom": su.nom or "", "prenom": su.prenom or "",
         "fonction": su.fonction or "", "departement": su.equipe or "",
-        "statut": _ACCESS_TO_PILOT_STATUT.get(su.statut or "actif", "actif"),
+        "statut": su.statut or "actif",                  # the same words in Pilot (FEAT-74)
+        "type_contrat": su.type_compte or "interne",
         "manager_email": su.manager_email or "",
     }
 

@@ -11,17 +11,17 @@ from routes.si_users import _validate_contract_end
 
 class TestContractEndValidation:
     """FEAT-15 Lot 1: date_fin_contrat is required for every type_compte
-    except 'salarie'. The helper returns the stripped value or raises 422."""
+    except 'interne'. The helper returns the stripped value or raises 422."""
 
-    def test_salarie_without_date_ok(self):
-        assert _validate_contract_end("salarie", "") == ""
+    def test_interne_without_date_ok(self):
+        assert _validate_contract_end("interne", "") == ""
 
-    def test_salarie_with_date_ok(self):
-        assert _validate_contract_end("salarie", "2026-12-31") == "2026-12-31"
+    def test_interne_with_date_ok(self):
+        assert _validate_contract_end("interne", "2026-12-31") == "2026-12-31"
 
-    def test_prestataire_without_date_rejected(self):
+    def test_externe_without_date_rejected(self):
         with pytest.raises(HTTPException) as exc:
-            _validate_contract_end("prestataire", "")
+            _validate_contract_end("externe", "")
         assert exc.value.status_code == 422
 
     def test_stagiaire_whitespace_only_rejected(self):
@@ -34,4 +34,4 @@ class TestContractEndValidation:
         assert _validate_contract_end("alternant", "2026-09-01") == "2026-09-01"
 
     def test_value_is_stripped(self):
-        assert _validate_contract_end("prestataire", "  2026-06-30  ") == "2026-06-30"
+        assert _validate_contract_end("externe", "  2026-06-30  ") == "2026-06-30"

@@ -1,0 +1,86 @@
+{
+ "meta": {
+  "schema_rev": 1
+ },
+ "metadata": {
+  "organization": "MedSecure",
+  "created": "2026-11-01"
+ },
+ "si_users": [
+  {
+   "id": "USR-001",
+   "nom": "Durand",
+   "prenom": "Alice",
+   "email": "a.durand@medsecure.example",
+   "statut": "actif",
+   "type_compte": "salarie",
+   "fonction": "Biomedical engineer",
+   "equipe": "R&D",
+   "date_fin_contrat": "",
+   "manager_email": "",
+   "politique_validee": true,
+   "politique_date": "2026-01-15",
+   "mfa_active": true,
+   "mfa_date": "2026-01-15",
+   "sensibilisation": false,
+   "sensibilisation_date": "",
+   "nda_signed": false,
+   "nda_date": "",
+   "sync_source": ""
+  },
+  {
+   "id": "USR-002",
+   "nom": "Leroy",
+   "prenom": "Paul",
+   "email": "p.leroy@medsecure.example",
+   "statut": "ancien",
+   "type_compte": "salarie",
+   "fonction": "Quality manager",
+   "equipe": "Quality",
+   "date_fin_contrat": "",
+   "manager_email": "",
+   "politique_validee": true,
+   "politique_date": "2025-03-02",
+   "mfa_active": true,
+   "mfa_date": "2025-03-02",
+   "sensibilisation": true,
+   "sensibilisation_date": "2025-06-10",
+   "nda_signed": false,
+   "nda_date": "",
+   "sync_source": ""
+  },
+  {
+   "id": "USR-003",
+   "nom": "Bernard",
+   "prenom": "Claire",
+   "email": "c.bernard@partner.example",
+   "statut": "recrutement",
+   "type_compte": "prestataire",
+   "fonction": "DevOps engineer",
+   "equipe": "Platform",
+   "date_fin_contrat": "2026-12-31",
+   "manager_email": "a.durand@medsecure.example",
+   "politique_validee": false,
+   "politique_date": "",
+   "mfa_active": false,
+   "mfa_date": "",
+   "sensibilisation": false,
+   "sensibilisation_date": "",
+   "nda_signed": true,
+   "nda_date": "2026-11-02",
+   "sync_source": ""
+  }
+ ],
+ "applications": [
+  {
+   "id": "APP-001",
+   "nom": "GitHub",
+   "type": "application",
+   "reviewers": [],
+   "frequence_revue": "semestrielle",
+   "roles": []
+  }
+ ],
+ "reviews": [],
+ "measures": []
+}
