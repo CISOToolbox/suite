@@ -12,7 +12,24 @@ window.CT_CONFIG = {
 };
 // FEAT-36 — schema versioning (rev 1 = normalized baseline; bump + add a
 // migration + archive a fixture whenever the exported data model changes).
-window.SCHEMA_REV = 1;
+// FEAT-74 — rev 2: a user's status and contract type take the words of Pilot's
+// directory (ancien → inactif, salarie → interne, prestataire → externe).
+// Python twin: schema_migrations._access_1_to_2.
+window.SCHEMA_REV = 2;
+window.SCHEMA_MIGRATIONS = {
+    1: function (data) {
+        var statut = { ancien: "inactif" };
+        var type = { salarie: "interne", prestataire: "externe" };
+        ((data && data.si_users) || []).forEach(function (u) {
+            if (!u)
+                return;
+            if (statut[u.statut])
+                u.statut = statut[u.statut];
+            if (type[u.type_compte])
+                u.type_compte = type[u.type_compte];
+        });
+    },
+};
 var D = JSON.parse(JSON.stringify(ACCESS_INIT_DATA));
 var _panel = "dashboard";
 var _selectedUser = null, _selectedApp = null, _selectedReview = null, _selectedSA = null;
@@ -254,7 +271,7 @@ var _ACCESS_TONES = {
     // measure statuses
     a_faire: "neutral", termine: "low", annule: "critical",
     // warning codes
-    admin: "medium", ancien: "critical", orphan: "critical", externe: "accent",
+    admin: "medium", inactif: "critical", orphan: "critical", externe: "accent",
     nomfa: "high", nosensi: "high", nopol: "high", service: "info",
 };
 function _accessTone(v) {
@@ -596,8 +613,8 @@ window.importUsersCsv = function () {
 // Download a ready-to-fill CSV template for the user referential import.
 window.downloadUsersCsvTemplate = function () {
     var header = "prenom;nom;email;fonction;equipe;type_compte;date_fin_contrat;manager;statut";
-    var example = "Claire;Dubois;claire.dubois@example.com;Quality Manager;Quality;salarie;;;actif\n"
-        + "Marc;Lefevre;marc.lefevre@example.com;DevOps Engineer;Platform;prestataire;2026-12-31;claire.dubois@example.com;actif\n"
+    var example = "Claire;Dubois;claire.dubois@example.com;Quality Manager;Quality;interne;;;actif\n"
+        + "Marc;Lefevre;marc.lefevre@example.com;DevOps Engineer;Platform;externe;2026-12-31;claire.dubois@example.com;actif\n"
         + "Sofia;Nguyen;sofia.nguyen@example.com;SOC Intern;Security;stagiaire;2026-08-31;marc.lefevre@example.com;recrutement";
     var csv = header + "\n" + example + "\n";
     var blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });
@@ -658,7 +675,7 @@ window.openUser = openUser;
 function addUser() {
     D.si_users.push({
         id: _genId("USR-", D.si_users), nom: "", prenom: "", email: "",
-        statut: "actif", type_compte: "salarie", fonction: "",
+        statut: "actif", type_compte: "interne", fonction: "",
         equipe: "", date_fin_contrat: "", manager_email: "",
         politique_validee: false, politique_date: "", politique_justification: "",
         mfa_active: false, mfa_date: "", mfa_justification: "",
@@ -759,18 +776,18 @@ function renderUserDetail() {
     h += _field("email", "Email", "email", u.email, lockedByPilot);
     h += _field("fonction", t("user.fonction"), "text", u.fonction, lockedByPilot);
     h += '</div><div class="ct-form-grid">';
-    h += _sel("statut", t("user.statut_label"), ["actif", "ancien", "recrutement"].map(function (s) { return { v: s, l: _statusLabel(s) }; }), u.statut, lockedByPilot);
-    h += _sel("type_compte", t("user.type_compte_label"), ["salarie", "prestataire", "stagiaire", "alternant"].map(function (s) {
+    h += _sel("statut", t("user.statut_label"), ["recrutement", "actif", "inactif"].map(function (s) { return { v: s, l: _statusLabel(s) }; }), u.statut, lockedByPilot);
+    h += _sel("type_compte", t("user.type_compte_label"), ["interne", "externe", "alternant", "stagiaire"].map(function (s) {
         return { v: s, l: t("user.type_compte." + s) || s };
-    }), u.type_compte || "salarie");
+    }), u.type_compte || "interne", lockedByPilot);
     h += '</div><div class="ct-form-grid">';
     h += _field("equipe", t("user.equipe"), "text", u.equipe);
     // Manager — shared user picker (ct_userpicker), mounted post-render on the
     // slot below. Stores the selected user's email in manager_email.
     h += '<div class="ct-form-row"><label>' + esc(t("user.manager")) + '</label><div id="user-manager-slot"></div></div>';
     h += '</div>';
-    // Contract end date — required/relevant for every type except salarie.
-    if ((u.type_compte || "salarie") !== "salarie") {
+    // Contract end date — required/relevant for every contract but interne.
+    if ((u.type_compte || "interne") !== "interne") {
         h += '<div class="ct-form-grid">';
         h += _field("date_fin_contrat", t("user.date_fin_contrat"), "date", u.date_fin_contrat);
         h += '</div>';
@@ -784,8 +801,8 @@ function renderUserDetail() {
     h += _proofCard("mfa", t("user.mfa_active"), u.mfa_active, u.mfa_date, u.mfa_justification, "mfa_active", "mfa_date", "mfa_justification");
     h += _sensibilisationCard(u);
     h += _proofCard("background_check", t("user.background_check"), u.background_check, u.background_check_date, u.background_check_justification, "background_check", "background_check_date", "background_check_justification");
-    // NDA — mandatory for prestataires, displayed only then to keep the UI tidy.
-    if ((u.type_compte || "salarie") === "prestataire") {
+    // NDA — mandatory for an externe contract, displayed only then to keep the UI tidy.
+    if ((u.type_compte || "interne") === "externe") {
         h += _proofCard("nda", t("user.nda"), u.nda_signed, u.nda_date, u.nda_justification, "nda_signed", "nda_date", "nda_justification");
     }
     h += '</div>';
@@ -1723,10 +1740,10 @@ function _getEntryWarnings(e, su) {
     }
     if (su) {
         var statut = (su.statut || "").toLowerCase();
-        if (statut === "ancien") {
-            warnings.push({ code: "ancien", label: t("warn.former"), title: t("warn.former_title") });
+        if (statut === "inactif") {
+            warnings.push({ code: "inactif", label: t("warn.former"), title: t("warn.former_title") });
         }
-        if (statut === "prestataire") {
+        if ((su.type_compte || "").toLowerCase() === "externe") {
             warnings.push({ code: "externe", label: t("warn.external"), title: t("warn.external_title") });
         }
         if (su.mfa_active === false) {
@@ -1817,7 +1834,7 @@ function renderReviewDetail() {
             suName: su ? (su.prenom + " " + su.nom).trim() : "",
             warnings: warnings,
             isAdmin: warnings.some(function (w) { return w.code === "admin"; }),
-            isCritical: warnings.some(function (w) { return w.code === "ancien" || w.code === "orphan"; }),
+            isCritical: warnings.some(function (w) { return w.code === "inactif" || w.code === "orphan"; }),
             lastLogin: lastLogin,
             daysSince: daysSince // null = never logged or no data
         };

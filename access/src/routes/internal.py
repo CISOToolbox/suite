@@ -230,7 +230,7 @@ async def internal_stats(request: Request, db: AsyncSession = Depends(get_db)):
                 sa_expiring_soon += 1
 
     # FEAT-15 Lot 5: identity-referential counters.
-    users_by_type = {"salarie": 0, "prestataire": 0, "stagiaire": 0, "alternant": 0}
+    users_by_type = {"interne": 0, "externe": 0, "alternant": 0, "stagiaire": 0}
     contracts_expiring = 0          # date_fin_contrat within the next 30 days
     contracts_expired_active = 0    # contract ended but the user is still 'actif'
     _today_iso = _date.today().isoformat()
@@ -350,10 +350,6 @@ async def internal_stats(request: Request, db: AsyncSession = Depends(get_db)):
     }
 
 
-# Access statut → Pilot personnel statut.
-_STATUT_TO_PILOT = {"actif": "actif", "ancien": "inactif", "recrutement": "actif"}
-
-
 @router.get("/internal/referential")
 async def internal_referential(request: Request, db: AsyncSession = Depends(get_db)):
     """Expose the Access user referential to Pilot (FEAT-15 Lot 5).
@@ -375,7 +371,8 @@ async def internal_referential(request: Request, db: AsyncSession = Depends(get_
             "email": email,
             "fonction": su.fonction or "",
             "departement": su.equipe or "",
-            "statut": _STATUT_TO_PILOT.get(su.statut, "actif"),
+            "statut": su.statut or "actif",
+            "type_contrat": su.type_compte or "interne",
             "manager_email": su.manager_email or "",
         }
     return list(by_email.values())
@@ -747,7 +744,7 @@ async def personnel_sync(request: Request, db: AsyncSession = Depends(get_db)):
         }
 
     Matches by (old_email → email). For "delete" actions, marks the
-    statut to 'ancien' instead of removing the row so historical
+    statut to 'inactif' instead of removing the row so historical
     references (reviews, measures) remain intact.
     """
     import logging
@@ -777,8 +774,6 @@ async def personnel_sync(request: Request, db: AsyncSession = Depends(get_db)):
 
     logger = logging.getLogger("access-backend")
 
-    _STATUT_MAP = {"actif": "actif", "inactif": "ancien"}
-
     # Find all SiUsers matching this email (possibly old_email)
     candidates_result = await db.execute(
         select(SiUser).where(func.lower(SiUser.email) == email)
@@ -802,11 +797,12 @@ async def personnel_sync(request: Request, db: AsyncSession = Depends(get_db)):
                 "personnel-sync delete: project=%s si_user_id=%s email=%s",
                 su.project_id, su.id, su.email,
             )
-            su.statut = "ancien"
+            su.statut = "inactif"
             su.sync_source = "pilot"
             touched_projects.add(su.project_id)
     else:
-        pilot_statut = _STATUT_MAP.get((p.get("statut") or "").lower(), "actif")
+        from src.routes.si_users import pilot_status
+        new_statut, new_contrat = pilot_status(p)
         # Cap lengths to the column sizes (see models.py) so a compromised
         # Pilot can't stuff multi-MB strings that would OOM or break DB writes.
         nom_val = str(p.get("nom") or "")[:255]
@@ -830,7 +826,7 @@ async def personnel_sync(request: Request, db: AsyncSession = Depends(get_db)):
             su.prenom = prenom_val or su.prenom
             su.email = email_val or su.email
             su.fonction = fonction_val or su.fonction
-            su.statut = pilot_statut
+            su.statut, su.type_compte = pilot_status(p, (su.statut or "actif", su.type_compte or "interne"))
             su.sync_source = "pilot"
             touched_projects.add(su.project_id)
 
@@ -873,7 +869,7 @@ async def personnel_sync(request: Request, db: AsyncSession = Depends(get_db)):
                     prenom=prenom_val,
                     email=email_val,
                     fonction=fonction_val,
-                    statut=pilot_statut,
+                    statut=new_statut, type_compte=new_contrat,
                     sync_source="pilot",
                 ))
                 touched_projects.add(proj.id)

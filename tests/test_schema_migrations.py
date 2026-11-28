@@ -88,6 +88,18 @@ check("vendor FEAT-54: exposure recomputed (incomplete axis -> null)",
       _v54_exp.get("penetration") is None,
       f"exp={_v54_exp!r}")
 
+# 6. FEAT-74: a rev<=1 Access export's users take the words of Pilot's directory.
+_a74 = json.loads((FIXTURES / "access" / "rev1.json").read_text())
+sm.migrate_blob("access", _a74)
+check("access FEAT-74: ancien -> inactif, salarie -> interne, prestataire -> externe",
+      [(u["statut"], u["type_compte"]) for u in _a74["si_users"]]
+      == [("actif", "interne"), ("inactif", "interne"), ("recrutement", "externe")],
+      f"{[(u['statut'], u['type_compte']) for u in _a74['si_users']]!r}")
+_a74b = {"meta": {"schema_rev": 1}, "si_users": [{"id": "U"}, {"statut": ["x"], "type_compte": None}]}
+sm.migrate_blob("access", _a74b)
+check("access FEAT-74: absent or unexpected values are left as they are",
+      _a74b["si_users"] == [{"id": "U"}, {"statut": ["x"], "type_compte": None}])
+
 print("=" * 60)
 if FAILS:
     print(f"{len(FAILS)} échec(s)"); sys.exit(1)

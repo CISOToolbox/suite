@@ -152,6 +152,32 @@ def _check_service_token(request: Request) -> None:
         raise HTTPException(status_code=403, detail="Invalid service token")
 
 
+STATUTS = ("recrutement", "actif", "inactif")
+CONTRATS = ("interne", "externe", "alternant", "stagiaire")
+
+
+def _status(statut: object, type_contrat: object, current: tuple[str, str] = ("actif", "")) -> tuple[str, str]:
+    """The activity and the contract of a person, checked: two notions (an
+    external contractor can be active). The former `externe` status is read
+    as an active person with an external contract. A contract nobody gave
+    stays empty: the modules then keep the one they know."""
+    s = str(statut or "").strip().lower() or current[0]
+    c = str(type_contrat or "").strip().lower() or current[1]
+    if s == "externe":
+        s, c = "actif", (str(type_contrat or "").strip().lower() or "externe")
+    if s not in STATUTS:
+        raise HTTPException(status_code=422, detail=f"statut must be one of {', '.join(STATUTS)}, not {s[:20]}")
+    if c and c not in CONTRATS:
+        raise HTTPException(status_code=422, detail=f"type_contrat must be one of {', '.join(CONTRATS)}, not {c[:20]}")
+    return s, c
+
+
+# The English words a CSV file may use for a status or a contract.
+_CSV_WORDS = {"active": "actif", "inactive": "inactif", "left": "inactif", "recruiting": "recrutement",
+              "internal": "interne", "employee": "interne", "external": "externe", "contractor": "externe",
+              "apprentice": "alternant", "intern": "stagiaire"}
+
+
 def _departure(statut: str, value: object) -> str | None:
     """The departure date to store: YYYY-MM-DD, and only for a person who
     left (`inactif`); refused when it is not a date."""
@@ -185,6 +211,7 @@ def _to_dict(p: Personnel) -> dict:
         "fonction": p.fonction or "",
         "departement": p.departement or "",
         "statut": p.statut or "actif",
+        "type_contrat": p.type_contrat or "",
         "date_depart": p.date_depart or None,
         "telephone": p.telephone or "",
         "site": p.site or "",
@@ -211,11 +238,12 @@ async def create_personnel(body: dict, user: User = Depends(get_current_user), d
     existing = await db.execute(select(Personnel).where(Personnel.email == email))
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=409, detail="Email already exists in directory")
+    statut, type_contrat = _status(body.get("statut"), body.get("type_contrat"))
     p = Personnel(
         nom=body.get("nom", ""), prenom=body.get("prenom", ""),
         email=email, fonction=body.get("fonction", ""),
-        departement=body.get("departement", ""), statut=body.get("statut", "actif"),
-        date_depart=_departure(body.get("statut", "actif"), body.get("date_depart")),
+        departement=body.get("departement", ""), statut=statut, type_contrat=type_contrat,
+        date_depart=_departure(statut, body.get("date_depart")),
         telephone=body.get("telephone", ""), site=body.get("site", ""),
         manager_email=manager_email,
     )
@@ -238,7 +266,13 @@ async def update_personnel(person_id: uuid.UUID, body: dict, user: User = Depend
     if (p.sync_source or "") == "access":
         raise HTTPException(status_code=403, detail="This person is managed by Access (HR connector): editing is disabled in Pilot.")
     old_email = p.email
-    for f in ("nom", "prenom", "email", "fonction", "departement", "statut", "telephone", "site", "manager_email"):
+    if "statut" in body or "type_contrat" in body:
+        p.statut, p.type_contrat = _status(body.get("statut"), body.get("type_contrat"),
+                                           (p.statut or "actif", p.type_contrat or ""))
+        if "type_contrat" in body and not str(body.get("type_contrat") or "").strip() \
+                and str(body.get("statut") or "").strip().lower() != "externe":
+            p.type_contrat = ""                         # "Not given" chosen: the modules keep their own again
+    for f in ("nom", "prenom", "email", "fonction", "departement", "telephone", "site", "manager_email"):
         if f in body:
             val = str(body[f]) if body[f] is not None else ""
             # Email-like fields are normalized to lowercase so casing
@@ -276,7 +310,7 @@ async def delete_personnel(person_id: uuid.UUID, user: User = Depends(get_curren
 
 @router.post("/api/directory/import-csv")
 async def import_csv(file: UploadFile, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    """Import personnel from CSV. Columns: nom, prenom, email, fonction, departement, statut, telephone, site, manager_email."""
+    """Import personnel from CSV. Columns: nom, prenom, email, fonction, departement, statut, type_contrat, date_depart, telephone, site, manager_email."""
     require_admin(user)
     content = await read_csv_upload(file, 5 * 1024 * 1024)
     for enc in ("utf-8-sig", "utf-8", "latin-1"):
@@ -301,6 +335,7 @@ async def import_csv(file: UploadFile, user: User = Depends(get_current_user), d
         "fonction": "fonction", "role": "fonction", "title": "fonction", "job_title": "fonction",
         "departement": "departement", "department": "departement", "service": "departement",
         "statut": "statut", "status": "statut",
+        "type_contrat": "type_contrat", "contrat": "type_contrat", "contract": "type_contrat", "contract_type": "type_contrat",
         "date_depart": "date_depart", "departure_date": "date_depart", "left_on": "date_depart",
         "telephone": "telephone", "phone": "telephone", "tel": "telephone",
         "site": "site", "location": "site", "localisation": "site",
@@ -309,7 +344,7 @@ async def import_csv(file: UploadFile, user: User = Depends(get_current_user), d
 
     existing_result = await db.execute(select(Personnel.email))
     existing_emails = {row[0].lower() for row in existing_result.all()}
-    imported = 0
+    imported = unreadable = 0
 
     for row in reader:
         mapped = {}
@@ -325,13 +360,19 @@ async def import_csv(file: UploadFile, user: User = Depends(get_current_user), d
         if not email or email in existing_emails:
             continue
         manager_email = (mapped.get("manager_email") or "").strip().lower()
+        try:
+            statut, type_contrat = _status(_CSV_WORDS.get((mapped.get("statut") or "").strip().lower(), mapped.get("statut")),
+                                           _CSV_WORDS.get((mapped.get("type_contrat") or "").strip().lower(), mapped.get("type_contrat")))
+        except HTTPException:
+            unreadable += 1                             # a status it cannot read: the line is left out, and counted
+            continue
 
         db.add(Personnel(
             nom=mapped.get("nom", ""), prenom=mapped.get("prenom", ""),
             email=email, fonction=mapped.get("fonction", ""),
             departement=mapped.get("departement", ""),
-            statut=mapped.get("statut", "actif"),
-            date_depart=_csv_departure(mapped.get("statut", "actif"), mapped.get("date_depart")),
+            statut=statut, type_contrat=type_contrat,
+            date_depart=_csv_departure(statut, mapped.get("date_depart")),
             telephone=mapped.get("telephone", ""),
             site=mapped.get("site", ""),
             manager_email=manager_email,
@@ -342,7 +383,7 @@ async def import_csv(file: UploadFile, user: User = Depends(get_current_user), d
         imported += 1
 
     await db.commit()
-    return {"imported": imported}
+    return {"imported": imported, "unreadable": unreadable}
 
 
 # ── Internal endpoint for modules (service token) ──────────────
@@ -374,11 +415,12 @@ async def internal_create_personnel(request: Request, body: dict, db: AsyncSessi
     existing = await db.execute(select(Personnel).where(Personnel.email == email))
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=409, detail="Email already exists in directory")
+    statut, type_contrat = _status(body.get("statut"), body.get("type_contrat"))
     p = Personnel(
         nom=body.get("nom", ""), prenom=body.get("prenom", ""),
         email=email, fonction=body.get("fonction", ""),
-        departement=body.get("departement", ""), statut=body.get("statut", "actif"),
-        date_depart=_departure(body.get("statut", "actif"), body.get("date_depart")),
+        departement=body.get("departement", ""), statut=statut, type_contrat=type_contrat,
+        date_depart=_departure(statut, body.get("date_depart")),
         telephone=body.get("telephone", ""), site=body.get("site", ""),
         manager_email=manager_email,
     )
@@ -398,7 +440,8 @@ async def internal_directory_from_access(request: Request, body: dict, db: Async
     Access owns these identities (an HR connector feeds it); Pilot mirrors them
     as `sync_source="access"` (read-only in Pilot) and re-broadcasts to the
     OTHER modules — **never back to Access** (one-directional, no loop). Access
-    is expected to send statut already mapped to Pilot's form (actif/inactif).
+    sends the status (recrutement, actif, inactif) and the contract type
+    (interne, externe, alternant, stagiaire) in Pilot's own words.
     """
     _check_service_token(request)
     users = body.get("users") or []
@@ -414,9 +457,13 @@ async def internal_directory_from_access(request: Request, body: dict, db: Async
         fields = {
             "nom": e.get("nom") or "", "prenom": e.get("prenom") or "",
             "fonction": e.get("fonction") or "", "departement": e.get("departement") or "",
-            "statut": e.get("statut") or "actif",
             "manager_email": (e.get("manager_email") or "").strip().lower(),
         }
+        try:
+            fields["statut"], fields["type_contrat"] = _status(e.get("statut"), e.get("type_contrat"))
+        except HTTPException:
+            skipped += 1
+            continue
         p = by_email.get(email)
         if p:
             for k, v in fields.items():

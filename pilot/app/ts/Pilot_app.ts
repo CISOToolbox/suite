@@ -2108,7 +2108,7 @@ function _doRenderDirectory(c: HTMLElement) {
     if (!_directory.length) { h += '<div class="ct-muted ct-p-5 ct-ta-c">' + t("pilot.directory.empty") + '</div>'; c.innerHTML = h; return; }
 
     h += '<table class="ct-table"><thead><tr>';
-    h += '<th>' + t("pilot.directory.col_lastname") + '</th><th>' + t("pilot.directory.col_firstname") + '</th><th>' + t("pilot.directory.col_email") + '</th><th>' + t("pilot.directory.col_function") + '</th><th>' + t("pilot.directory.col_department") + '</th><th>' + t("pilot.col.status") + '</th><th>' + t("pilot.directory.col_site") + '</th>';
+    h += '<th>' + t("pilot.directory.col_lastname") + '</th><th>' + t("pilot.directory.col_firstname") + '</th><th>' + t("pilot.directory.col_email") + '</th><th>' + t("pilot.directory.col_function") + '</th><th>' + t("pilot.directory.col_department") + '</th><th>' + t("pilot.col.status") + '</th><th>' + t("pilot.directory.col_contract") + '</th><th>' + t("pilot.directory.col_site") + '</th>';
     h += '</tr></thead><tbody>';
     _directory.forEach(function(p, i) {
         var cls = p.statut === "inactif" ? ' style="opacity:0.5"' : '';
@@ -2122,6 +2122,7 @@ function _doRenderDirectory(c: HTMLElement) {
         h += '<td class="ct-text-meta">' + esc(p.fonction) + '</td>';
         h += '<td class="ct-text-meta">' + esc(p.departement) + '</td>';
         h += '<td><span class="ct-badge" data-tone="' + _pilotTone(p.statut) + '">' + esc(t("pilot.directory.status." + p.statut)) + '</span></td>';
+        h += '<td class="ct-text-meta">' + (p.type_contrat ? esc(t("pilot.directory.contract." + p.type_contrat)) : "—") + '</td>';
         h += '<td class="ct-text-meta">' + esc(p.site) + '</td>';
         h += '</tr>';
     });
@@ -2138,7 +2139,7 @@ function _doRenderDirectory(c: HTMLElement) {
 // On Delete (edit only) : confirms then DELETE.
 function _dirOpenPersonModal(idx: number | null) {
     var isNew = (idx === null || idx === undefined);
-    var p = isNew ? { nom: "", prenom: "", email: "", fonction: "", departement: "", statut: "actif", date_depart: "", telephone: "", site: "", manager_email: "" } : (_directory[idx!] || {});
+    var p = isNew ? { nom: "", prenom: "", email: "", fonction: "", departement: "", statut: "actif", type_contrat: "", date_depart: "", telephone: "", site: "", manager_email: "" } : (_directory[idx!] || {});
     var title = isNew ? t("pilot.directory.new_person") : ((p.prenom + " " + p.nom).trim() || p.email || t("pilot.directory.person"));
     // Read-only when fed from Access (HR connector). Identities flow
     // Access → Pilot only; editing/deleting here is disabled.
@@ -2157,12 +2158,14 @@ function _dirOpenPersonModal(idx: number | null) {
     body +=   _dirModalField("fonction",  t("pilot.directory.col_function"),    p.fonction, "text", locked);
     body += '</div><div class="ct-form-grid">';
     body +=   _dirModalField("departement", t("pilot.directory.col_department"), p.departement, "text", locked);
-    body +=   _dirModalSelect("statut",  t("pilot.col.status"),      ["actif", "inactif", "externe"], p.statut || "actif", locked, function(o) { return t("pilot.directory.status." + o); });
+    body +=   _dirModalSelect("statut",  t("pilot.col.status"),      ["recrutement", "actif", "inactif"], p.statut || "actif", locked, function(o) { return t("pilot.directory.status." + o); });
     body += '</div><div class="ct-form-grid">';
     body +=   _dirModalField("telephone", t("pilot.directory.field_phone"),  p.telephone, "tel", locked);
     body +=   _dirModalField("site",      t("pilot.directory.col_site"),     p.site, "text", locked);
     body += '</div><div class="ct-form-grid">';
     // Kept only for a person who left (inactif); the modules read it from here.
+    // "" = not said here yet: the modules keep the contract they know.
+    body +=   _dirModalSelect("type_contrat", t("pilot.directory.col_contract"), ["", "interne", "externe", "alternant", "stagiaire"], p.type_contrat || "", locked, function(o) { return o ? t("pilot.directory.contract." + o) : t("pilot.directory.contract.none"); });
     body +=   _dirModalField("date_depart", t("pilot.directory.field_departure"), p.date_depart, "date", locked);
     body += '</div>';
     if (locked) {
@@ -2204,7 +2207,7 @@ function _dirOpenPersonModal(idx: number | null) {
         id: "save", label: t("pilot.action.save"), primary: true,
         result: function() {
             var data: Record<string, string> = {};
-            ["nom","prenom","email","fonction","departement","statut","date_depart","telephone","site"].forEach(function(k) {
+            ["nom","prenom","email","fonction","departement","statut","type_contrat","date_depart","telephone","site"].forEach(function(k) {
                 var el = document.getElementById("pdm-" + k) as HTMLInputElement | HTMLSelectElement | null;
                 data[k] = el ? (el.value || "") : "";
             });
@@ -2296,7 +2299,8 @@ window._dirImportCsv = function() {
         fetch(BASE + "/directory/import-csv", { method: "POST", body: fd, credentials: "same-origin" })
             .then(function(r) { return r.json(); })
             .then(function(result) {
-                showStatus(t("pilot.directory.imported_n", { n: result.imported }));
+                showStatus(t("pilot.directory.imported_n", { n: result.imported })
+                    + (result.unreadable ? " — " + t("pilot.directory.import_unreadable", { n: result.unreadable }) : ""));
                 _renderPanel();
             }).catch(function(e) { showStatus(e.message, true); });
     };

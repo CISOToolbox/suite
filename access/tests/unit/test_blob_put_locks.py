@@ -44,7 +44,7 @@ def _review(rid, status, entries, **kw):
 
 def _si_user(uid, sync_source=""):
     return {"id": uid, "nom": "Martin", "prenom": "Paul", "email": "paul.martin@medsecure.example",
-            "statut": "actif", "type_compte": "salarie", "fonction": "Biomedical engineer",
+            "statut": "actif", "type_compte": "interne", "fonction": "Biomedical engineer",
             "equipe": "R&D", "sync_source": sync_source}
 
 
@@ -238,7 +238,7 @@ def test_open_review_carries_no_closer(put):
 
 @pytest.mark.parametrize("field,value", [
     ("nom", "Intrus"), ("prenom", "Eve"), ("email", "eve@evil.example"),
-    ("fonction", "Admin"), ("statut", "ancien"), ("sync_source", ""),
+    ("fonction", "Admin"), ("statut", "inactif"), ("type_compte", "externe"), ("sync_source", ""),
 ])
 def test_pilot_identity_is_kept(put, field, value):
     data = _blob()

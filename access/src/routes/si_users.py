@@ -29,9 +29,9 @@ router = APIRouter(prefix="/api/projects/{project_id}", tags=["si_users"])
 
 # Identity fields of a Pilot-managed SiUser (sync_source == "pilot"): owned by
 # the central directory, never edited from Access — neither here nor through
-# the project blob PUT. `statut` is included because Pilot maps it from its
-# own actif/inactif state.
-PILOT_LOCKED_FIELDS = ("nom", "prenom", "email", "fonction", "statut")
+# the project blob PUT. `statut` and `type_compte` are Pilot's status and
+# contract type, sent as they are (FEAT-74).
+PILOT_LOCKED_FIELDS = ("nom", "prenom", "email", "fonction", "statut", "type_compte")
 
 
 def _validate_url_field(value: str, field_name: str, max_len: int = 500) -> str:
@@ -66,8 +66,22 @@ async def list_si_users(project_id: uuid.UUID, user: Optional[User] = Depends(ge
     return [_to_dict(u) for u in result.scalars().all()]
 
 
-_VALID_STATUTS = {"actif", "ancien", "recrutement"}
-_VALID_TYPES = {"salarie", "prestataire", "stagiaire", "alternant"}
+# FEAT-74: two notions, as in Pilot's directory — the activity and the contract.
+_VALID_STATUTS = {"recrutement", "actif", "inactif"}
+_VALID_TYPES = {"interne", "externe", "alternant", "stagiaire"}
+
+
+def pilot_status(person: dict, current: tuple[str, str] = ("actif", "interne")) -> tuple[str, str]:
+    """The status and contract type of a person sent by Pilot, in Access's
+    columns: the same words on both sides. A value Access does not know
+    keeps the current one (a Pilot not yet updated may still send the former
+    `externe` status: an active external contract)."""
+    statut = str(person.get("statut") or "").strip().lower()
+    contrat = str(person.get("type_contrat") or "").strip().lower()
+    if statut == "externe":
+        statut, contrat = "actif", contrat or "externe"
+    return (statut if statut in _VALID_STATUTS else current[0],
+            contrat if contrat in _VALID_TYPES else current[1])
 
 
 def _validate_statut(v: str) -> str:
@@ -78,19 +92,19 @@ def _validate_statut(v: str) -> str:
 
 
 def _validate_type_compte(v: str) -> str:
-    v = (v or "salarie").strip().lower()
+    v = (v or "interne").strip().lower()
     if v not in _VALID_TYPES:
         raise HTTPException(status_code=422, detail=f"Invalid type_compte: {v}")
     return v
 
 
 def _validate_contract_end(type_compte: str, date_fin_contrat: str) -> str:
-    """FEAT-15: date_fin_contrat is required for every type except 'salarie'."""
+    """FEAT-15: date_fin_contrat is required for every type except 'interne'."""
     v = (date_fin_contrat or "").strip()
-    if type_compte != "salarie" and not v:
+    if type_compte != "interne" and not v:
         raise HTTPException(
             status_code=422,
-            detail="A contract end date is required for non-employees",
+            detail="A contract end date is required for every contract but an internal one",
         )
     return v
 
@@ -99,7 +113,7 @@ def _validate_contract_end(type_compte: str, date_fin_contrat: str) -> str:
 async def create_si_user(project_id: uuid.UUID, body: dict, user: Optional[User] = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     project = await get_project_or_404(project_id, user, db, require_perm="edit")
     max_order = await db.scalar(select(func.coalesce(func.max(SiUser.sort_order), 0)).where(SiUser.project_id == project_id))
-    tc = _validate_type_compte(body.get("type_compte", "salarie"))
+    tc = _validate_type_compte(body.get("type_compte", "interne"))
     su = SiUser(
         project_id=project_id, id=body.get("id", ""), sort_order=(max_order or 0) + 1,
         nom=body.get("nom", ""), prenom=body.get("prenom", ""),
@@ -185,14 +199,14 @@ async def patch_si_user(project_id: uuid.UUID, si_user_id: str, body: dict, user
             setattr(su, f, bool(body[f]))
     if "date_fin_contrat" in body:
         su.date_fin_contrat = str(body["date_fin_contrat"] or "")
-    # FEAT-15: contract end date required for non-salarie. Enforce only when the
+    # FEAT-15: contract end date required for every contract but interne. Enforce only when the
     # patch touches the type or the date, so unrelated patches (e.g. proof
     # toggles) on legacy rows missing the date are not blocked.
     if ("date_fin_contrat" in body or "type_compte" in body) \
-            and su.type_compte != "salarie" and not (su.date_fin_contrat or "").strip():
+            and su.type_compte != "interne" and not (su.date_fin_contrat or "").strip():
         raise HTTPException(
             status_code=422,
-            detail="A contract end date is required for non-employees",
+            detail="A contract end date is required for every contract but an internal one",
         )
     if "sort_order" in body:
         su.sort_order = int(body["sort_order"])
@@ -232,14 +246,15 @@ _CSV_COL_MAP = {
     "prénom": "prenom", "équipe": "equipe",
 }
 _CSV_TYPE_MAP = {
-    "salarie": "salarie", "salarié": "salarie", "employe": "salarie", "employee": "salarie",
-    "prestataire": "prestataire", "contractor": "prestataire", "externe": "prestataire", "external": "prestataire",
+    "interne": "interne", "internal": "interne",
+    "salarie": "interne", "salarié": "interne", "employe": "interne", "employee": "interne",
+    "externe": "externe", "external": "externe", "prestataire": "externe", "contractor": "externe",
     "stagiaire": "stagiaire", "intern": "stagiaire",
     "alternant": "alternant", "apprenti": "alternant", "apprentice": "alternant",
 }
 _CSV_STATUT_MAP = {
     "actif": "actif", "active": "actif",
-    "ancien": "ancien", "former": "ancien", "inactif": "ancien", "inactive": "ancien",
+    "inactif": "inactif", "inactive": "inactif", "ancien": "inactif", "former": "inactif",
     "recrutement": "recrutement", "recruiting": "recrutement", "onboarding": "recrutement",
 }
 
@@ -323,7 +338,7 @@ async def import_si_users_csv(project_id: uuid.UUID, file: UploadFile, user: Opt
                 fonction=mapped.get("fonction", ""), equipe=mapped.get("equipe", ""),
                 manager_email=mapped.get("manager_email", ""),
                 date_fin_contrat=mapped.get("date_fin_contrat", ""),
-                type_compte=_CSV_TYPE_MAP.get((mapped.get("type_compte") or "").lower(), "salarie"),
+                type_compte=_CSV_TYPE_MAP.get((mapped.get("type_compte") or "").lower(), "interne"),
                 statut=_CSV_STATUT_MAP.get((mapped.get("statut") or "").lower(), "actif"),
             ))
             by_email[key] = True  # guard against duplicate emails within the same file
@@ -344,8 +359,8 @@ async def sync_si_users_from_pilot(
 
     - Matches by email (case-insensitive). Updates nom/prenom/fonction
       if the row already exists, never overwrites compliance flags.
-    - Creates missing entries with statut='actif'. Pilot's own statut
-      ('actif'/'inactif') is mapped to 'actif'/'ancien'.
+    - Creates missing entries. Pilot's status and contract type are taken
+      as they are (the same words on both sides, see pilot_status).
     - Does nothing when PILOT_URL / SERVICE_TOKEN aren't configured
       (standalone mode).
     """
@@ -391,9 +406,6 @@ async def sync_si_users_from_pilot(
         select(func.coalesce(func.max(SiUser.sort_order), 0)).where(SiUser.project_id == project_id)
     ) or 0
 
-    # Migration 008 renamed 'employe' → 'actif' to match Pilot's vocabulary.
-    _STATUT_MAP = {"actif": "actif", "inactif": "ancien"}
-
     created = 0
     updated = 0
     skipped = 0
@@ -413,9 +425,9 @@ async def sync_si_users_from_pilot(
                 su.prenom = p["prenom"]; changed = True
             if p.get("fonction") and su.fonction != p["fonction"]:
                 su.fonction = p["fonction"]; changed = True
-            pilot_statut = _STATUT_MAP.get((p.get("statut") or "").lower())
-            if pilot_statut and su.statut != pilot_statut:
-                su.statut = pilot_statut; changed = True
+            statut, contrat = pilot_status(p, (su.statut, su.type_compte))
+            if (su.statut, su.type_compte) != (statut, contrat):
+                su.statut, su.type_compte = statut, contrat; changed = True
             if su.sync_source != "pilot":
                 su.sync_source = "pilot"; changed = True
             if changed:
@@ -424,7 +436,7 @@ async def sync_si_users_from_pilot(
         else:
             max_num += 1
             max_order += 1
-            pilot_statut = _STATUT_MAP.get((p.get("statut") or "").lower(), "actif")
+            statut, contrat = pilot_status(p)
             db.add(SiUser(
                 project_id=project_id,
                 id=f"USR-{max_num:03d}",
@@ -433,7 +445,7 @@ async def sync_si_users_from_pilot(
                 nom=p.get("nom") or "",
                 email=email,
                 fonction=p.get("fonction") or "",
-                statut=pilot_statut,
+                statut=statut, type_compte=contrat,
                 sync_source="pilot",
             ))
             created += 1
@@ -550,7 +562,7 @@ async def sync_si_users_from_hr(project_id: uuid.UUID, user: Optional[User] = De
                     fonction=ident.get("fonction", ""), equipe=ident.get("equipe", ""),
                     manager_email=ident.get("manager_email", ""),
                     date_fin_contrat=ident.get("date_fin_contrat", ""),
-                    type_compte=tc or "salarie", statut=st or "actif", sync_source="hr_generic",
+                    type_compte=tc or "interne", statut=st or "actif", sync_source="hr_generic",
                 )
                 db.add(nu)
                 by_email[key] = nu
@@ -587,7 +599,7 @@ async def sync_si_users_from_hr(project_id: uuid.UUID, user: Optional[User] = De
 def _to_dict(u: SiUser) -> dict:
     return {
         "id": u.id, "nom": u.nom, "prenom": u.prenom, "email": u.email,
-        "statut": u.statut, "type_compte": u.type_compte or "salarie", "fonction": u.fonction,
+        "statut": u.statut, "type_compte": u.type_compte or "interne", "fonction": u.fonction,
         "equipe": u.equipe or "", "date_fin_contrat": u.date_fin_contrat or "",
         "manager_email": u.manager_email or "",
         "politique_validee": u.politique_validee,

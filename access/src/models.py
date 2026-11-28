@@ -84,18 +84,19 @@ class SiUser(Base):
     nom = Column(String(255), nullable=False, default="")
     prenom = Column(String(255), nullable=False, default="")
     email = Column(String(255), nullable=False, default="")
-    # statut ∈ {'actif', 'ancien', 'recrutement'} — CHECK-constrained
-    # in migration 008. Pilot's 'actif/inactif' maps via _STATUT_MAP.
+    # statut ∈ {'recrutement', 'actif', 'inactif'} — CHECK-constrained
+    # (migration 024), the same words as Pilot's directory (FEAT-74).
     statut = Column(String(50), nullable=False, default="actif")
-    # type_compte ∈ {'salarie','prestataire','stagiaire','alternant'}
-    # (CHECK-constrained). Drives whether NDA proof is required.
-    type_compte = Column(String(50), nullable=False, default="salarie")
+    # type_compte ∈ {'interne','externe','alternant','stagiaire'} — the
+    # contract type, Pilot's `type_contrat` (CHECK-constrained). Drives whether
+    # the NDA proof is required (externe).
+    type_compte = Column(String(50), nullable=False, default="interne")
     fonction = Column(String(255), nullable=True, default="")
 
     # Team/department (free text, all user types).
     equipe = Column(String(255), nullable=False, default="", server_default="")
     # Planned contract end date (ISO string). Required for every type
-    # except 'salarie' — enforced at the HTTP layer, see routes/si_users.py.
+    # except 'interne' — enforced at the HTTP layer, see routes/si_users.py.
     date_fin_contrat = Column(String(20), nullable=False, default="", server_default="")
     # Hierarchy: email of the user's manager. Used to authorize who may edit
     # this user's requested entitlements (manager chain), see FEAT-15.
@@ -126,7 +127,7 @@ class SiUser(Base):
     # Legacy URL field — kept for backwards compatibility with existing
     # rows. New UI writes to background_check_justification instead.
     background_check_url = Column(String(500), nullable=True, default="")
-    # NDA (mandatory for prestataires, optional for other user types).
+    # NDA (mandatory for an externe contract, optional for the others).
     nda_signed = Column(Boolean, nullable=False, default=False)
     nda_date = Column(String(20), nullable=False, default="")
     nda_justification = Column(Text, nullable=False, default="")

@@ -57,7 +57,10 @@ class Personnel(Base):
     email = Column(String(255), unique=True, nullable=False)
     fonction = Column(String(255), nullable=True, default="")
     departement = Column(String(255), nullable=True, default="")
-    statut = Column(String(50), nullable=False, default="actif")  # actif, inactif, externe
+    statut = Column(String(50), nullable=False, default="actif")  # recrutement | actif | inactif
+    # interne | externe | alternant | stagiaire — distinct from the status
+    # (FEAT-74); "" while nobody has said it in Pilot: a module then keeps its own.
+    type_contrat = Column(String(20), nullable=False, default="", server_default=text("''"))
     date_depart = Column(String(10), nullable=True)               # YYYY-MM-DD, an inactif's departure
     telephone = Column(String(50), nullable=True, default="")
     site = Column(String(255), nullable=True, default="")
